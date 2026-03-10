@@ -1,0 +1,32 @@
+{
+  "plugins": [
+    "stylelint-order",
+    "@stylistic/stylelint-plugin"
+  ],
+  "extends": "stylelint-config-standard",
+  "ignoreFiles": ["src/css/*.min.css"],
+  "rules": {
+    "declaration-block-no-duplicate-properties": true,
+    "property-no-unknown": [
+      true, {
+        "ignoreProperties": ["inset-block-end", "inset-block-start"]
+      }
+    ],
+    "comment-empty-line-before": null,
+    "no-descending-specificity": null,
+    "rule-empty-line-before": null,
+    "value-keyword-case": null,
+    "selector-class-pattern": null,
+    "custom-property-pattern": null,
+    "keyframes-name-pattern": null,
+    "selector-id-pattern": null,
+    "alpha-value-notation": "number",
+    "color-function-notation": "modern",
+    "declaration-block-no-shorthand-property-overrides": null,
+    "declaration-block-no-duplicate-custom-properties": null,
+    "@stylistic/indentation": 2,
+    "@stylistic/max-empty-lines": 2,
+    "@stylistic/color-hex-case": "lower",
+    "@stylistic/number-leading-zero": "always"
+  }
+}

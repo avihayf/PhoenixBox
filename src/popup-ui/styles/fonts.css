@@ -1,0 +1,42 @@
+/* PhoenixBox Brand Fonts */
+
+/* Audiowide - retro-futuristic, bold brand font (local file for extension CSP) */
+@font-face {
+  font-family: "Audiowide";
+  src: url("../../fonts/Audiowide-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Fascinate - decorative display font */
+@font-face {
+  font-family: "Fascinate";
+  src: url("../../fonts/Fascinate-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Main Brand Logo Font */
+.brand-main-title {
+  font-family: "Fascinate", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+
+/* General Brand Headers */
+.brand-title {
+  font-family: Audiowide, sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-size: 20px;
+}
+
+/* Utility class (matches Google Fonts snippet) */
+.audiowide-regular {
+  font-family: "Audiowide", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+}

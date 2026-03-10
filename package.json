@@ -1,0 +1,73 @@
+{
+  "name": "phoenix-box",
+  "title": "Phoenix Box",
+  "description": "Phoenix Box is a powerful multi-container extension specifically designed for security testing and penetration testing workflows with seamless Burp Suite integration.",
+  "version": "1.0.0",
+  "author": "0xR3dB0mb",
+  "bugs": {
+    "url": "https://github.com/avihaife-cmyk/PhoenixBox/issues"
+  },
+  "dependencies": {
+    "@radix-ui/react-switch": "1.1.3",
+    "clsx": "2.1.1",
+    "lucide-react": "0.487.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "tailwind-merge": "3.2.0",
+    "tw-animate-css": "1.3.8"
+  },
+  "devDependencies": {
+    "@eslint/js": "^8.57.0",
+    "@stylistic/stylelint-plugin": "^4.0.0",
+    "@tailwindcss/vite": "^4.1.0",
+    "@types/firefox-webext-browser": "^120.0.4",
+    "@types/node": "^22.10.7",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "addons-linter": "^9.5.0",
+    "chai": "^4.2.0",
+    "eslint": "^8.57.1",
+    "eslint-plugin-no-unsanitized": "^4.1.4",
+    "eslint-plugin-promise": "^7.2.1",
+    "globals": "^16.4.0",
+    "html-validate": "^9.1.0",
+    "mocha": "^10.1.0",
+    "npm-run-all": "^4.0.0",
+    "sinon": "^8.1.1",
+    "sinon-chai": "^3.3.0",
+    "stylelint": "^16.18.0",
+    "stylelint-config-standard": "^36.0.0",
+    "stylelint-order": "^6.0.4",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.6.3",
+    "vite": "^6.3.0",
+    "web-ext": "^8.10.0"
+  },
+  "homepage": "https://github.com/avihaife-cmyk/PhoenixBox#readme",
+  "license": "MPL-2.0",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avihaife-cmyk/PhoenixBox.git"
+  },
+  "overrides": {
+    "braces": "^3.0.3",
+    "micromatch": "^4.0.8"
+  },
+  "scripts": {
+    "build": "node scripts/build-extension.mjs && web-ext build -s dist/ --overwrite-dest",
+    "dev": "npm run remove-locales-github && node scripts/build-extension.mjs && web-ext run -s dist/ -f \"/Applications/Firefox Developer Edition.app/Contents/MacOS/firefox\"",
+    "lint": "npm-run-all lint:*",
+    "lint:addon": "node scripts/build-extension.mjs && web-ext lint -s dist/",
+    "lint:css": "stylelint src/css/*.css",
+    "lint:html": "html-validate \"src/**/*.html\"",
+    "lint:js": "eslint .",
+    "package": "rm -rf web-ext-artifacts addon.xpi && npm run build && mv web-ext-artifacts/*.zip addon.xpi",
+    "package:source": "zip -r source-code.zip src/ scripts/ docs/ burp/ .github/ package.json package-lock.json tsconfig.json vite.config.mts eslint.config.js .stylelintrc .htmlvalidate.json README.md LICENSE PRIVACY.md -x '*.DS_Store' '*/node_modules/*' '*/.git/*' '*/dist/*' '*/.vscode/*' '*/.cursor/*'",
+    "restore-locales-github": "cd src/_locales && git restore .github/",
+    "remove-locales-github": "rm -rf src/_locales/.github",
+    "test": "npm-run-all lint test:unit",
+    "test:unit": "mocha test/**/*.test.js"
+  }
+}

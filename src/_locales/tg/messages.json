@@ -1,0 +1,464 @@
+{
+  "extensionDescription": {
+    "message": "Phoenix Box: Security testing extension with Burp Suite integration and multi-container management.",
+    "description": "Description of the extension. DO NOT TRANSLATE \"Phoenix Box\"."
+  },
+  "openInNewTabTitle": {
+    "message": "Кушодани варақаи нав дар…",
+    "description": "Menu title"
+  },
+  "reopenThisSiteIn": {
+    "message": "Аз нав кушодани ин сомона дар…",
+    "description": "Menu title"
+  },
+  "sortTabsByContainer": {
+    "message": "Мураттаб кардани варақаҳо аз рӯи дарбаргиранда",
+    "description": "Menu title"
+  },
+  "alwaysOpenThisSiteIn": {
+    "message": "Ҳамеша кушодани ин сомона дар…",
+    "description": "Menu title"
+  },
+  "alwaysOpenIn": {
+    "message": "Ҳамеша кушодан дар…",
+    "description": "Menu title"
+  },
+  "alwaysOpenSiteInContainer": {
+    "message": "Сомона ҳамеша дар дарбаргиранда кушода шавад"
+  },
+  "openANewTabIn": {
+    "message": "Кушодани варақаи нав дар…"
+  },
+  "openNewTabInThisContainer": {
+    "message": "Кушодани варақаи нав дар ин дарбаргиранда"
+  },
+  "openTabs": {
+    "message": "Варақаҳои кушодашуда",
+    "description": "Section title for tabs that are currently open in that container"
+  },
+  "moveTabsToANewWindow": {
+    "message": "Гузаронидани варақаҳо ба равзанаи нав"
+  },
+  "onboarding-1-header": {
+    "message": "Роҳи беҳтарин барои идора кардани ҳамаи корҳое, ки шумо дар онлайн мекунед"
+  },
+  "onboarding-1-description": {
+    "message": "Шумо метавонед барои ташкил кардани вазифаҳо, идора кардани ҳисобҳо ва нигоҳ доштани диққати худ дар чизҳои дилхоҳ аз дарбаргирандаҳо истифода баред."
+  },
+  "onboarding-2-header": {
+    "message": "Бигузор, ки дарбаргирандаҳо барои шумо кор кунанд."
+  },
+  "onboarding-2-description": {
+    "message": "Хусусиятҳо ба монанди рангҳои нишонгузорӣ ва варақаҳои дарбаргирандаҳои алоҳида ба шумо кумак мекунанд, то тавонед чизҳоро ба осонӣ пайдо кунед, диққати худро ба чизҳои муҳим равона кунед ва парешонхотириро кам намоед."
+  },
+  "onboarding-3-header": {
+    "message": "Ҷой барои ҳамаи чизҳои шумо ва ҳамаи чизҳои шумо дар ҷойи худ."
+  },
+  "onboarding-3-description": {
+    "message": "Бо дарбаргирандаҳое, ки мо сохтаем, оғоз кунед ё дарбаргирандаҳои худро эҷод намоед."
+  },
+  "onboarding-4-header": {
+    "message": "Ҳамеша сомонаҳоро дар дарбаргирандаҳои дилхоҳ кушоед."
+  },
+  "onboarding-4-description": {
+    "message": "Дар дохили варақаи дарбаргиранда бо тугмаи рости муш зер кунед ва сомонаеро, ки мехоҳед дар дарбаргиранда кушода шавад, таъин намоед."
+  },
+  "onboarding-5-header": {
+    "message": "Варақаҳоро дар вақти дилхоҳ дар дарбаргирандаҳо кушоед."
+  },
+  "onboarding-5-description": {
+    "message": "Барои эҷод кардани варақаи дарбаргирандаи нав, тугмаи «Варақаи нав»-ро зер карда, доред."
+  },
+  "onboarding-6-header": {
+    "message": "Акнун имконияти ҳамоҳангсозии дарбаргирандаҳо дастрас аст!"
+  },
+  "onboarding-6-description-2": {
+    "message": "Барои мубодила кардани дарбаргирандаҳо ва сомонаҳои таъиншуда бо ҳар як компютере, ки ба ҳисоби шумо пайваст шудааст, имкони ҳамоҳангсозиро фаъол созед."
+  },
+  "onboarding-7-header-2": {
+    "message": "Барои ҳамоҳангсозӣ ҳисоби шахсӣ лозим аст."
+  },
+  "onboarding-7-description-2": {
+    "message": "Барои тасдиқ кардани он, ки ҳисоби шумо фаъол аст, тугмаи «Ворид шудан»-ро зер кунед."
+  },
+  "onboarding-8-description": {
+    "message": "Акнун дарбаргирандаҳо метавонанд бо «Mozilla VPN» ё проксии шахсии шумо ҳамгиро карда шаванд ва ҳамин тариқ вайвастшавии хусусӣ ва бехатариеро созанд, ки фаъолияти шуморо дар онлайн муҳофизат мекунад."
+  },
+  "oneHundredTabsHeader": {
+    "message": "100 варақа!"
+  },
+  "youHaveOpened": {
+    "message": "Шумо 100 варақаи дарбаргирандаро кушодаед."
+  },
+  "spreadTheWord": {
+    "message": "Агар шумо аз истифодаи дарбаргирандаҳо лаззат баред, дар бораи таҷрибаи худ ба дигарон хабар расонед!"
+  },
+  "rate": {
+    "message": "Баҳо додан"
+  },
+  "share": {
+    "message": "Мубодила кардан"
+  },
+  "tweet": {
+    "message": "Фиристодан ба «Twitter»"
+  },
+  "default": {
+    "message": "Пешфарз"
+  },
+  "manageContainers": {
+    "message": "Идоракунии дарбаргирандаҳо"
+  },
+  "newContainer": {
+    "message": "Дарбаргирандаи нав"
+  },
+  "hideThisContainer": {
+    "message": "Пинҳон кардани ин дарбаргиранда"
+  },
+  "showThisContainer": {
+    "message": "Нишон додани ин дарбаргиранда"
+  },
+  "removeThisContainer": {
+    "message": "Тоза кардани ин дарбаргиранда"
+  },
+  "removeThisContainerConfirmation": {
+    "message": "Шумо мутмаин ҳастед, ки мехоҳед ин дарбаргирандаро тоза намоед?"
+  },
+  "clearContainerStoragePanelTitle": {
+    "message": "Пок кардани захирагоҳи дарбаргиранда"
+  },
+  "clearContainerStorageConfirmation": {
+    "message": "Оё мутмаин ҳастед, ки мехоҳед кукиҳо ва захирагоҳро барои ин дарбаргиранда пок созед?"
+  },
+  "cancel": {
+    "message": "Бекор кардан"
+  },
+  "ok": {
+    "message": "ХУБ"
+  },
+  "sitesAssignedToThisContainer": {
+    "message": "Сомонаҳои таъиншуда ба ин дарбаргиранда"
+  },
+  "options": {
+    "message": "Имконот"
+  },
+  "name": {
+    "message": "Ном"
+  },
+  "color": {
+    "message": "Ранг"
+  },
+  "icon": {
+    "message": "Нишона"
+  },
+  "limitToDesignatedSites": {
+    "message": "Маҳдудият ба самонаҳои таъиншуда"
+  },
+  "deleteThisContainer": {
+    "message": "Нест кардани ин дарбаргиранда"
+  },
+  "manageSiteList": {
+    "message": "Идора кардани рӯйхати сомонаҳо…"
+  },
+  "manageThisContainer": {
+    "message": "Идора кардани ин дарбаргиранда"
+  },
+  "containers": {
+    "message": "Дарбаргирандаҳо"
+  },
+  "done": {
+    "message": "Тайёр"
+  },
+  "getStarted": {
+    "message": "Оғози кор"
+  },
+  "signIn": {
+    "message": "Ворид шудан"
+  },
+  "notNow": {
+    "message": "Ҳоло не"
+  },
+  "startSyncing": {
+    "message": "Оғози ҳамоҳангсозӣ"
+  },
+  "info": {
+    "message": "Иттилоот",
+    "description": "Alternative text for the i icon in the toolbar icon pop-up"
+  },
+  "next": {
+    "message": "Навбатӣ"
+  },
+  "openThisSiteConfirmation": {
+    "message": "Ин сомонаро дар дарбаргирандаи таъиншуда мекушоед?"
+  },
+  "wouldYouStillLikeToOpenConfirmation": {
+    "message": "Оё шумо ба ҳар ҳол мехоҳед, ки онро дар ин дарбаргирандаи ҷорӣ кушоед?"
+  },
+  "rememberMyDecision": {
+    "message": "Қарори ман барои ин сомона дар хотир дошта шавад"
+  },
+  "optionalPermissions": {
+    "message": "Иҷозатҳои интихобӣ"
+  },
+  "keyboardShortCuts": {
+    "message": "Миёнбурҳои клавиатура:"
+  },
+  "onboarding": {
+    "message": "Лавҳаи оғози кор"
+  },
+  "resetOnboardingPanels": {
+    "message": "Аз нав танзим кардани лавҳаҳои оғози кор"
+  },
+  "onboardingToggle": {
+    "message": "Барои аз нав намоиш додани лавҳаҳои оғози кор, ин имконро интихоб намоед."
+  },
+  "tabBehavior": {
+    "message": "Рафтори варақа:"
+  },
+  "enableBookMarkMenus": {
+    "message": "Фаъол кардани менюи хатбаракҳо"
+  },
+  "sync": {
+    "message": "Ҳамоҳангсозӣ:"
+  },
+  "enableSync": {
+    "message": "Фаъол кардани ҳамоҳангсозӣ"
+  },
+  "enableBookMarkMenusDescription": {
+    "message": "Ин танзим ба шумо имкон медиҳад, то ки тавонед хатбарак ё ҷузвдони хатбаракҳоро дар дарбаргиранда кушоед."
+  },
+  "enableSyncDescription": {
+    "message": "Ин танзим ба шумо имкон медиҳад, то ки тавонед дарбаргирандаҳо ва сомонаҳои таъиншударо дар байни дастгоҳҳои худ ҳамоҳанг созед."
+  },
+  "syncExclude": {
+    "message": "Истиснои дарбаргирандаҳо"
+  },
+  "syncExcludePlaceholder": {
+    "message": "Ибораи мунтазамро ворид намоед"
+  },
+  "syncExcludeDescription": {
+    "message": "Дарбаргирандаҳоро аз ҳамоҳангсозӣ истисно кунед, агар номи он ба ибораи мунтазами муайян бе дарназардошти ҳарфҳои хурду калон мувофиқат кунад."
+  },
+  "replaceTab": {
+    "message": "Ба ҷойи сохтани варақаи нав, варақаеро иваз намоед"
+  },
+  "replaceTabDescription": {
+    "message": "Варақаи ҷориро иваз кунед, агар саҳифае, ки ба дарбаргирандаи дигар таъин шудааст, кушода шавад (ба ҷойи кушода нигоҳ доштани варақаи ҷорӣ). Ин амал ба кушоиши варақаҳо тавассути тугмаи миёнаи муш таъсир намерасонад."
+  },
+  "editWhichContainer": {
+    "message": "Муайян кунед, ки кадом дарбаргирандаҳо ҳангоми истифодаи миёнбурҳои рақамдор кушода мешаванд."
+  },
+  "keyboardShortCut": {
+    "message": "Дарбаргирандае, ки ба воситаи миёнбури клавиатураи «$keyId$» кушода мешавад",
+    "placeholders": {
+      "keyId": {
+        "content": "$1"
+      }
+    }
+  },
+  "confirmNavigationTitle": {
+    "message": "Тасдиқи паймоиш тавассути дарбаргирандаҳои серҳисоб",
+    "description": "This is the title of a confirmation page. Please do not translate \"Phoenix Box\"."
+  },
+  "openInContainer": {
+    "message": "Кушодан дар дарбаргирандаи «$containerName$»",
+    "placeholders": {
+      "containerName": {
+        "content": "$1"
+      }
+    }
+  },
+  "openInNoContainer": {
+    "message": "Кушодан дар варақаи ҷорӣ",
+    "description": "This is the button text in confirmation page when we are not inside a container"
+  },
+  "youAskedFirefox": {
+    "message": "Шумо аз браузери «Firefox» дархост кардед, ки ин сомона ҳамеша дар «$containerName$» кушода шавад:",
+    "placeholders": {
+      "containerName": {
+        "content": "$1"
+      }
+    }
+  },
+  "chooseLocation": {
+    "message": "Интихоби ҷойгиршавӣ",
+    "description": "Location refers to the geographical position used by the VPN"
+  },
+  "hide": {
+    "message": "Пинҳон кардан"
+  },
+  "show": {
+    "message": "Намоиш додан"
+  },
+  "protectYourContainers": {
+    "message": "Дарбаргирандаҳои худро ба воситаи «Mozilla VPN» муҳофизат намоед"
+  },
+  "protectThisContainer": {
+    "message": "Муҳофизат кардани ин дарбаргиранда ба воситаи «Mozilla VPN»"
+  },
+  "advancedProxySettings": {
+    "message": "Танзимоти иловагии прокси"
+  },
+  "proxyInputLabel": {
+    "message": "Прокси фармоиширо ворид намоед"
+  },
+  "useCustomLocation": {
+    "message": "Истифода кардани ҷойгиршавии фармоишӣ барои ин дарбаргиранда"
+  },
+  "clearproxylabel": {
+    "message": "Пок кардани прокси"
+  },
+  "moz-vpn-connected": {
+    "message": "«Mozilla VPN» фаъол аст"
+  },
+  "moz-vpn-disconnected": {
+    "message": "«Mozilla VPN» хомӯш аст"
+  },
+  "invalidProxyAlert": {
+    "message": "Лутфан, нишонии URL-и эътибори проксиро ворид намоед"
+  },
+  "mozillaVpnMustBeOn": {
+    "message": "Барои истифода кардани ин хусусият «Mozilla VPN» бояд фаъол бошад."
+  },
+  "learnMore": {
+    "message": "Маълумоти бештар"
+  },
+  "proxyNowAvailable": {
+    "message": "Акнун дорои «Mozilla VPN» ва танзимоти иловагии прокси мебошад"
+  },
+  "applyToContainer": {
+    "message": "Татбиқ кардан ба дарбаргиранда"
+  },
+  "tooltipWarning": {
+    "message": "Ин дарбаргиранда барои истифодаи прокси «Mozilla VPN» насб шудааст, аммо «Mozilla VPN» фаъол нест. Барои истифодаи ин дарбаргиранда, лутфан, «Mozilla VPN»-ро фаъол созед."
+  },
+  "getMozillaVpn": {
+    "message": "Ба даст овардани «Mozilla VPN»"
+  },
+  "integratewithmozillavpn": {
+    "message": "Дарбаргирандаҳои худро бо «Mozilla VPN» ҳамгиро созед"
+  },
+  "mozillaVpnAndProxyPermissionsTitle": {
+    "message": "Иҷозатҳои «Mozilla VPN» ва Прокси",
+    "description": "Section headline in settings"
+  },
+  "nativeMessagingPermissionTitle": {
+    "message": "Ба васеъшавӣ барои мубодила кардани паёмҳо бо барномаҳои ғайр аз «Firefox» иҷозат диҳед",
+    "description": "Permission title"
+  },
+  "nativeMessagingPermissionDescription": {
+    "message": "Ин танзим ба васеъшавӣ имкон медиҳад, ки тавонад паёмҳоро бо муштарии «Mozilla VPN» мубодила кунад ва ин танзим, инчунин, барои кор кардани хусусиятҳои ҳамгироии «Mozilla VPN» талаб карда мешавад.",
+    "description": "'This setting' refers to the permission indicated in nativeMessagingPermissionTitle"
+  },
+  "proxyPermissionTitle": {
+    "message": "Ба васеъшавӣ иҷозат диҳед, ки танзимоти проксиро идора кунад",
+    "description": "Permission title"
+  },
+  "proxyPermissionDescription": {
+    "message": "Ин ба шумо имкон медиҳад, ки тавонед танзимоти иловагии проксиро истифода баред ва хусусиятҳои ҳамгироии «Mozilla VPN»-ро фаъол созед.",
+    "description": "'This' refers to the permission indicated in proxyPermissionTitle"
+  },
+  "additionalPermissionNeeded": {
+    "message": "Ин хусусият барои кор иҷозати иловагиро талаб мекунад. Иҷозатҳо метавонанд дар саҳифаи танзимот дар вақти дилхоҳ ғайрифаъол карда шаванд.",
+    "description": "'This feature' is the browser proxy permission. This string appears on the 'Advanced Proxy Settings' panel when the proxy permission is disabled."
+  },
+  "mozillaVpnRequiresAdditionalPermissions": {
+    "message": "Амали ҳамгироӣ ва кор бо «Mozilla VPN» обуна ва иҷозатҳои иловагиро талаб мекунад."
+  },
+  "enable": {
+    "message": "Фаъол кардан",
+    "description": "Button title "
+  },
+  "integrateContainers": {
+    "message": "Дарбаргирандаҳои худро бо «Mozilla VPN» ҳамгиро созед"
+  },
+  "theme": {
+    "message": "Мавзуъ:",
+    "description": "Theme section title in the option page"
+  },
+  "chooseTheme": {
+    "message": "Мавзуеро интихоб кунед",
+    "description": "Description for the theme option"
+  },
+  "themeAuto": {
+    "message": "Муайянкунии худкор (пешфарз)",
+    "description": "Default value for the theme option select tag"
+  },
+  "themeLight": {
+    "message": "Равшан",
+    "description": "Value for the theme option select tag"
+  },
+  "themeDark": {
+    "message": "Торик",
+    "description": "Value for the theme option select tag"
+  },
+  "filterInputLabel": {
+    "message": "Мураттаб кардани рӯйхати дарбаргирандаҳо аз рӯйи ном:",
+    "description": "Label for the filter input in the main panel. Only visible for screen reader."
+  },
+  "filterInputPlaceholder": {
+    "message": "Ҷустуҷӯи номи дарбаргиранда"
+  },
+  "imageAltContainerInfo": {
+    "message": "Маълумот дар бораи дарбаргиранда",
+    "description": "Alt text for right-arrow button to view container info"
+  },
+  "defaultContainerLabel": {
+    "message": "Дарбаргирандаи пешфарз",
+    "description": "The title of the default container"
+  },
+  "openContainerPanel": {
+    "message": "Кушодани лавҳаи дарбаргиранда",
+    "description": "Label for option in the keyboard shortcut manager (associating a shortcut to open the container panel)"
+  },
+  "containerShortcut": {
+    "message": "Миёнбури дарбаргиранда $keyId$",
+    "description": "Label for option in the keyboard shortcut manager. $keyId$ is a number from 1 to 10.",
+    "placeholders": {
+      "keyId": {
+        "content": "$1"
+      }
+    }
+  },
+  "openBookmarkInContainerTab": {
+    "message": "Кушодани хатбарак дар варақаи дарбаргиранда"
+  },
+  "clearSiteCookiesTooltipInfo": {
+    "message": "Пок кардани кукиҳо барои ин сомона",
+    "description": "Label for hovering of the refresh button in a containers site manager"
+  },
+  "deleteSiteTooltipInfo": {
+    "message": "Тоза кардани ин сомона",
+    "description": "Label for hovering of the trash button in a containers site manager"
+  },
+  "clearContainerStorage": {
+    "message": "Пок кардани захирагоҳ ва кукиҳо",
+    "description": "Label for the clearing a containers storage and cache option"
+  },
+  "cookiesClearedSuccess": {
+    "message": "Кукиҳо барои сомонаи $siteName$ бо муваффақият пок карда шудаанд",
+    "description": "Label to confirm that cookies were cleared in the site manager",
+    "placeholders": {
+      "siteName": {
+        "content": "$1"
+      }
+    }
+  },
+  "cookiesCouldNotBeCleared": {
+    "message": "Кукиҳо барои сомонаи $siteName$ пок карда нашуданд",
+    "description": "Error message that shows if cookies could not be cleared in the site manager",
+    "placeholders": {
+      "siteName": {
+        "content": "$1"
+      }
+    }
+  },
+  "storageWasClearedConfirmation": {
+    "message": "Захирагоҳ ва кукиҳои «$containerName$» пок карда шудаанд.",
+    "description": "The confirmation label that a containers storage was cleared successfully.",
+    "placeholders": {
+      "containerName": {
+        "content": "$1"
+      }
+    }
+  }
+}

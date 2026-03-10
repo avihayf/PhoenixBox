@@ -1,0 +1,31 @@
+{
+  "extends": [
+    "html-validate:recommended"
+  ],
+  "rules": {
+    "attr-case": "off",
+    "no-inline-style": "off",
+    "require-sri": "off",
+    "void-style": "off",
+    "element-required-attributes": "off",
+    "empty-title": "off",
+    "script-type": "off",
+    "empty-heading": "off",
+    "no-redundant-for": "off",
+    "no-implicit-button-type": "off",
+    "text-content": "off",
+    "element-required-content": "off",
+    "prefer-tbody": "off",
+    "parser-error": "off",
+    "id-pattern": "off",
+    "class-pattern": "off",
+    "wcag/h30": "off",
+    "wcag/h37": "off",
+    "wcag/h32": "off",
+    "wcag/h71": "off",
+    "no-dup-id": "off",
+    "element-permitted-content": "off",
+    "attribute-allowed-values": "off",
+    "attribute-boolean-style": "off"
+  }
+}

@@ -1,0 +1,42 @@
+# Build artifacts
+dist/
+web-ext-artifacts/
+*.xpi
+*.zip
+
+# Dependencies
+node_modules/
+
+# Development
+.env
+.DS_Store
+*.sw*
+*.swp
+*.swo
+.vimrc
+
+# Test coverage
+.nyc_output
+coverage/
+
+# IDE
+.idea/
+.vscode/
+*.code-workspace
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Temporary files
+*.tmp
+*.temp
+
+# Debug
+.debug/

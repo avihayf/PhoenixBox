@@ -1,0 +1,141 @@
+/* Minimal container icon + color helpers.
+ * Extracted from css/popup.css so pages like pageActionPopup
+ * don't need to load the full legacy stylesheet.
+ */
+
+/* Color helpers (Firefox container palette) */
+[data-identity-color="blue"] {
+  --identity-tab-color: #00d4ff;
+  --identity-icon-color: #00d4ff;
+}
+
+[data-identity-color="turquoise"] {
+  --identity-tab-color: #00ffc8;
+  --identity-icon-color: #00ffc8;
+}
+
+[data-identity-color="green"] {
+  --identity-tab-color: #39ff14;
+  --identity-icon-color: #39ff14;
+}
+
+[data-identity-color="yellow"] {
+  --identity-tab-color: #ff0;
+  --identity-icon-color: #ff0;
+}
+
+[data-identity-color="orange"] {
+  --identity-tab-color: #f60;
+  --identity-icon-color: #f60;
+}
+
+[data-identity-color="red"] {
+  --identity-tab-color: #f36;
+  --identity-icon-color: #f36;
+}
+
+[data-identity-color="pink"] {
+  --identity-tab-color: #f0f;
+  --identity-icon-color: #f0f;
+}
+
+[data-identity-color="purple"] {
+  --identity-tab-color: #c0f;
+  --identity-icon-color: #c0f;
+}
+
+/* Icon helpers — standard Firefox sprite icons */
+[data-identity-icon="fingerprint"] {
+  --identity-icon: url("/img/usercontext.svg#fingerprint");
+}
+
+[data-identity-icon="briefcase"] {
+  --identity-icon: url("/img/usercontext.svg#briefcase");
+}
+
+[data-identity-icon="dollar"] {
+  --identity-icon: url("/img/usercontext.svg#dollar");
+}
+
+[data-identity-icon="cart"] {
+  --identity-icon: url("/img/usercontext.svg#cart");
+}
+
+[data-identity-icon="circle"] {
+  --identity-icon: url("/img/usercontext.svg#circle");
+}
+
+[data-identity-icon="food"] {
+  --identity-icon: url("/img/usercontext.svg#food");
+}
+
+[data-identity-icon="gift"] {
+  --identity-icon: url("/img/usercontext.svg#gift");
+}
+
+[data-identity-icon="vacation"] {
+  --identity-icon: url("/img/usercontext.svg#vacation");
+}
+
+[data-identity-icon="fruit"] {
+  --identity-icon: url("/img/usercontext.svg#fruit");
+}
+
+[data-identity-icon="pet"] {
+  --identity-icon: url("/img/usercontext.svg#pet");
+}
+
+[data-identity-icon="tree"] {
+  --identity-icon: url("/img/usercontext.svg#tree");
+}
+
+[data-identity-icon="chill"] {
+  --identity-icon: url("/img/usercontext.svg#chill");
+}
+
+[data-identity-icon="fence"] {
+  --identity-icon: url("/img/usercontext.svg#fence");
+}
+
+/* Core icon rendering — filter-based colorization for SVG sprite icons */
+.usercontext-icon {
+  background-image: var(--identity-icon);
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-size: 16px;
+  block-size: 100%;
+  fill: var(--identity-icon-color);
+  filter: url('/img/filters.svg#fill');
+}
+
+/* Security profile icons — standalone SVGs that need mask-image to colorize.
+   The filter approach only works with the usercontext.svg sprite; standalone
+   SVGs require rendering through a CSS mask with background-color instead. */
+.usercontext-icon[data-identity-icon="skull"],
+.usercontext-icon[data-identity-icon="user-x"],
+.usercontext-icon[data-identity-icon="user-cog"],
+.usercontext-icon[data-identity-icon="user-minus"] {
+  background-image: none;
+  filter: none;
+  background-color: var(--identity-icon-color, currentColor);
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: 16px;
+}
+
+.usercontext-icon[data-identity-icon="skull"] {
+  mask-image: url("/img/skull.svg");
+}
+
+.usercontext-icon[data-identity-icon="user-x"] {
+  mask-image: url("/img/user-x.svg");
+}
+
+.usercontext-icon[data-identity-icon="user-cog"] {
+  mask-image: url("/img/user-cog.svg");
+}
+
+.usercontext-icon[data-identity-icon="user-minus"] {
+  mask-image: url("/img/user-minus.svg");
+}
+

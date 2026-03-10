@@ -1,0 +1,464 @@
+{
+  "extensionDescription": {
+    "message": "Phoenix Box: Security testing extension with Burp Suite integration and multi-container management.",
+    "description": "Description of the extension. DO NOT TRANSLATE \"Phoenix Box\"."
+  },
+  "openInNewTabTitle": {
+    "message": "เปิดแท็บใหม่ใน…",
+    "description": "Menu title"
+  },
+  "reopenThisSiteIn": {
+    "message": "เปิดไซต์นี้ใหม่ใน…",
+    "description": "Menu title"
+  },
+  "sortTabsByContainer": {
+    "message": "เรียงแท็บตามที่แยกข้อมูล",
+    "description": "Menu title"
+  },
+  "alwaysOpenThisSiteIn": {
+    "message": "ทุกครั้งให้เปิดไซต์นี้ใน…",
+    "description": "Menu title"
+  },
+  "alwaysOpenIn": {
+    "message": "ทุกครั้งให้เปิดใน…",
+    "description": "Menu title"
+  },
+  "alwaysOpenSiteInContainer": {
+    "message": "ทุกครั้งให้เปิดไซต์ในที่แยกข้อมูล"
+  },
+  "openANewTabIn": {
+    "message": "เปิดแท็บใหม่ใน…"
+  },
+  "openNewTabInThisContainer": {
+    "message": "เปิดแท็บใหม่ในที่แยกข้อมูลนี้"
+  },
+  "openTabs": {
+    "message": "แท็บที่เปิด",
+    "description": "Section title for tabs that are currently open in that container"
+  },
+  "moveTabsToANewWindow": {
+    "message": "ย้ายแท็บไปยังหน้าต่างใหม่"
+  },
+  "onboarding-1-header": {
+    "message": "วิธีที่ดีกว่าในการจัดการทุกสิ่งที่คุณทำบนโลกออนไลน์"
+  },
+  "onboarding-1-description": {
+    "message": "ใช้ที่แยกข้อมูลเพื่อจัดระเบียบงาน จัดการบัญชี และไม่ให้เสียสมาธิในจุดที่คุณต้องการ"
+  },
+  "onboarding-2-header": {
+    "message": "ให้ที่แยกข้อมูลทำงานเพื่อคุณ"
+  },
+  "onboarding-2-description": {
+    "message": "คุณลักษณะต่างๆ เช่น การกำหนดสี และแท็บแยกข้อมูลแยกต่างหาก ช่วยคุณหาสิ่งต่างๆ ได้อย่างง่ายดาย รวมทั้งดึงดูดความสนใจของคุณ และลดสิ่งรบกวนให้เหลือน้อยที่สุด"
+  },
+  "onboarding-3-header": {
+    "message": "ที่สำหรับทุกอย่าง ครบในที่เดียว"
+  },
+  "onboarding-3-description": {
+    "message": "เริ่มด้วยที่แยกข้อมูลที่เราสร้างขึ้น หรือสร้างของคุณเอง"
+  },
+  "onboarding-4-header": {
+    "message": "เปิดไซต์ในที่แยกข้อมูลที่คุณต้องการเสมอ"
+  },
+  "onboarding-4-description": {
+    "message": "คลิกขวาภายในแท็บแยกข้อมูล เพื่อกำหนดไซต์ให้เปิดในที่แยกข้อมูลเสมอ"
+  },
+  "onboarding-5-header": {
+    "message": "ใช้แท็บแยกข้อมูลเมื่อคุณต้องการ"
+  },
+  "onboarding-5-description": {
+    "message": "กดปุ่ม \"แท็บใหม่\" ค้างเพื่อสร้างแท็บแยกข้อมูลใหม่"
+  },
+  "onboarding-6-header": {
+    "message": "การซิงค์ที่แยกข้อมูลสามารถใช้ได้แล้ว!"
+  },
+  "onboarding-6-description-2": {
+    "message": "เปิดการซิงค์เพื่อแบ่งปันที่แยกข้อมูลและรายการไซต์ที่กำหนดไว้กับคอมพิวเตอร์ใดก็ตามที่เชื่อมต่อกับบัญชีของคุณ"
+  },
+  "onboarding-7-header-2": {
+    "message": "ต้องมีบัญชีเพื่อซิงค์"
+  },
+  "onboarding-7-description-2": {
+    "message": "คลิก \"ลงชื่อเข้า\" เพื่อยืนยันว่าบัญชีของคุณเปิดใช้งานอยู่"
+  },
+  "onboarding-8-description": {
+    "message": "ตอนนี้ที่แยกข้อมูลสามารถผสานรวมกับ Mozilla VPN หรือพร็อกซีของคุณเองเพื่อสร้างการเชื่อมต่อที่ปลอดภัยและเป็นส่วนตัวซึ่งปกป้องกิจกรรมของคุณ"
+  },
+  "oneHundredTabsHeader": {
+    "message": "100 แท็บ!"
+  },
+  "youHaveOpened": {
+    "message": "คุณได้เปิดแท็บแยกข้อมูล 100 แท็บ"
+  },
+  "spreadTheWord": {
+    "message": "ถ้าคุณเพลิดเพลินกับการใช้ที่แยกข้อมูล ก็ช่วยเราบอกต่อเลย!"
+  },
+  "rate": {
+    "message": "ให้คะแนน"
+  },
+  "share": {
+    "message": "แบ่งปัน"
+  },
+  "tweet": {
+    "message": "ทวีต"
+  },
+  "default": {
+    "message": "ค่าเริ่มต้น"
+  },
+  "manageContainers": {
+    "message": "จัดการที่แยกข้อมูล"
+  },
+  "newContainer": {
+    "message": "ที่แยกข้อมูลใหม่"
+  },
+  "hideThisContainer": {
+    "message": "ซ่อนที่แยกข้อมูลนี้"
+  },
+  "showThisContainer": {
+    "message": "แสดงที่แยกข้อมูลนี้"
+  },
+  "removeThisContainer": {
+    "message": "เอาที่แยกข้อมูลนี้ออก"
+  },
+  "removeThisContainerConfirmation": {
+    "message": "คุณแน่ใจหรือไม่ว่าต้องการเอาที่แยกข้อมูลนี้ออก?"
+  },
+  "clearContainerStoragePanelTitle": {
+    "message": "ล้างพื้นที่จัดเก็บข้อมูลของที่แยกข้อมูล"
+  },
+  "clearContainerStorageConfirmation": {
+    "message": "คุณแน่ใจหรือไม่ว่าต้องการล้างคุกกี้และพื้นที่จัดเก็บข้อมูลสำหรับที่แยกข้อมูลนี้?"
+  },
+  "cancel": {
+    "message": "ยกเลิก"
+  },
+  "ok": {
+    "message": "ตกลง"
+  },
+  "sitesAssignedToThisContainer": {
+    "message": "ไซต์ที่กำหนดให้กับที่แยกข้อมูลนี้"
+  },
+  "options": {
+    "message": "ตัวเลือก"
+  },
+  "name": {
+    "message": "ชื่อ"
+  },
+  "color": {
+    "message": "สี"
+  },
+  "icon": {
+    "message": "ไอคอน"
+  },
+  "limitToDesignatedSites": {
+    "message": "จำกัดเฉพาะไซต์ที่กำหนด"
+  },
+  "deleteThisContainer": {
+    "message": "ลบที่แยกข้อมูลนี้"
+  },
+  "manageSiteList": {
+    "message": "จัดการรายการไซต์…"
+  },
+  "manageThisContainer": {
+    "message": "จัดการที่แยกข้อมูลนี้"
+  },
+  "containers": {
+    "message": "ที่แยกข้อมูล"
+  },
+  "done": {
+    "message": "เสร็จสิ้น"
+  },
+  "getStarted": {
+    "message": "เริ่มต้นใช้งาน"
+  },
+  "signIn": {
+    "message": "ลงชื่อเข้า"
+  },
+  "notNow": {
+    "message": "ไม่ใช่ตอนนี้"
+  },
+  "startSyncing": {
+    "message": "เริ่มซิงค์"
+  },
+  "info": {
+    "message": "ข้อมูล",
+    "description": "Alternative text for the i icon in the toolbar icon pop-up"
+  },
+  "next": {
+    "message": "ถัดไป"
+  },
+  "openThisSiteConfirmation": {
+    "message": "ต้องการเปิดไซต์นี้ในที่แยกข้อมูลที่กำหนดของคุณหรือไม่?"
+  },
+  "wouldYouStillLikeToOpenConfirmation": {
+    "message": "คุณยังต้องการเปิดในที่แยกข้อมูลปัจจุบันนี้หรือไม่?"
+  },
+  "rememberMyDecision": {
+    "message": "จดจำการตัดสินใจของฉันสำหรับไซต์นี้"
+  },
+  "optionalPermissions": {
+    "message": "สิทธิอนุญาตที่เลือกได้:"
+  },
+  "keyboardShortCuts": {
+    "message": "แป้นพิมพ์ลัด:"
+  },
+  "onboarding": {
+    "message": "การออนบอร์ด"
+  },
+  "resetOnboardingPanels": {
+    "message": "ตั้งค่าแผงออนบอร์ดใหม่"
+  },
+  "onboardingToggle": {
+    "message": "สลับตัวเลือกนี้เพื่อดูแผงออนบอร์ดใหม่อีกครั้ง"
+  },
+  "tabBehavior": {
+    "message": "ลักษณะการทำงานของแท็บ:"
+  },
+  "enableBookMarkMenus": {
+    "message": "เปิดใช้งานเมนที่คั่นหน้า"
+  },
+  "sync": {
+    "message": "การประสานข้อมูล:"
+  },
+  "enableSync": {
+    "message": "เปิดใช้งานการซิงค์"
+  },
+  "enableBookMarkMenusDescription": {
+    "message": "การตั้งค่านี้ให้คุณสามารถเปิดที่คั่นหน้าหรือโฟลเดอร์เก็บที่คั่นหน้าในที่แยกข้อมูลได้"
+  },
+  "enableSyncDescription": {
+    "message": "การตั้งค่านี้ให้คุณสามารถซิงค์ที่แยกข้อมูลและรายการไซต์ที่กำหนดไว้ของคุณระหว่างอุปกรณ์ต่างๆ ได้"
+  },
+  "syncExclude": {
+    "message": "การยกเว้นที่แยกข้อมูล"
+  },
+  "syncExcludePlaceholder": {
+    "message": "แทรกนิพจน์ปกติ"
+  },
+  "syncExcludeDescription": {
+    "message": "ไม่รวมที่แยกข้อมูลจากการซิงค์เมื่อชื่อของที่แยกข้อมูลเหล่านั้นตรงกับนิพจน์ปกติที่ไม่คำนึงถึงตัวพิมพ์ใหญ่-เล็กตามที่ระบุ"
+  },
+  "replaceTab": {
+    "message": "แทนที่แท็บแทนที่จะสร้างใหม่"
+  },
+  "replaceTabDescription": {
+    "message": "แทนที่แท็บปัจจุบันถ้าหน้าที่กำหนดให้กับที่แยกข้อมูลอื่นนั้นถูกเปิดอยู่ (แทนที่จะปล่อยให้แท็บปัจจุบันเปิดต่อไป) จะไม่มีผลกับการเปิดแท็บด้วยปุ่มเมาส์กลาง"
+  },
+  "editWhichContainer": {
+    "message": "แก้ไขว่าจะให้เปิดที่แยกข้อมูลใดบ้างเมื่อใช้แป้นลัดที่เป็นตัวเลข"
+  },
+  "keyboardShortCut": {
+    "message": "ที่แยกข้อมูลที่จะเปิดด้วยแป้นพิมพ์ลัด $keyId$",
+    "placeholders": {
+      "keyId": {
+        "content": "$1"
+      }
+    }
+  },
+  "confirmNavigationTitle": {
+    "message": "ยืนยันการนำทางให้กับ Phoenix Box",
+    "description": "This is the title of a confirmation page. Please do not translate \"Phoenix Box\"."
+  },
+  "openInContainer": {
+    "message": "เปิดในการแยกข้อมูล $containerName$",
+    "placeholders": {
+      "containerName": {
+        "content": "$1"
+      }
+    }
+  },
+  "openInNoContainer": {
+    "message": "เปิดในแท็บปัจจุบัน",
+    "description": "This is the button text in confirmation page when we are not inside a container"
+  },
+  "youAskedFirefox": {
+    "message": "คุณได้ขอให้ Firefox เปิด $containerName$ สำหรับไซต์นี้เสมอ:",
+    "placeholders": {
+      "containerName": {
+        "content": "$1"
+      }
+    }
+  },
+  "chooseLocation": {
+    "message": "เลือกตำแหน่งที่ตั้ง",
+    "description": "Location refers to the geographical position used by the VPN"
+  },
+  "hide": {
+    "message": "ซ่อน"
+  },
+  "show": {
+    "message": "แสดง"
+  },
+  "protectYourContainers": {
+    "message": "ปกป้องที่แยกข้อมูลของคุณด้วย Mozilla VPN"
+  },
+  "protectThisContainer": {
+    "message": "ปกป้องที่แยกข้อมูลนี้ด้วย Mozilla VPN"
+  },
+  "advancedProxySettings": {
+    "message": "การตั้งค่าพร็อกซีขั้นสูง"
+  },
+  "proxyInputLabel": {
+    "message": "ใส่พร็อกซีที่กำหนดเอง"
+  },
+  "useCustomLocation": {
+    "message": "ใช้ตำแหน่งที่กำหนดเองสำหรับที่แยกข้อมูลนี้"
+  },
+  "clearproxylabel": {
+    "message": "ล้างพร็อกซี"
+  },
+  "moz-vpn-connected": {
+    "message": "Mozilla VPN เปิดอยู่"
+  },
+  "moz-vpn-disconnected": {
+    "message": "Mozilla VPN ปิดอยู่"
+  },
+  "invalidProxyAlert": {
+    "message": "โปรดใส่ URL พร็อกซีที่ถูกต้อง"
+  },
+  "mozillaVpnMustBeOn": {
+    "message": "ต้องเปิด Mozilla VPN เพื่อใช้คุณลักษณะนี้"
+  },
+  "learnMore": {
+    "message": "เรียนรู้เพิ่มเติม"
+  },
+  "proxyNowAvailable": {
+    "message": "ตอนนี้มาพร้อมกับ Mozilla VPN และการตั้งค่าพร็อกซีขั้นสูง"
+  },
+  "applyToContainer": {
+    "message": "นำไปใช้กับที่แยกข้อมูล"
+  },
+  "tooltipWarning": {
+    "message": "ที่แยกข้อมูลนี้ถูกตั้งค่าให้ใช้พร็อกซี Mozilla VPN แต่ Mozilla VPN ไม่ได้เปิดอยู่ ให้เปิด Mozilla VPN เพื่อใช้ที่แยกข้อมูลนี้"
+  },
+  "getMozillaVpn": {
+    "message": "รับ Mozilla VPN"
+  },
+  "integratewithmozillavpn": {
+    "message": "ผสานรวมที่แยกข้อมูลของคุณกับ Mozilla VPN"
+  },
+  "mozillaVpnAndProxyPermissionsTitle": {
+    "message": "Mozilla VPN และการกำหนดสิทธิ์พร็อกซี",
+    "description": "Section headline in settings"
+  },
+  "nativeMessagingPermissionTitle": {
+    "message": "อนุญาตให้ส่วนขยายแลกเปลี่ยนข้อความกับโปรแกรมอื่นที่ไม่ใช่ Firefox ได้",
+    "description": "Permission title"
+  },
+  "nativeMessagingPermissionDescription": {
+    "message": "การตั้งค่านี้จะอนุญาตให้ส่วนขยายแลกเปลี่ยนข้อความกับไคลเอนต์ Mozilla VPN ได้ และจำเป็นเพื่อให้คุณลักษณะการผสานรวมกับ Mozilla VPN สามารถใช้งานได้",
+    "description": "'This setting' refers to the permission indicated in nativeMessagingPermissionTitle"
+  },
+  "proxyPermissionTitle": {
+    "message": "อนุญาตให้ส่วนขยายควบคุมการตั้งค่าพร็อกซีได้",
+    "description": "Permission title"
+  },
+  "proxyPermissionDescription": {
+    "message": "การตั้งค่านี้ให้คุณใช้การตั้งค่าพร็อกซีขั้นสูงและเปิดใช้งานคุณลักษณะการผสานรวมกับ Mozilla VPN ได้",
+    "description": "'This' refers to the permission indicated in proxyPermissionTitle"
+  },
+  "additionalPermissionNeeded": {
+    "message": "คุณลักษณะนี้ต้องการการกำหนดสิทธิ์เพิ่มเติมจึงจะทำงานได้ โดยสามารถปิดใช้งานสิทธิ์ได้ตลอดเวลาบนหน้าการตั้งค่า",
+    "description": "'This feature' is the browser proxy permission. This string appears on the 'Advanced Proxy Settings' panel when the proxy permission is disabled."
+  },
+  "mozillaVpnRequiresAdditionalPermissions": {
+    "message": "การผสานรวมกับ Mozilla VPN ต้องการการสมัครสมาชิกและการกำหนดสิทธิ์เพิ่มเติมจึงจะทำงานได้"
+  },
+  "enable": {
+    "message": "เปิดใช้งาน",
+    "description": "Button title "
+  },
+  "integrateContainers": {
+    "message": "ผสานรวมที่แยกข้อมูลของคุณกับ Mozilla VPN"
+  },
+  "theme": {
+    "message": "ชุดตกแต่ง:",
+    "description": "Theme section title in the option page"
+  },
+  "chooseTheme": {
+    "message": "เลือกชุดตกแต่ง",
+    "description": "Description for the theme option"
+  },
+  "themeAuto": {
+    "message": "ตรวจหาอัตโนมัติ (ค่าเริ่มต้น)",
+    "description": "Default value for the theme option select tag"
+  },
+  "themeLight": {
+    "message": "สว่าง",
+    "description": "Value for the theme option select tag"
+  },
+  "themeDark": {
+    "message": "มืด",
+    "description": "Value for the theme option select tag"
+  },
+  "filterInputLabel": {
+    "message": "กรองรายการที่แยกข้อมูลตามชื่อ:",
+    "description": "Label for the filter input in the main panel. Only visible for screen reader."
+  },
+  "filterInputPlaceholder": {
+    "message": "ค้นหาชื่อที่แยกข้อมูล"
+  },
+  "imageAltContainerInfo": {
+    "message": "ข้อมูลที่แยกข้อมูล",
+    "description": "Alt text for right-arrow button to view container info"
+  },
+  "defaultContainerLabel": {
+    "message": "ที่แยกข้อมูลเริ่มต้น",
+    "description": "The title of the default container"
+  },
+  "openContainerPanel": {
+    "message": "เปิดแผงที่แยกข้อมูล",
+    "description": "Label for option in the keyboard shortcut manager (associating a shortcut to open the container panel)"
+  },
+  "containerShortcut": {
+    "message": "แป้นลัดที่แยกข้อมูล $keyId$",
+    "description": "Label for option in the keyboard shortcut manager. $keyId$ is a number from 1 to 10.",
+    "placeholders": {
+      "keyId": {
+        "content": "$1"
+      }
+    }
+  },
+  "openBookmarkInContainerTab": {
+    "message": "เปิดที่คั่นหน้าในแท็บแยกข้อมูล"
+  },
+  "clearSiteCookiesTooltipInfo": {
+    "message": "ล้างคุกกี้สำหรับไซต์นี้",
+    "description": "Label for hovering of the refresh button in a containers site manager"
+  },
+  "deleteSiteTooltipInfo": {
+    "message": "เอาไซต์นี้ออก",
+    "description": "Label for hovering of the trash button in a containers site manager"
+  },
+  "clearContainerStorage": {
+    "message": "ล้างพื้นที่จัดเก็บข้อมูลและคุกกี้",
+    "description": "Label for the clearing a containers storage and cache option"
+  },
+  "cookiesClearedSuccess": {
+    "message": "คุกกี้สำหรับ $siteName$ ถูกล้างเรียบร้อยแล้ว",
+    "description": "Label to confirm that cookies were cleared in the site manager",
+    "placeholders": {
+      "siteName": {
+        "content": "$1"
+      }
+    }
+  },
+  "cookiesCouldNotBeCleared": {
+    "message": "ไม่สามารถล้างคุกกี้สำหรับ $siteName$ ได้",
+    "description": "Error message that shows if cookies could not be cleared in the site manager",
+    "placeholders": {
+      "siteName": {
+        "content": "$1"
+      }
+    }
+  },
+  "storageWasClearedConfirmation": {
+    "message": "พื้นที่จัดเก็บข้อมูลและคุกกี้ของ $containerName$ ถูกล้างแล้ว",
+    "description": "The confirmation label that a containers storage was cleared successfully.",
+    "placeholders": {
+      "containerName": {
+        "content": "$1"
+      }
+    }
+  }
+}

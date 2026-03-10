@@ -1,0 +1,160 @@
+{
+  "manifest_version": 2,
+  "name": "Phoenix Box",
+  "version": "1.0.0",
+  "author": "0xR3dB0mb",
+  "incognito": "not_allowed",
+  "description": "__MSG_extensionDescription__",
+  "content_security_policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src https://cdn.jsdelivr.net; object-src 'none';",
+  "icons": {
+    "16": "img/icon-16.png",
+    "48": "img/icon-48.png",
+    "96": "img/icon-96.png",
+    "128": "img/icon-128.png"
+  },
+  "homepage_url": "https://github.com/avihaife-cmyk/PhoenixBox#readme",
+  "permissions": [
+    "<all_urls>",
+    "activeTab",
+    "cookies",
+    "contextMenus",
+    "contextualIdentities",
+    "history",
+    "storage",
+    "unlimitedStorage",
+    "tabs",
+    "webRequestBlocking",
+    "webRequest"
+  ],
+  "optional_permissions": [
+    "bookmarks",
+    "browsingData",
+    "nativeMessaging",
+    "proxy"
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "phoenix-box@0xr3db0mb.com",
+      "strict_min_version": "138.0",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      }
+    }
+  },
+  "commands": {
+    "_execute_browser_action": {
+      "suggested_key": {
+        "default": "Ctrl+Period",
+        "mac": "MacCtrl+Period"
+      },
+      "description": "__MSG_openContainerPanel__"
+    },
+    "sort_tabs": {
+      "description": "__MSG_sortTabsByContainer__"
+    },
+    "open_container_0": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+1"
+      },
+      "description": "__MSG_containerShortcut__"
+    },
+    "open_container_1": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+2"
+      },
+      "description": "__MSG_containerShortcut__"
+    },
+    "open_container_2": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+3"
+      },
+      "description": "__MSG_containerShortcut__"
+    },
+    "open_container_3": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+4"
+      },
+      "description": "__MSG_containerShortcut__"
+    },
+    "open_container_4": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+5"
+      },
+      "description": "__MSG_containerShortcut__"
+    },
+    "open_container_5": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+6"
+      },
+      "description": "__MSG_containerShortcut__"
+    },
+    "open_container_6": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+7"
+      },
+      "description": "__MSG_containerShortcut__"
+    },
+    "open_container_7": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+8"
+      },
+      "description": "__MSG_containerShortcut__"
+    },
+    "open_container_8": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+9"
+      },
+      "description": "__MSG_containerShortcut__"
+    },
+    "open_container_9": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+0"
+      },
+      "description": "__MSG_containerShortcut__"
+    }
+  },
+  "browser_action": {
+    "browser_style": true,
+    "default_icon": "img/icon-128.png",
+    "default_title": "Phoenix Box",
+    "default_popup": "popup/index.html",
+    "default_area": "navbar"
+  },
+  "page_action": {
+    "browser_style": true,
+    "default_icon": "img/icon-128.png",
+    "default_title": "__MSG_alwaysOpenSiteInContainer__",
+    "default_popup": "pageActionPopup.html",
+    "pinned": false,
+    "show_matches": [
+      "*://*/*"
+    ]
+  },
+  "background": {
+    "page": "js/background/index.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "js/content-script.js"
+      ],
+      "css": [
+        "css/content.css"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "default_locale": "en",
+  "web_accessible_resources": [
+    "img/PheonixLogo.png"
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "browser_style": true
+  }
+}

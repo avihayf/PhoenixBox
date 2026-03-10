@@ -1,0 +1,382 @@
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-size: 16px;
+  
+  /* Light Mode - Enhanced with better contrast and vibrant colors */
+  --background: #f8f9ff;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #0066ff;
+  --primary-foreground: #ffffff;
+  --secondary: #e0e7ff;
+  --secondary-foreground: #1e293b;
+  --muted: #f1f5f9;
+  --muted-foreground: #475569;
+  --accent: #06b6d4;
+  --accent-foreground: #ffffff;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #cbd5e1;
+  --input: transparent;
+  --input-background: #ffffff;
+  --switch-background: #cbd5e1;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --ring: #0066ff;
+  --chart-1: #3b82f6;
+  --chart-2: #06b6d4;
+  --chart-3: #8b5cf6;
+  --chart-4: #10b981;
+  --chart-5: #f59e0b;
+  --radius: 0.75rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f172a;
+  --sidebar-primary: #0066ff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f1f5f9;
+  --sidebar-accent-foreground: #1e293b;
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: #0066ff;
+  
+  /* Firefox Extension Theme - Light Mode */
+  --ext-bg: #f8f9ff;
+  --ext-bg-secondary: #ffffff;
+  --ext-bg-tertiary: #e0e7ff;
+  --ext-border: #cbd5e1;
+  --ext-border-accent: #94a3b8;
+  --ext-cyan: #0891b2;
+  --ext-cyan-dark: #0e7490;
+  --ext-cyan-light: #06b6d4;
+  --ext-cyan-bg: #ecfeff;
+  --ext-text: #0f172a;
+  --ext-text-muted: #64748b;
+  --ext-text-highlight: #0066ff;
+  --ext-red: #B91C1C;
+  --ext-pink: #db2777;
+  --ext-purple: #7c3aed;
+  --ext-green: #059669;
+  --ext-orange: #F97316;
+  --ext-yellow: #ca8a04;
+  --ext-error: #B91C1C;
+  --ext-success: #059669;
+  --ext-warning: #F97316;
+  --ext-info: #0891b2;
+  
+  /* Glow and special effects */
+  --ext-glow-cyan: rgba(8, 145, 178, 0.3);
+  --ext-glow-pink: rgba(219, 39, 119, 0.3);
+  --ext-glow-purple: rgba(124, 58, 237, 0.3);
+}
+
+.dark {
+  /* Dark Mode - Cyberpunk enhanced with better contrast */
+  --background: #050510;
+  --foreground: #f0f9ff;
+  --card: #0f0f1e;
+  --card-foreground: #f0f9ff;
+  --popover: #0f0f1e;
+  --popover-foreground: #f0f9ff;
+  --primary: #00ffff;
+  --primary-foreground: #050510;
+  --secondary: #1a1a2e;
+  --secondary-foreground: #f0f9ff;
+  --muted: #1e1e33;
+  --muted-foreground: #94a3b8;
+  --accent: #00ffff;
+  --accent-foreground: #050510;
+  --destructive: #ff0066;
+  --destructive-foreground: #ffffff;
+  --border: #2d2d4a;
+  --input: #1a1a2e;
+  --input-background: #0a0a18;
+  --switch-background: #1e1e33;
+  --ring: #00ffff;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --chart-1: #8b5cf6;
+  --chart-2: #06b6d4;
+  --chart-3: #f59e0b;
+  --chart-4: #ec4899;
+  --chart-5: #10b981;
+  --sidebar: #0a0a18;
+  --sidebar-foreground: #f0f9ff;
+  --sidebar-primary: #00ffff;
+  --sidebar-primary-foreground: #050510;
+  --sidebar-accent: #1a1a2e;
+  --sidebar-accent-foreground: #f0f9ff;
+  --sidebar-border: #2d2d4a;
+  --sidebar-ring: #00ffff;
+  
+  /* Firefox Extension Theme - Dark Mode Cyberpunk */
+  --ext-bg: #050510;
+  --ext-bg-secondary: #0f0f1e;
+  --ext-bg-tertiary: #1a1a2e;
+  --ext-border: #2d2d4a;
+  --ext-border-accent: #3d3d5a;
+  --ext-cyan: #00ffff;
+  --ext-cyan-dark: #00cccc;
+  --ext-cyan-light: #66ffff;
+  --ext-cyan-bg: rgba(0, 255, 255, 0.1);
+  --ext-text: #f0f9ff;
+  --ext-text-muted: #94a3b8;
+  --ext-text-highlight: #00ffff;
+  --ext-red: #B91C1C;
+  --ext-pink: #ff1493;
+  --ext-purple: #a855f7;
+  --ext-green: #00ff88;
+  --ext-orange: #F97316;
+  --ext-yellow: #ffcc00;
+  --ext-error: #B91C1C;
+  --ext-success: #00ff88;
+  --ext-warning: #F97316;
+  --ext-info: #00ffff;
+  
+  /* Glow and special effects - brighter in dark mode */
+  --ext-glow-cyan: rgba(0, 255, 255, 0.5);
+  --ext-glow-pink: rgba(255, 20, 147, 0.5);
+  --ext-glow-purple: rgba(168, 85, 247, 0.5);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* Accent Color System - User selectable accent colors */
+/* Default accent is cyan - these get overridden by accent-* classes */
+:root {
+  --ext-accent: var(--ext-cyan);
+  --ext-accent-dark: var(--ext-cyan-dark);
+  --ext-accent-light: var(--ext-cyan-light);
+  --ext-accent-bg: var(--ext-cyan-bg);
+  --ext-glow-accent: var(--ext-glow-cyan);
+}
+
+/* Accent: Cyan (default) */
+.accent-cyan {
+  --ext-accent: #0891b2;
+  --ext-accent-dark: #0e7490;
+  --ext-accent-light: #06b6d4;
+  --ext-accent-bg: #ecfeff;
+  --ext-glow-accent: rgba(8, 145, 178, 0.3);
+}
+.dark.accent-cyan, .dark .accent-cyan {
+  --ext-accent: #00ffff;
+  --ext-accent-dark: #00cccc;
+  --ext-accent-light: #66ffff;
+  --ext-accent-bg: rgba(0, 255, 255, 0.1);
+  --ext-glow-accent: rgba(0, 255, 255, 0.5);
+}
+
+/* Accent: Green (Matrix/Hacker) */
+.accent-green {
+  --ext-accent: #059669;
+  --ext-accent-dark: #047857;
+  --ext-accent-light: #10b981;
+  --ext-accent-bg: #ecfdf5;
+  --ext-glow-accent: rgba(5, 150, 105, 0.3);
+}
+.dark.accent-green, .dark .accent-green {
+  --ext-accent: #22C55E;
+  --ext-accent-dark: #16a34a;
+  --ext-accent-light: #4ade80;
+  --ext-accent-bg: rgba(34, 197, 94, 0.1);
+  --ext-glow-accent: rgba(34, 197, 94, 0.5);
+}
+
+/* Accent: Purple (Cyberpunk) */
+.accent-purple {
+  --ext-accent: #7c3aed;
+  --ext-accent-dark: #6d28d9;
+  --ext-accent-light: #8b5cf6;
+  --ext-accent-bg: #f5f3ff;
+  --ext-glow-accent: rgba(124, 58, 237, 0.3);
+}
+.dark.accent-purple, .dark .accent-purple {
+  --ext-accent: #A855F7;
+  --ext-accent-dark: #9333ea;
+  --ext-accent-light: #c084fc;
+  --ext-accent-bg: rgba(168, 85, 247, 0.1);
+  --ext-glow-accent: rgba(168, 85, 247, 0.5);
+}
+
+/* Accent: Pink (Neon) */
+.accent-pink {
+  --ext-accent: #db2777;
+  --ext-accent-dark: #be185d;
+  --ext-accent-light: #ec4899;
+  --ext-accent-bg: #fdf2f8;
+  --ext-glow-accent: rgba(219, 39, 119, 0.3);
+}
+.dark.accent-pink, .dark .accent-pink {
+  --ext-accent: #EC4899;
+  --ext-accent-dark: #db2777;
+  --ext-accent-light: #f472b6;
+  --ext-accent-bg: rgba(236, 72, 153, 0.1);
+  --ext-glow-accent: rgba(236, 72, 153, 0.5);
+}
+
+/* Accent: Orange (Warm) */
+.accent-orange {
+  --ext-accent: #ea580c;
+  --ext-accent-dark: #c2410c;
+  --ext-accent-light: #f97316;
+  --ext-accent-bg: #fff7ed;
+  --ext-glow-accent: rgba(234, 88, 12, 0.3);
+}
+.dark.accent-orange, .dark .accent-orange {
+  --ext-accent: #F97316;
+  --ext-accent-dark: #ea580c;
+  --ext-accent-light: #fb923c;
+  --ext-accent-bg: rgba(249, 115, 22, 0.1);
+  --ext-glow-accent: rgba(249, 115, 22, 0.5);
+}
+
+/* Accent: Yellow (Gold) */
+.accent-yellow {
+  --ext-accent: #ca8a04;
+  --ext-accent-dark: #a16207;
+  --ext-accent-light: #eab308;
+  --ext-accent-bg: #fefce8;
+  --ext-glow-accent: rgba(202, 138, 4, 0.3);
+}
+.dark.accent-yellow, .dark .accent-yellow {
+  --ext-accent: #EAB308;
+  --ext-accent-dark: #ca8a04;
+  --ext-accent-light: #facc15;
+  --ext-accent-bg: rgba(234, 179, 8, 0.1);
+  --ext-glow-accent: rgba(234, 179, 8, 0.5);
+}
+
+/* Accent: Red (Alert) */
+.accent-red {
+  --ext-accent: #dc2626;
+  --ext-accent-dark: #b91c1c;
+  --ext-accent-light: #ef4444;
+  --ext-accent-bg: #fef2f2;
+  --ext-glow-accent: rgba(220, 38, 38, 0.3);
+}
+.dark.accent-red, .dark .accent-red {
+  --ext-accent: #EF4444;
+  --ext-accent-dark: #dc2626;
+  --ext-accent-light: #f87171;
+  --ext-accent-bg: rgba(239, 68, 68, 0.1);
+  --ext-glow-accent: rgba(239, 68, 68, 0.5);
+}
+
+/* Accent: Indigo (Deep) */
+.accent-indigo {
+  --ext-accent: #4f46e5;
+  --ext-accent-dark: #4338ca;
+  --ext-accent-light: #6366f1;
+  --ext-accent-bg: #eef2ff;
+  --ext-glow-accent: rgba(79, 70, 229, 0.3);
+}
+.dark.accent-indigo, .dark .accent-indigo {
+  --ext-accent: #6366F1;
+  --ext-accent-dark: #4f46e5;
+  --ext-accent-light: #818cf8;
+  --ext-accent-bg: rgba(99, 102, 241, 0.1);
+  --ext-glow-accent: rgba(99, 102, 241, 0.5);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /**
+  * Default typography styles for HTML elements (h1-h4, p, label, button, input).
+  * These are in @layer base, so Tailwind utility classes (like text-sm, text-lg) automatically override them.
+  */
+
+  html {
+    font-size: var(--font-size);
+  }
+
+  h1 {
+    font-size: var(--text-2xl);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  h2 {
+    font-size: var(--text-xl);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  h3 {
+    font-size: var(--text-lg);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  h4 {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  label {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  button {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  input {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-normal);
+    line-height: 1.5;
+  }
+}

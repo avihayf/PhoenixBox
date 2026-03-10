@@ -1,0 +1,159 @@
+
+/* Extension popup container - Dynamic height, capped at Firefox popup limit */
+.extension-popup {
+  width: 340px;
+  min-height: min-content;
+  max-height: 600px;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Background Phoenix Logo watermark - Only on Main View */
+.extension-popup.main-view::before {
+  content: '';
+  position: absolute;
+  top: 76%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 150px;
+  height: 150px;
+  background-image: url('../../img/PheonixLogo-light.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: 0.15;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Background Phoenix Logo watermark - Dark Mode (Main View only) */
+.dark .extension-popup.main-view::before {
+  background-image: url('../../img/PheonixLogo-New.png');
+}
+
+/* Ensure popup frame shrinks with content */
+html,
+body,
+#root {
+  width: 340px;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+  background: var(--ext-bg);
+}
+
+/* Animations */
+@keyframes badge-pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.badge-pulse {
+  animation: badge-pulse 2s ease-in-out infinite;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out;
+}
+
+/* Unified Scrollbar - accent-colored */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ext-accent) var(--ext-accent-bg);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: var(--ext-accent-bg);
+  border-radius: 10px;
+  margin: 4px 0;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--ext-accent);
+  border-radius: 10px;
+  box-shadow: 0 0 8px var(--ext-glow-accent);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--ext-accent-light);
+  box-shadow: 0 0 12px var(--ext-glow-accent);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:active {
+  background: var(--ext-accent);
+  box-shadow: 0 0 16px var(--ext-glow-accent);
+}
+
+/* Container-themed scrollbar - uses per-container color via --c-accent */
+.themed-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-accent) transparent;
+}
+
+.themed-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.themed-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.themed-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--c-accent, var(--ext-border));
+  border-radius: 10px;
+}
+
+.themed-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--c-accent, var(--ext-accent));
+}
+
+/* Unified Brand Button Styling */
+.btn-brand-primary {
+  text-transform: uppercase;
+  letter-spacing: 0.05em; /* Tailwind: tracking-wider */
+  font-weight: 500; /* Tailwind: font-medium */
+  font-size: 13px; /* Tailwind: text-[13px] */
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms; /* Tailwind default */
+}

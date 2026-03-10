@@ -1,0 +1,195 @@
+{
+  "openInNewTabTitle": {
+    "message": "Opna nýjan flipa í…",
+    "description": "Menu title"
+  },
+  "reopenThisSiteIn": {
+    "message": "Opna þessa síðu aftur í…",
+    "description": "Menu title"
+  },
+  "sortTabsByContainer": {
+    "message": "Raða flipum eftir sérefni",
+    "description": "Menu title"
+  },
+  "alwaysOpenThisSiteIn": {
+    "message": "Opna þessa síðu alltaf í…",
+    "description": "Menu title"
+  },
+  "alwaysOpenIn": {
+    "message": "Alltaf opna í…",
+    "description": "Menu title"
+  },
+  "alwaysOpenSiteInContainer": {
+    "message": "Opna vefsvæðið alltaf í sérefnisflipa"
+  },
+  "openANewTabIn": {
+    "message": "Opna nýjan flipa í…"
+  },
+  "openNewTabInThisContainer": {
+    "message": "Opna nýjan flipa í þessum sérefnisflipa"
+  },
+  "openTabs": {
+    "message": "Opna flipa",
+    "description": "Section title for tabs that are currently open in that container"
+  },
+  "moveTabsToANewWindow": {
+    "message": "Færa flipa yfir í nýjan glugga"
+  },
+  "onboarding-1-header": {
+    "message": "Betri leið til að halda utan um allt það sem þú gerir á netinu"
+  },
+  "oneHundredTabsHeader": {
+    "message": "100 flipar!"
+  },
+  "youHaveOpened": {
+    "message": "Þú hefur opnað 100 sérefnisflipa."
+  },
+  "rate": {
+    "message": "Gefa einkunn"
+  },
+  "share": {
+    "message": "Deila"
+  },
+  "tweet": {
+    "message": "Tísta"
+  },
+  "default": {
+    "message": "Sjálfgefið"
+  },
+  "manageContainers": {
+    "message": "Sýsla með sérefnisgáma"
+  },
+  "newContainer": {
+    "message": "Nýr sérefnisgámur"
+  },
+  "hideThisContainer": {
+    "message": "Fela þennan sérefnisgám"
+  },
+  "showThisContainer": {
+    "message": "Sýna þennan sérefnisgám"
+  },
+  "removeThisContainer": {
+    "message": "Fjarlægja þennan sérefnisgám"
+  },
+  "cancel": {
+    "message": "Hætta við"
+  },
+  "ok": {
+    "message": "Í lagi"
+  },
+  "options": {
+    "message": "Valkostir"
+  },
+  "name": {
+    "message": "Nafn"
+  },
+  "color": {
+    "message": "Litur"
+  },
+  "icon": {
+    "message": "Táknmynd"
+  },
+  "limitToDesignatedSites": {
+    "message": "Takmarka við tilgreind vefsvæði"
+  },
+  "deleteThisContainer": {
+    "message": "Eyða þessum sérefnisgámi"
+  },
+  "done": {
+    "message": "Lokið"
+  },
+  "getStarted": {
+    "message": "Hefjast handa"
+  },
+  "signIn": {
+    "message": "Skrá inn"
+  },
+  "notNow": {
+    "message": "Ekki núna"
+  },
+  "startSyncing": {
+    "message": "Hefja samstillingu"
+  },
+  "info": {
+    "message": "upplýsingar",
+    "description": "Alternative text for the i icon in the toolbar icon pop-up"
+  },
+  "next": {
+    "message": "Næsta"
+  },
+  "optionalPermissions": {
+    "message": "Valfrjálsar heimildir:"
+  },
+  "keyboardShortCuts": {
+    "message": "Flýtilyklar:"
+  },
+  "onboarding": {
+    "message": "Kynning"
+  },
+  "tabBehavior": {
+    "message": "Hegðun flipa:"
+  },
+  "sync": {
+    "message": "Samstilling:"
+  },
+  "enableSync": {
+    "message": "Virkja samstillingu"
+  },
+  "chooseLocation": {
+    "message": "Veldu staðsetningu",
+    "description": "Location refers to the geographical position used by the VPN"
+  },
+  "hide": {
+    "message": "Fela"
+  },
+  "show": {
+    "message": "Sýna"
+  },
+  "clearproxylabel": {
+    "message": "Hreinsa milliþjón"
+  },
+  "moz-vpn-connected": {
+    "message": "Kveikt er á Mozilla VPN"
+  },
+  "moz-vpn-disconnected": {
+    "message": "Slökkt er á Mozilla VPN"
+  },
+  "learnMore": {
+    "message": "Fræðast meira"
+  },
+  "getMozillaVpn": {
+    "message": "Fáðu þér Mozilla VPN"
+  },
+  "enable": {
+    "message": "Virkja",
+    "description": "Button title "
+  },
+  "theme": {
+    "message": "Þema:",
+    "description": "Theme section title in the option page"
+  },
+  "chooseTheme": {
+    "message": "Veldu þema",
+    "description": "Description for the theme option"
+  },
+  "themeAuto": {
+    "message": "Finna sjálfvirkt (sjálfgefið)",
+    "description": "Default value for the theme option select tag"
+  },
+  "themeLight": {
+    "message": "Ljóst",
+    "description": "Value for the theme option select tag"
+  },
+  "themeDark": {
+    "message": "Dökkt",
+    "description": "Value for the theme option select tag"
+  },
+  "deleteSiteTooltipInfo": {
+    "message": "Fjarlægja þetta vefsvæði",
+    "description": "Label for hovering of the trash button in a containers site manager"
+  },
+  "clearContainerStorage": {
+    "message": "Hreinsa geymslu og vefkökur",
+    "description": "Label for the clearing a containers storage and cache option"
+  }
+}

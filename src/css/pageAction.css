@@ -1,0 +1,56 @@
+/* Page-action popup overrides.
+ * Base layout comes from popup.css; this file only tunes the
+ * compact "Always open this site in…" picker. */
+
+@font-face {
+  font-family: Audiowide;
+  src: url("/fonts/Audiowide-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+html,
+body {
+  inline-size: 280px !important;
+  min-inline-size: 280px !important;
+  block-size: auto !important;
+  min-block-size: 0 !important;
+  max-block-size: none !important;
+  overflow: hidden !important;
+}
+
+body {
+  inline-size: 280px !important;
+  min-inline-size: 280px !important;
+}
+
+.page-action-container-picker {
+  inline-size: 280px;
+}
+
+/* Title — match the Manage view brand-title style */
+h3.title {
+  font-family: Audiowide, sans-serif !important;
+  font-weight: 400 !important;
+  font-size: 13px !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  block-size: auto !important;
+  line-height: 1.4 !important;
+  padding-block: 10px !important;
+  padding-inline: 10px !important;
+}
+
+.scrollable.identities-list {
+  display: block !important;
+  flex: none !important;
+  block-size: auto !important;
+  max-block-size: 400px !important;
+  overflow-y: auto !important;
+  padding-block-end: 0 !important;
+}
+
+.menu {
+  padding-block-end: 0 !important;
+}
