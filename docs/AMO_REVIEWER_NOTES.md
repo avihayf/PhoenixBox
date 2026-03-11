@@ -11,7 +11,7 @@ Phoenix Box is a multi-container browser extension for security testing and pene
 - Optional Mozilla VPN integration via native messaging
 
 The extension is open source under MPL-2.0:
-https://github.com/avihaife-cmyk/PhoenixBox
+https://github.com/avihayf/PhoenixBox
 
 ---
 
@@ -29,15 +29,11 @@ The content script injected on `<all_urls>` at `document_start` is minimal (55 l
 
 ### `cookies`
 
-Used to clear cookies within specific containers (`browser.browsingData.removeCookies` scoped by `cookieStoreId`) for session isolation during penetration testing.
+Required for Firefox to allow the extension to create and manage tabs tied to specific container cookie stores (`cookieStoreId`). Without this permission Firefox does not permit the extension to open URLs in specific container sessions. The extension does not call `browser.cookies.*` directly; cookie-clearing within a container is handled by the optional `browsingData` permission.
 
 ### `contextualIdentities`
 
 Core functionality — creating, updating, querying, and deleting Firefox containers.
-
-### `history`
-
-Used in exactly one place: `browser.history.deleteUrl()` in `assignManager.js` to remove internal `confirm-page.html` URLs from browsing history so they don't appear in the address bar autocomplete. The extension does not read or query browsing history.
 
 ### `tabs`
 
@@ -105,10 +101,9 @@ This is the only external connection the extension makes. The CSP explicitly lim
 ## CSP Notes
 
 ```
-default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src https://cdn.jsdelivr.net; object-src 'none';
+default-src 'self'; script-src 'self'; style-src 'self'; connect-src https://cdn.jsdelivr.net; object-src 'none';
 ```
 
-- `style-src 'unsafe-inline'` is required because the popup UI is built with React 18 + Tailwind CSS 4, which inject styles at runtime. There is no way to avoid this with the current framework stack.
 - `connect-src https://cdn.jsdelivr.net` is the narrowest origin-level scope CSP allows (path restrictions are not supported in CSP `connect-src` directives). The actual URLs are further restricted in code via pinned commit hash.
 
 ---
@@ -116,6 +111,12 @@ default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect
 ## Content Script
 
 The content script (`js/content-script.js`) is 55 lines and does only one thing: it listens for `runtime.onMessage` from the extension's background script and shows a brief slide-down notification toast (e.g., "Successfully assigned site to always open in this container"). It uses `innerText` (not `innerHTML`) and only accepts messages where `sender.id === browser.runtime.id`. It does not read, modify, or exfiltrate any page content.
+
+---
+
+## Known web-ext Lint Warnings
+
+`web-ext lint` reports two `UNSAFE_VAR_ASSIGNMENT` warnings for `innerHTML` in `popup/assets/index-*.js`. These originate entirely from React 18's internal DOM reconciler (minified into the bundle by Vite) — specifically React's synthetic event system probing CSS animation event names on a temporary detached `<div>`. No extension-authored code writes to `innerHTML`. The legacy background scripts and content script use `innerText`, `textContent`, and `createElement` exclusively.
 
 ---
 

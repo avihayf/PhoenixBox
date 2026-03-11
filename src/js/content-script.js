@@ -28,7 +28,7 @@ async function addMessage(message) {
   divElement.innerText = message.text;
 
   const imageElement = document.createElement("img");
-  const imagePath = browser.runtime.getURL("/img/PheonixLogo.png");
+  const imagePath = browser.runtime.getURL("/img/PhoenixLogo.png");
   const response = await fetch(imagePath);
   const blob = await response.blob();
   const objectUrl = URL.createObjectURL(blob);

@@ -79,7 +79,7 @@ const backgroundLogic = {
         await userAgentFetcher.getUserAgents(false);
       }
     } catch (error) {
-      console.error("Failed to initialize User-Agent cache:", error);
+      LOG.error("Failed to initialize User-Agent cache:", error);
       // Don't block extension startup on cache failure
     }
   },
@@ -249,7 +249,7 @@ const backgroundLogic = {
             await browser.storage.local.set({ globalProxyEnabled: false });
           }
         } catch (e) {
-          console.error("Error in resetPermissions for proxy:", e);
+          LOG.error("Error in resetPermissions for proxy:", e);
         }
         break;
       }

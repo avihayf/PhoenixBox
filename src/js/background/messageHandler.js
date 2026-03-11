@@ -143,7 +143,7 @@ const messageHandler = {
         return response;
       } catch (e) {
         // Never throw from the message handler; it can destabilize the background page.
-        console.error("Background onMessage failed:", e, m && m.method);
+        LOG.error("Background onMessage failed:", e, m && m.method);
         return undefined;
       }
     });
@@ -160,7 +160,7 @@ const messageHandler = {
       browser.tabs.get(info.tabId).then((tab) => {
         assignManager.calculateContextMenu(tab);
       }).catch((e) => {
-        console.error("Failed to update context menu onActivated:", e);
+        LOG.error("Failed to update context menu onActivated:", e);
       });
     });
 
@@ -177,7 +177,7 @@ const messageHandler = {
       browser.tabs.get(details.tabId).then((tab) => {
         assignManager.calculateContextMenu(tab);
       }).catch((e) => {
-        console.error("Failed to update context menu onCompleted:", e);
+        LOG.error("Failed to update context menu onCompleted:", e);
       });
     }, {urls: ["<all_urls>"], types: ["main_frame"]});
 
@@ -199,7 +199,7 @@ const messageHandler = {
                 browser.tabs.get(tabId).then(loadedTab => {
                   backgroundLogic.unhideContainer(tab.cookieStoreId, loadedTab.url);
                 }).catch((e) => {
-                  console.error("Failed to unhide container:", e);
+                  LOG.error("Failed to unhide container:", e);
                 });
 
                 cleanup();

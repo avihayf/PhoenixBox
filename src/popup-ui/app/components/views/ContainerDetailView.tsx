@@ -50,7 +50,7 @@ export function ContainerDetailView({
   return (
     <div className="w-full h-auto max-h-[720px] flex flex-col bg-[var(--ext-bg)] border border-[var(--ext-border)] rounded-xl shadow-xl overflow-hidden" style={themed}>
       {/* Accent top stripe */}
-      <div className="h-[2px] w-full flex-shrink-0" style={{ background: colorHex }} />
+      <div className="h-[2px] w-full flex-shrink-0" style={{ background: 'var(--ext-accent)' }} />
 
       {/* Header */}
       <div className="flex items-center gap-3 px-3 py-2 border-b border-[var(--ext-border)] z-20" style={{ background: `${colorHex}08` }}>
@@ -152,8 +152,8 @@ export function ContainerDetailView({
         <button
           onClick={onManageContainer}
           className="w-full flex items-center justify-center py-2 border-2 rounded-lg font-medium text-sm transition-colors"
-          style={{ borderColor: colorHex, color: colorHex }}
-          onMouseEnter={e => (e.currentTarget.style.background = `${colorHex}18`)}
+          style={{ borderColor: 'var(--ext-accent)', color: 'var(--ext-accent)' }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'color-mix(in srgb, var(--ext-accent) 9%, transparent)')}
           onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
         >
           Manage This Container

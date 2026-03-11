@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "author": "0xR3dB0mb",
   "bugs": {
-    "url": "https://github.com/avihaife-cmyk/PhoenixBox/issues"
+    "url": "https://github.com/avihayf/PhoenixBox/issues"
   },
   "dependencies": {
     "@radix-ui/react-switch": "1.1.3",
@@ -44,12 +44,12 @@
     "vite": "^6.3.0",
     "web-ext": "^8.10.0"
   },
-  "homepage": "https://github.com/avihaife-cmyk/PhoenixBox#readme",
+  "homepage": "https://github.com/avihayf/PhoenixBox#readme",
   "license": "MPL-2.0",
   "main": "index.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/avihaife-cmyk/PhoenixBox.git"
+    "url": "git+https://github.com/avihayf/PhoenixBox.git"
   },
   "overrides": {
     "braces": "^3.0.3",
@@ -57,16 +57,14 @@
   },
   "scripts": {
     "build": "node scripts/build-extension.mjs && web-ext build -s dist/ --overwrite-dest",
-    "dev": "npm run remove-locales-github && node scripts/build-extension.mjs && web-ext run -s dist/ -f \"/Applications/Firefox Developer Edition.app/Contents/MacOS/firefox\"",
+    "dev": "node scripts/build-extension.mjs && web-ext run -s dist/ ${FIREFOX_BIN:+--firefox=\"$FIREFOX_BIN\"}",
     "lint": "npm-run-all lint:*",
     "lint:addon": "node scripts/build-extension.mjs && web-ext lint -s dist/",
     "lint:css": "stylelint src/css/*.css",
     "lint:html": "html-validate \"src/**/*.html\"",
     "lint:js": "eslint .",
     "package": "rm -rf web-ext-artifacts addon.xpi && npm run build && mv web-ext-artifacts/*.zip addon.xpi",
-    "package:source": "zip -r source-code.zip src/ scripts/ docs/ burp/ .github/ package.json package-lock.json tsconfig.json vite.config.mts eslint.config.js .stylelintrc .htmlvalidate.json README.md LICENSE PRIVACY.md -x '*.DS_Store' '*/node_modules/*' '*/.git/*' '*/dist/*' '*/.vscode/*' '*/.cursor/*'",
-    "restore-locales-github": "cd src/_locales && git restore .github/",
-    "remove-locales-github": "rm -rf src/_locales/.github",
+    "package:source": "zip -r source-code.zip src/ scripts/ docs/ burp/ package.json package-lock.json tsconfig.json vite.config.mts eslint.config.js .stylelintrc .htmlvalidate.json README.md LICENSE PRIVACY.md -x '*.DS_Store' '*/node_modules/*' '*/.git/*' '*/dist/*' '*/.vscode/*' '*/.cursor/*' '*/.claude/*'",
     "test": "npm-run-all lint test:unit",
     "test:unit": "mocha test/**/*.test.js"
   }

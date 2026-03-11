@@ -241,7 +241,7 @@ This header:
 
 ### Burp Extension Features
 
-The Phoenix-Highlighter.jar extension provides:
+The PhoenixBoxHighlighter.jar extension provides:
 
 - **Auto-highlighting** - Requests highlighted by container color
 - **Zero configuration** - Works immediately after installation
@@ -250,7 +250,7 @@ The Phoenix-Highlighter.jar extension provides:
 
 ### Setup Process
 
-1. Install Phoenix-Highlighter.jar in Burp Suite
+1. Install PhoenixBoxHighlighter.jar in Burp Suite
 2. Enable "Add container color header" in Firefox extension
 3. Configure proxy (127.0.0.1:8080 typically)
 4. Start testing - requests auto-highlight

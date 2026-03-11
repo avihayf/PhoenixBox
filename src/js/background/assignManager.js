@@ -268,7 +268,7 @@ window.assignManager = {
     } catch {
       // Tab may have been closed between request dispatch and lookup.
       // Fail safely (DIRECT) instead of throwing and breaking proxy resolution.
-      console.warn("handleProxifiedRequest: tab lookup failed", requestInfo.tabId);
+      LOG.warn("handleProxifiedRequest: tab lookup failed", requestInfo.tabId);
       return {};
     }
 
@@ -984,10 +984,7 @@ window.assignManager = {
         active,
         openerTabId,
         groupId
-      ).then(() => {
-        // We don't want to sync this URL ever nor clutter the users history
-        browser.history.deleteUrl({url: confirmUrl});
-      }).catch((e) => {
+      ).catch((e) => {
         throw e;
       });
     }

@@ -5,21 +5,20 @@
   "author": "0xR3dB0mb",
   "incognito": "not_allowed",
   "description": "__MSG_extensionDescription__",
-  "content_security_policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src https://cdn.jsdelivr.net; object-src 'none';",
+  "content_security_policy": "default-src 'self'; script-src 'self'; style-src 'self'; connect-src https://cdn.jsdelivr.net; object-src 'none';",
   "icons": {
     "16": "img/icon-16.png",
     "48": "img/icon-48.png",
     "96": "img/icon-96.png",
     "128": "img/icon-128.png"
   },
-  "homepage_url": "https://github.com/avihaife-cmyk/PhoenixBox#readme",
+  "homepage_url": "https://github.com/avihayf/PhoenixBox#readme",
   "permissions": [
     "<all_urls>",
     "activeTab",
     "cookies",
     "contextMenus",
     "contextualIdentities",
-    "history",
     "storage",
     "unlimitedStorage",
     "tabs",
@@ -151,7 +150,7 @@
   ],
   "default_locale": "en",
   "web_accessible_resources": [
-    "img/PheonixLogo.png"
+    "img/PhoenixLogo.png"
   ],
   "options_ui": {
     "page": "options.html",

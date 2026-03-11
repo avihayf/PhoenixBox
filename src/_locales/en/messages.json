@@ -39,69 +39,6 @@
   "moveTabsToANewWindow": {
     "message": "Move Tabs to a New Window"
   },
-  "onboarding-1-header": {
-    "message": "Your Security Testing Command Center"
-  },
-  "onboarding-1-description": {
-    "message": "Phoenix Box isolates your penetration testing sessions using browser containers. Perfect for Burp Suite integration and web app security research."
-  },
-  "onboarding-2-header": {
-    "message": "Attacker, Victim, Member — Ready to Go"
-  },
-  "onboarding-2-description": {
-    "message": "Pre-configured security profiles help you simulate different user roles. Each profile has isolated cookies, sessions, and can route through different proxies."
-  },
-  "onboarding-3-header": {
-    "message": "Color-Coded Tabs for Clear Separation"
-  },
-  "onboarding-3-description": {
-    "message": "Instantly identify which security context you're in. Red for Attacker, orange for Victim — never mix up your testing sessions again."
-  },
-  "onboarding-4-header": {
-    "message": "Route Traffic Through Burp Suite"
-  },
-  "onboarding-4-description": {
-    "message": "Configure custom proxy settings per container. Send Attacker traffic through Burp while keeping Victim traffic clean."
-  },
-  "onboarding-5-header": {
-    "message": "Spoof User-Agents Per Container"
-  },
-  "onboarding-5-description": {
-    "message": "Override User-Agent strings globally or per container. Test how targets respond to different browsers and devices."
-  },
-  "onboarding-6-header": {
-    "message": "Syncing Profiles is Available!"
-  },
-  "onboarding-6-description-2": {
-    "message": "Sync your security profiles and site assignments across your testing machines."
-  },
-  "onboarding-7-header-2": {
-    "message": "An account is required to sync."
-  },
-  "onboarding-7-description-2": {
-    "message": "Click Sign In to confirm that your account is active."
-  },
-  "onboarding-8-description": {
-    "message": "Phoenix Box integrates with your proxy tools to create isolated, interceptable connections for each security testing session."
-  },
-  "oneHundredTabsHeader": {
-    "message": "100 tabs!"
-  },
-  "youHaveOpened": {
-    "message": "You've opened 100 security profile tabs."
-  },
-  "spreadTheWord": {
-    "message": "If Phoenix Box helps your security testing, share it with your team!"
-  },
-  "rate": {
-    "message": "Rate"
-  },
-  "share": {
-    "message": "Share"
-  },
-  "tweet": {
-    "message": "Tweet"
-  },
   "default": {
     "message": "Default"
   },

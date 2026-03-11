@@ -73,6 +73,7 @@ module.exports = [
     files: ["src/js/**/*.js"],
     languageOptions: {
       globals: {
+        LOG: true,
         assignManager: true,
         badge: true,
         backgroundLogic: true,

@@ -10,35 +10,28 @@ interface OnboardingViewProps {
 const STEPS = [
   {
     id: 1,
-    header: "Control in Every Browser Context",
-    description: "PhoenixBox gives you fully isolated browser containers so you can run multiple roles side-by-side — safely and clearly.\n\nNo cookie conflicts. No accidental cross-login. No confusion.",
+    header: "Your Security Testing Workspace",
+    description: "Preconfigured profiles like Attacker, Victim, Admin, and Member are ready to go — each isolated with its own cookies, storage, and proxy.\n\nNeed something custom? Create containers with any name, color, and icon to fit your workflow.",
     image: "/img/onboarding-1.png",
     buttonText: "Get Started"
   },
   {
     id: 2,
-    header: "Use Roles with Colored Tabs",
-    description: "Launch isolated containers for Attacker, Victim, Member — or create your own.\n\nEach has independent cookies, sessions, and proxy routing.\n\nColor-coded tabs ensure you always know which role you're in.",
-    image: "/img/onboarding-3.png",
-    buttonText: "Next"
-  },
-  {
-    id: 3,
-    header: "Built for Security — Integrated with Burp Suite",
-    description: "Route traffic through Burp and highlight requests by container. You can instantly see where the traffic is coming from. No more guessing.",
+    header: "Burp Suite, Built In",
+    description: "Route any container through Burp with per-container proxy settings. Every request is color-highlighted by its container — instantly see which role sent it.\n\nNo more guessing which session a request belongs to. Clear visibility, faster hunting.",
     image: "/img/onboarding-4.png",
     buttonText: "Next"
   },
   {
-    id: 4,
-    header: "Real-Time User-Agent Switching",
-    description: "Instantly switch between real desktop and mobile User-Agents — applied live with no restarts or resets, so you can test behavior differences in seconds.",
+    id: 3,
+    header: "Spoof User-Agents on the Fly",
+    description: "Switch between desktop and mobile User-Agents per container — live, no restart. Test mobile-only endpoints, check browser-specific behavior, and explore how targets respond to different fingerprints.",
     image: "/img/onboarding-2.png",
     buttonText: "Next"
   },
   {
-    id: 5,
-    header: "Sync Across Machines",
+    id: 4,
+    header: "Sync Your Setup Across Machines",
     description: "",
     image: "/img/Sync.svg",
     dualButtons: true,
@@ -47,15 +40,15 @@ const STEPS = [
     isSyncStep: true
   },
   {
-    id: 6,
+    id: 5,
     header: "You're All Set",
-    description: "Your browser contexts are fully isolated and ready.\n\nLaunch PhoenixBox and start working.",
+    description: "Your containers are isolated and ready.\n\nOpen a target, pick a role, and start testing.",
     image: "/img/moz-vpn-onboarding.svg",
     buttonText: "Launch PhoenixBox"
   }
 ];
 
-const FIREFOX_SIGNIN_URL = "https://accounts.firefox.com/?service=sync&action=email&context=fx_desktop_v3&entrypoint=multi-account-containers&utm_source=addon&utm_medium=panel&utm_campaign=container-sync&brand=mozilla";
+const FIREFOX_SIGNIN_URL = "https://accounts.firefox.com/?service=sync&action=email&context=fx_desktop_v3&entrypoint=phoenix-box&utm_source=addon&utm_medium=panel&utm_campaign=phoenix-box-sync";
 
 export function OnboardingView({ onComplete, initialStep = 0 }: OnboardingViewProps) {
   const clampedInitial = Math.max(0, Math.min(initialStep, STEPS.length - 1));
@@ -65,8 +58,8 @@ export function OnboardingView({ onComplete, initialStep = 0 }: OnboardingViewPr
   const step = STEPS[currentStepIndex];
   const isSyncStep = "isSyncStep" in step && step.isSyncStep;
   const syncDescription = syncDetected
-    ? "Your Mozilla account is connected. Keep your isolated environments consistent across devices."
-    : "Sign in with your Mozilla account to sync roles, containers, and site assignments across machines.";
+    ? "Your Mozilla account is connected. Keep your roles, targets, and container setup consistent across machines."
+    : "Sign in with your Mozilla account to sync your containers, site assignments, and proxy configs across devices.";
   const syncActionText = syncDetected ? "Enable Sync" : "Sign In & Enable Sync";
 
   useEffect(() => {
@@ -127,7 +120,7 @@ export function OnboardingView({ onComplete, initialStep = 0 }: OnboardingViewPr
     try {
       const browser = requireWebExt();
 
-      if (step.id === 5) {
+      if (step.id === 4) {
         const syncEnabled = await enableSync(browser, syncDetected !== true);
         if (!syncEnabled) {
           return;
@@ -156,7 +149,7 @@ export function OnboardingView({ onComplete, initialStep = 0 }: OnboardingViewPr
     setBusy(true);
     try {
       const browser = requireWebExt();
-      if (step.id === 5) {
+      if (step.id === 4) {
         await browser.storage.local.set({ syncEnabled: false });
         await browser.runtime.sendMessage({ method: "resetSync" });
         await browser.storage.local.set({ "onboarding-stage": 5 });

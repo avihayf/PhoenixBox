@@ -3,6 +3,7 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 const NUMBER_OF_KEYBOARD_SHORTCUTS = 10;
+const LOG_DEBUG = false;
 
 async function setUpCheckBoxes() {
   for (const el of document.querySelectorAll("[data-permission-id]")) {
@@ -54,7 +55,7 @@ async function enableDisableSync() {
   try {
     await browser.runtime.sendMessage({ method: "resetSync" });
   } catch (e) {
-    console.error("Failed to send resetSync message:", e);
+    if (LOG_DEBUG) { console.error("Failed to send resetSync message:", e); }
   }
 }
 

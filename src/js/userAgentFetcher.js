@@ -86,7 +86,7 @@ const userAgentFetcher = {
 
       return results;
     } catch (error) {
-      console.error("Failed to fetch User-Agents from CDN:", error);
+      LOG.error("Failed to fetch User-Agents from CDN:", error);
       
       // Try to return cached data as fallback
       const cached = await this.getCached();

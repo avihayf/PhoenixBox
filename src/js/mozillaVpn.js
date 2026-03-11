@@ -122,8 +122,8 @@ const MozillaVPN = {
   attachUtmParameters(baseUrl, utmContent) {
     const url = new URL(baseUrl);
     const utmParameters = {
-      utm_source: "multi.account.containers",
-      utm_medium: "mac-browser-addon",
+      utm_source: "phoenix-box",
+      utm_medium: "browser-addon",
       utm_content: utmContent,
       utm_campaign: "vpn-better-together",
     };

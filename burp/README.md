@@ -6,7 +6,7 @@ Pre-compiled JAR file for automatic request highlighting in Burp Suite.
 
 ## Quick Installation
 
-1. Download `Phoenix-Highlighter.jar`
+1. Download `PhoenixBoxHighlighter.jar`
 2. Open Burp Suite
 3. Go to **Extender** → **Extensions** → **Add**
 4. Select **"Java"** as extension type
@@ -60,7 +60,7 @@ Firefox (Phoenix Box)
   ↓
   Adds: X-MAC-Container-Color: red
   ↓
-Burp Suite (Phoenix-Highlighter)
+Burp Suite (PhoenixBoxHighlighter)
   ↓
   1. Reads header
   2. Highlights request (red)
@@ -187,25 +187,13 @@ Implements Burp Extender API interfaces:
 
 ## Source Code
 
-The source code for this extension is available in the development repository at:
+The Burp extension is written in Kotlin. For security and simplicity, only the compiled JAR is included in this repository.
 
-```
-https://github.com/avihaife-cmyk/PhoenixBox-dev
-```
-
-For security and simplicity, only the compiled JAR is included in the public repository.
-
-### Why No Source in Public Repo?
+### Why Only the JAR?
 
 1. **Simplicity** - Most users only need the JAR file
-2. **Size** - Reduces repository size significantly
-3. **Dependencies** - No need for Gradle, Kotlin SDK, etc.
-4. **Security** - Compiled artifact is auditable
-
-If you want to build from source or modify the extension:
-1. Clone the dev repository
-2. Navigate to `burp/` directory
-3. See `BUILD_INSTRUCTIONS.md` for build instructions
+2. **Size** - Reduces repository size by omitting Gradle wrapper, Kotlin SDK, and build output
+3. **Auditability** - The compiled artifact can be decompiled and inspected directly
 
 ---
 
@@ -223,8 +211,8 @@ See: [BURP_SUITE_SETUP.md](../docs/BURP_SUITE_SETUP.md)
 
 ## Support
 
-- 🐛 [Report Issues](https://github.com/avihaife-cmyk/PhoenixBox/issues)
-- 💬 [Discussions](https://github.com/avihaife-cmyk/PhoenixBox/discussions)
+- 🐛 [Report Issues](https://github.com/avihayf/PhoenixBox/issues)
+- 💬 [Discussions](https://github.com/avihayf/PhoenixBox/discussions)
 - 📖 [Main Documentation](../README.md)
 
 ---

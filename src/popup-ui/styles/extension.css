@@ -17,7 +17,7 @@
   transform: translate(-50%, -50%);
   width: 150px;
   height: 150px;
-  background-image: url('../../img/PheonixLogo-light.png');
+  background-image: url('../../img/PhoenixLogo-light.png');
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
@@ -28,7 +28,7 @@
 
 /* Background Phoenix Logo watermark - Dark Mode (Main View only) */
 .dark .extension-popup.main-view::before {
-  background-image: url('../../img/PheonixLogo-New.png');
+  background-image: url('../../img/PhoenixLogo-New.png');
 }
 
 /* Ensure popup frame shrinks with content */

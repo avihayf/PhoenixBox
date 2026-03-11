@@ -39,7 +39,7 @@ Complete installation instructions for Phoenix Box.
 
 1. **Download the Extension**
    ```
-   Go to: https://github.com/avihaife-cmyk/PhoenixBox/releases
+   Go to: https://github.com/avihayf/PhoenixBox/releases
    Download: phoenix_proxy-1.0.0.xpi
    ```
 
@@ -88,7 +88,7 @@ Complete installation instructions for Phoenix Box.
 
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/avihaife-cmyk/PhoenixBox.git
+   git clone https://github.com/avihayf/PhoenixBox.git
    cd PhoenixBox
    ```
 
@@ -200,8 +200,8 @@ npm run package
 
 1. **Download the JAR**
    ```
-   Go to: https://github.com/avihaife-cmyk/PhoenixBox/releases
-   Download: Phoenix-Highlighter.jar
+   Go to: https://github.com/avihayf/PhoenixBox/releases
+   Download: PhoenixBoxHighlighter.jar
    ```
 
 2. **Install in Burp Suite**
@@ -209,7 +209,7 @@ npm run package
    - Go to **Extender** → **Extensions** → **Add**
    - Extension type: **Java**
    - Click "Select file..."
-   - Choose `Phoenix-Highlighter.jar`
+   - Choose `PhoenixBoxHighlighter.jar`
    - Click **"Next"**
 
 3. **Verify Installation**
@@ -298,7 +298,7 @@ See [BURP_SUITE_SETUP.md](BURP_SUITE_SETUP.md) for detailed setup.
 
 **Solutions**:
 1. Ensure "Add container color header" is enabled in Firefox
-2. Verify Phoenix-Highlighter.jar is loaded in Burp
+2. Verify PhoenixBoxHighlighter.jar is loaded in Burp
 3. Check Burp Output tab for extension errors
 4. Extension should strip headers - if you see them, extension may not be working
 
@@ -353,6 +353,6 @@ See [FEATURES.md](FEATURES.md) for complete feature documentation.
 
 ## Support
 
-- 🐛 [Report Issues](https://github.com/avihaife-cmyk/PhoenixBox/issues)
-- 💬 [Discussions](https://github.com/avihaife-cmyk/PhoenixBox/discussions)
+- 🐛 [Report Issues](https://github.com/avihayf/PhoenixBox/issues)
+- 💬 [Discussions](https://github.com/avihayf/PhoenixBox/discussions)
 - 📖 [Documentation](../README.md)

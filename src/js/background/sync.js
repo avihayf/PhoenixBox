@@ -396,7 +396,7 @@ const sync = {
       }
     } catch (e) {
       restoreSucceeded = false;
-      console.error("runSync: restore/upgrade failed, continuing with backup:", e);
+      LOG.error("runSync: restore/upgrade failed, continuing with backup:", e);
     }
 
     await sync.storageArea.backup();
@@ -472,7 +472,7 @@ async function reconcileIdentities(){
       try{
         await browser.contextualIdentities.remove(deletedCookieStoreId);
       } catch {
-        console.error("Error deleting contextualIdentity", deletedCookieStoreId);
+        LOG.error("Error deleting contextualIdentity", deletedCookieStoreId);
         continue;
       }
     }
@@ -535,7 +535,7 @@ async function reconcileIdentities(){
       if (localMatchByNameAndUUID) {
         await updateIdentityWithSyncInfo(syncIdentity, localMatchByNameAndUUID);
       } else {
-        console.warn("Skipping ambiguous sync identity match for name:", syncIdentity.name);
+        LOG.warn("Skipping ambiguous sync identity match for name:", syncIdentity.name);
       }
       continue;
     }
