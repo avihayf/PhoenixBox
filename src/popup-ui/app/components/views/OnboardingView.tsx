@@ -152,9 +152,6 @@ export function OnboardingView({ onComplete, initialStep = 0 }: OnboardingViewPr
       if (step.id === 4) {
         await browser.storage.local.set({ syncEnabled: false });
         await browser.runtime.sendMessage({ method: "resetSync" });
-        await browser.storage.local.set({ "onboarding-stage": 5 });
-        setCurrentStepIndex(5);
-        return;
       }
       await goToNextStep(browser);
     } finally {
