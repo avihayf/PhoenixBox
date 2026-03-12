@@ -9,10 +9,9 @@
 
 ## Quick Start
 
-1. Download `PhoenixBox.xpi` from [Releases](https://github.com/avihayf/PhoenixBox/releases).
-2. Install it in Firefox Developer Edition or Firefox Nightly.
-3. Open the Phoenix Box popup and start testing with the built-in Attacker, Victim, Admin, and Member containers.
-4. For Burp highlighting, also install `PhoenixBoxHighlighter.jar` in Burp Suite and enable **Add container color header**.
+1. Install Phoenix Box from [Firefox Add-ons (AMO)](https://addons.mozilla.org/firefox/addon/phoenix-box/) or download `PhoenixBox.xpi` from [Releases](https://github.com/avihayf/PhoenixBox/releases).
+2. Open the Phoenix Box popup and start testing with the built-in Attacker, Victim, Admin, and Member containers.
+3. For Burp highlighting, also install `PhoenixBoxHighlighter.jar` in Burp Suite and enable **Add container color header**.
 
 ---
 
@@ -33,16 +32,15 @@
 
 ### End Users
 
-Phoenix Box is currently intended for Firefox Developer Edition or Firefox Nightly.
+Works on any Firefox (release, ESR, Developer Edition, or Nightly).
 
-1. Download the latest release assets from [GitHub Releases](https://github.com/avihayf/PhoenixBox/releases):
-   - `PhoenixBox.xpi` for the Firefox extension
-   - `PhoenixBoxHighlighter.jar` for Burp Suite integration
-2. Open Firefox Developer Edition.
-3. Go to `about:config`.
-4. Set `xpinstall.signatures.required` to `false`.
-5. Drag `PhoenixBox.xpi` into Firefox and confirm the installation prompt.
-6. Pin the Phoenix Box toolbar icon if needed.
+**Option A — Firefox Add-ons (recommended):**
+Search for "Phoenix Box" on [addons.mozilla.org](https://addons.mozilla.org) and click **Add to Firefox**.
+
+**Option B — Manual install from GitHub Releases:**
+1. Download `PhoenixBox.xpi` and `PhoenixBoxHighlighter.jar` from [GitHub Releases](https://github.com/avihayf/PhoenixBox/releases).
+2. Drag `PhoenixBox.xpi` into Firefox and confirm the installation prompt.
+3. Pin the Phoenix Box toolbar icon if needed.
 
 If you want Burp integration, also install `PhoenixBoxHighlighter.jar` in Burp Suite:
 
@@ -123,28 +121,9 @@ The Burp companion extension strips the header before the request reaches the ta
 
 ---
 
-## Security Notes
+## Privacy & Security
 
-### Proxy Password Storage
-
-Proxy authentication passwords are held **in memory only** for the current browser session. They are never written to `browser.storage.local` or synced across devices. This means:
-
-- Website logins inside containers persist normally across restarts (cookies are stored per-container).
-- Proxy auth credentials will need to be re-entered after a Firefox restart.
-- Proxy presets (scheme, host, port) are saved and optionally synced, but passwords are excluded.
-
-### Container Color Header (Paint the Burp)
-
-When "Add container color header" is enabled, every HTTP request from a container tab includes an `X-MAC-Container-Color` header. This is intended for local Burp Suite highlighting and should be **disabled when testing against live targets** to avoid:
-
-- Fingerprinting: the non-standard header uniquely identifies Phoenix Box users.
-- OPSEC leakage: the color value can reveal your container role (e.g. "red" = Attacker).
-
-The companion Burp Suite extension (`PhoenixBoxHighlighter.jar`) strips this header before forwarding to the target server, so traffic through Burp is clean. Direct browser traffic (without Burp) will carry the header to the server if this feature is on.
-
-### Sync
-
-Profile sync uses `browser.storage.sync` tied to your Mozilla account. Proxy topology metadata (host, port, scheme) may be synced; passwords are never synced. If you are working in a sensitive environment, consider leaving sync disabled.
+No telemetry, no data collection. See [PRIVACY.md](PRIVACY.md) for full details on data handling, proxy password storage, the container color header, and sync behavior.
 
 ---
 

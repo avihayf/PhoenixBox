@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Phoenix Box is a Firefox WebExtension (Manifest V2) for security testing workflows. It provides multi-container browser sessions with per-container proxy routing, User-Agent spoofing, Burp Suite integration, and site assignment — so pentesters can run Attacker/Victim/Admin/Member roles side by side without session collisions.
 
-Requires Firefox Developer Edition or Nightly (min version 138.0). Extension ID: `phoenix-box@0xr3db0mb.com`.
+Requires Firefox Developer Edition or Nightly (min version 140.0). Extension ID: `phoenix-box@0xr3db0mb.com`.
 
 ## Build & Development Commands
 

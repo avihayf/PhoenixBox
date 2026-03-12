@@ -122,15 +122,30 @@ The content script (`js/content-script.js`) is 55 lines and does only one thing:
 
 ## Build Instructions
 
+### Environment Requirements
+
+- **OS**: macOS, Linux, or Windows
+- **Node.js**: v18 or higher (tested with v18.12.1) — download from https://nodejs.org
+- **npm**: v8 or higher (included with Node.js)
+
+### Steps
+
 ```bash
+# 1. Install dependencies
 npm install
-npm run build    # outputs to dist/ and web-ext-artifacts/
-npm test         # runs lint + unit tests
+
+# 2. Build the extension (outputs XPI to web-ext-artifacts/)
+npm run build
+
+# 3. Run linters and unit tests (optional verification)
+npm test
 ```
 
-The React popup is built with Vite; the build script (`scripts/build-extension.mjs`) copies legacy extension files alongside the Vite output into `dist/`, then `web-ext build` packages the XPI.
+The built extension will be in `dist/` and the packaged XPI in `web-ext-artifacts/phoenix_box-1.0.0.zip`.
 
-Source code is also available as a zip via `npm run package:source`.
+### What the build does
+
+The React popup (`src/popup-ui/`) is compiled by Vite into `dist/popup/`. The build script (`scripts/build-extension.mjs`) then copies all legacy JS, CSS, images, fonts, and locales alongside the Vite output into `dist/`, patches `manifest.json`, and `web-ext build` packages the final XPI.
 
 ---
 
