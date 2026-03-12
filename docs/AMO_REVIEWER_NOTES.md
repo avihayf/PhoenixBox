@@ -1,4 +1,4 @@
-# Notes to AMO Reviewer — Phoenix Box v1.0.0
+# Notes to AMO Reviewer — Phoenix Box v1.1.0
 
 ## What This Extension Does
 

@@ -2,7 +2,7 @@
   "name": "phoenix-box",
   "title": "Phoenix Box",
   "description": "Phoenix Box is a powerful multi-container extension specifically designed for security testing and penetration testing workflows with seamless Burp Suite integration.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "0xR3dB0mb",
   "bugs": {
     "url": "https://github.com/avihayf/PhoenixBox/issues"
