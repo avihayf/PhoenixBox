@@ -1,6 +1,5 @@
 # Privacy Policy for Phoenix Box
 
-**Last Updated**: March 10, 2026
 
 ## Overview
 
