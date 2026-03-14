@@ -3,7 +3,7 @@
 [![License](https://img.shields.io/badge/License-MPL%202.0-blue.svg)](https://opensource.org/licenses/MPL-2.0)
 [![Version](https://img.shields.io/badge/version-1.2.0-green.svg)](https://github.com/avihayf/PhoenixBox/releases)
 
-**Run attacker, victim, admin, and member sessions side by side in Firefox, create any custom containers you want, route the right traffic through Burp, and test faster without session collisions.**
+**Run different sessions side by side in Firefox, create any custom containers you want, route the right traffic through Burp and Highlight your traffic, and test faster without session collisions.**
 
 ---
 
