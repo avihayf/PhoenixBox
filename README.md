@@ -11,13 +11,13 @@
 
 1. Install Phoenix Box from [Firefox Add-ons (AMO)](https://addons.mozilla.org/firefox/addon/phoenix-box/) or download `PhoenixBox.xpi` from [Releases](https://github.com/avihayf/PhoenixBox/releases).
 2. Open the Phoenix Box popup and start testing with the built-in Attacker, Victim, Admin, and Member containers.
-3. For Burp highlighting, also install `PhoenixBoxHighlighter.jar` in Burp Suite and enable **Add container color header**.
+3. For Burp highlighting, also install `PhoenixBoxHighlighter.jar` in Burp Suite and enable **PhoenixBox Highlighter**.
 
 ---
 
 ## Features
 
-- Preconfigured **Attacker**, **Victim**, **Admin**, and **Member** containers
+- Preconfigured Container like **Attacker**, **Victim**, **Admin**, and **Member**.
 - Per-container and global **proxy routing** for Burp or other tools
 - **Burp Suite highlighting** via `X-MAC-Container-Color` and the companion JAR
 - Global and per-container **User-Agent overrides**
