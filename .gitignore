@@ -25,6 +25,7 @@ coverage/
 .vscode/
 .cursor/
 .claude/
+CLAUDE.md
 *.code-workspace
 
 # Logs
