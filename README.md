@@ -25,6 +25,7 @@
 - Full **cookie and storage separation** between containers
 - **Mozilla VPN integration** for optional per-container VPN routing
 - Dark/light themes, accent colors, keyboard shortcuts, and multi-language support
+- Extended icon set including security-focused icons (skull, user-x, user-cog, user-minus) — these display correctly in the Phoenix Box UI, but Firefox's URL bar and tab indicator will show **fingerprint** as a fallback since custom icons are not part of the native `contextualIdentities` API
 
 ---
 
