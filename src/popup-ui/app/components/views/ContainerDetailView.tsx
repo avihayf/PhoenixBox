@@ -1,6 +1,7 @@
 import { ArrowLeft, Plus, Eye, ArrowLeftRight, Hourglass, Trash2, X } from 'lucide-react';
 import { ContainerIcon } from '../ContainerIcon';
 import { getContainerColorHex } from '../../../lib/containerColors';
+import type { ProxyPreset } from '../../../data/mockData';
 
 interface Tab {
   id: number;
@@ -14,6 +15,8 @@ interface ContainerDetailViewProps {
   containerColor: string;
   containerIcon?: string;
   tabs: Tab[];
+  activeProxyPresetId?: string;
+  proxyPresets?: ProxyPreset[];
   onBack: () => void;
   onManageContainer: () => void;
   onOpenNewTab: () => void;
@@ -22,6 +25,7 @@ interface ContainerDetailViewProps {
   onManageSites: () => void;
   onClearStorage: () => void;
   onCloseTab: (tabId: number) => void;
+  onSelectProxyPreset?: (preset: ProxyPreset | null) => void;
 }
 
 export function ContainerDetailView({
@@ -29,6 +33,8 @@ export function ContainerDetailView({
   containerColor,
   containerIcon,
   tabs,
+  activeProxyPresetId,
+  proxyPresets = [],
   onBack,
   onManageContainer,
   onOpenNewTab,
@@ -37,6 +43,7 @@ export function ContainerDetailView({
   onManageSites,
   onClearStorage,
   onCloseTab,
+  onSelectProxyPreset,
 }: ContainerDetailViewProps) {
   const colorHex = getContainerColorHex(containerColor);
 
@@ -105,6 +112,32 @@ export function ContainerDetailView({
             variant="danger"
           />
         </div>
+
+        {/* Proxy Quick-Switch */}
+        {onSelectProxyPreset && proxyPresets.length > 0 && (
+          <div className="px-2.5 pb-2.5 flex-shrink-0">
+            <div className="flex items-center gap-2 p-2 rounded-lg border border-[var(--ext-border)] bg-[var(--ext-bg-secondary)]">
+              <span className="text-xs text-[var(--ext-text-muted)] uppercase tracking-wider flex-shrink-0">Proxy</span>
+              <select
+                value={activeProxyPresetId || ""}
+                onChange={(e) => {
+                  if (e.target.value === "") {
+                    onSelectProxyPreset(null);
+                  } else {
+                    const preset = proxyPresets.find(p => p.id === e.target.value) || null;
+                    onSelectProxyPreset(preset);
+                  }
+                }}
+                className="flex-1 min-w-0 text-xs bg-transparent border-none text-[var(--ext-text)] focus:outline-none cursor-pointer"
+              >
+                <option value="">— None —</option>
+                {proxyPresets.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
 
         {/* Open Tabs Section */}
         <div className="p-2.5 border-t border-[var(--ext-border)] flex-1 flex flex-col min-h-0 space-y-1">

@@ -1100,6 +1100,28 @@ function App() {
             await browser.tabs.remove(tabId);
             await refreshContainers();
           }}
+          proxyPresets={customProxyPresets}
+          activeProxyPresetId={(() => {
+            if (!selectedContainer.proxyUrl) return undefined;
+            const match = customProxyPresets.find(p => {
+              const presetUrl = `${p.scheme}://${p.host}:${p.port}`;
+              return selectedContainer.proxyUrl === presetUrl;
+            });
+            return match?.id;
+          })()}
+          onSelectProxyPreset={async (preset) => {
+            if (!preset) {
+              await setProxyForContainer(selectedContainer.cookieStoreId, null);
+            } else {
+              await setProxyForContainer(selectedContainer.cookieStoreId, {
+                type: preset.scheme,
+                host: preset.host,
+                port: preset.port,
+                mozProxyEnabled: true,
+              });
+            }
+            await refreshContainers();
+          }}
         />
       </PopupWrapper>
     );
