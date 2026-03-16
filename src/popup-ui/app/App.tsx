@@ -1102,10 +1102,12 @@ function App() {
           }}
           proxyPresets={customProxyPresets}
           activeProxyPresetId={(() => {
-            if (!selectedContainer.proxyUrl) return undefined;
+            // Check per-container proxy first, then fall back to global proxy
+            const effectiveUrl = selectedContainer.proxyUrl || (globalProxyEnabled ? proxyUrl : "");
+            if (!effectiveUrl) return undefined;
             const match = customProxyPresets.find(p => {
               const presetUrl = `${p.scheme}://${p.host}:${p.port}`;
-              return selectedContainer.proxyUrl === presetUrl;
+              return effectiveUrl === presetUrl;
             });
             return match?.id;
           })()}
