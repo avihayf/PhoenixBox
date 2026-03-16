@@ -94,7 +94,7 @@ Phoenix Box can add an `X-MAC-Container-Color` header to requests so Burp can vi
 
 Basic setup:
 
-1. Install `PhoenixBoxHighlighter.jar` in Burp Suite.
+1. Download and install `PhoenixBoxHighlighter.jar` from the [PhoenixBox-Highlighter releases page](https://github.com/avihayf/PhoenixBox-Highlighter/releases/tag/v1.0.0) into Burp Suite via **Extender → Extensions → Add**.
 2. Configure Firefox to send traffic through Burp.
 3. Enable **Add container color header** in Phoenix Box.
 4. Browse in different containers and check Burp HTTP history.

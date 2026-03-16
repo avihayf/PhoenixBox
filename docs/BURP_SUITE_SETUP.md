@@ -161,7 +161,7 @@ The `X-MAC-Container-Color` header can also be used with Burp extensions like Lo
 
 ## Source Code
 
-The Burp extension is open source and included in the Phoenix Box repository under `burp/`. You can review or modify the code as needed for your specific use case.
+The Burp extension source code is available in the [PhoenixBox-Highlighter repository](https://github.com/avihayf/PhoenixBox-Highlighter). You can review or modify the code as needed for your specific use case.
 
 ## License
 
