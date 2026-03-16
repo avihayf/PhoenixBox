@@ -10,7 +10,7 @@ To enable automatic request highlighting in Burp Suite, you **must** install the
 
 ### Step 1: Install the Burp Suite Extension
 
-1. Download `PhoenixBoxHighlighter.jar` from the [burp folder on GitHub](https://github.com/avihayf/PhoenixBox/tree/main/burp) — click the JAR file and then **Download raw file**
+1. Download `PhoenixBoxHighlighter.jar` from the [PhoenixBox-Highlighter releases page](https://github.com/avihayf/PhoenixBox-Highlighter/releases/tag/v1.0.0)
 2. Open Burp Suite
 3. Go to **Extender** → **Extensions** → **Add**
 4. Select **"Java"** as the extension type

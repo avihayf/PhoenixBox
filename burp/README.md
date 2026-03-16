@@ -6,7 +6,7 @@ Pre-compiled JAR file for automatic request highlighting in Burp Suite.
 
 ## Quick Installation
 
-1. Download `PhoenixBoxHighlighter.jar`
+1. Download `PhoenixBoxHighlighter.jar` from the [releases page](https://github.com/avihayf/PhoenixBox-Highlighter/releases/tag/v1.0.0)
 2. Open Burp Suite
 3. Go to **Extender** → **Extensions** → **Add**
 4. Select **"Java"** as extension type
