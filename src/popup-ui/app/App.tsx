@@ -1161,6 +1161,18 @@ function App() {
         onManageContainers={() => setCurrentView("manage")}
         onSelectContainer={handleContainerClick}
         onContainerDetails={handleContainerDetails}
+        onQuickDeleteContainer={async (container) => {
+          const browser = requireWebExt();
+          const userContextId = Number(container.cookieStoreId.split("-").pop());
+          await browser.runtime.sendMessage({ method: "deleteContainer", message: { userContextId } });
+          const stored = await browser.storage.local.get({ containerDisplayIconOverrides: {} });
+          const overrides = (stored.containerDisplayIconOverrides && typeof stored.containerDisplayIconOverrides === "object" ? stored.containerDisplayIconOverrides : {}) || {};
+          if (overrides[container.cookieStoreId]) {
+            delete overrides[container.cookieStoreId];
+            await browser.storage.local.set({ containerDisplayIconOverrides: overrides });
+          }
+          await refreshContainers();
+        }}
         proxyEnabled={globalProxyEnabled}
         onToggleProxy={async (enabled, urlOverride) => {
           if (proxyToggleBusyRef.current) return false;
