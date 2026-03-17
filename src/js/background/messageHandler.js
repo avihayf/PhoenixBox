@@ -186,6 +186,7 @@ const messageHandler = {
 
     browser.tabs.onActivated.addListener((info) => {
       assignManager.removeContextMenu();
+      browser.pageAction.show(info.tabId).catch(() => {});
       browser.tabs.get(info.tabId).then((tab) => {
         assignManager.calculateContextMenu(tab);
       }).catch((e) => {
@@ -202,6 +203,7 @@ const messageHandler = {
         return {};
       }
       assignManager.removeContextMenu();
+      browser.pageAction.show(details.tabId).catch(() => {});
 
       browser.tabs.get(details.tabId).then((tab) => {
         assignManager.calculateContextMenu(tab);

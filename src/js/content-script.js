@@ -58,7 +58,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
   if (message && message.method === "scanEndpoints") {
     // Same regex as the endlets bookmarklet — path must be wrapped in quotes on both sides.
     // Backtick is safe in a regex literal (no special meaning).
-    const re = /(?<=["'`])\/[a-zA-Z0-9_?&=\/\-#.]*(?=["'`])/g;
+    const re = /(?<=["'`])\/[a-zA-Z0-9_?&=/\-#.]*(?=["'`])/g;
     const found = new Set();
     const html = document.documentElement.outerHTML;
     for (const m of html.matchAll(re)) { found.add(m[0]); }

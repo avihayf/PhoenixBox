@@ -211,6 +211,7 @@ const Utils = {
     const popup = document.getElementsByTagName("html")[0];
     const theme = Utils.getTheme(currentTheme, window);
     popup.setAttribute("data-theme", theme);
+    popup.classList.toggle("dark", theme === "dark");
   },
 
 };

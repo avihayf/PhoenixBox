@@ -2,6 +2,35 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+// Apply accent color + dark/light theme from localStorage (mirrors accentColors.ts formula)
+{
+  const ACCENT_HUES = { cyan: 187, green: 142, purple: 271, pink: 330, red: 0, orange: 25, yellow: 48, indigo: 235 };
+  const rawAccent = localStorage.getItem("accentColor");
+  let accentHue = 187;
+  if (rawAccent && rawAccent.startsWith("hue:")) {
+    accentHue = Math.max(0, Math.min(360, Number(rawAccent.slice(4)) || 0));
+  } else if (rawAccent && ACCENT_HUES[rawAccent] !== undefined) {
+    accentHue = ACCENT_HUES[rawAccent];
+  }
+  const theme = localStorage.getItem("theme") || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const isDark = theme === "dark";
+  const root = document.documentElement;
+  if (isDark) {
+    root.classList.add("dark");
+    root.style.setProperty("--ext-accent",       `hsl(${accentHue}, 85%, 60%)`);
+    root.style.setProperty("--ext-accent-dark",   `hsl(${accentHue}, 80%, 45%)`);
+    root.style.setProperty("--ext-accent-light",  `hsl(${accentHue}, 90%, 72%)`);
+    root.style.setProperty("--ext-accent-bg",     `hsla(${accentHue}, 80%, 55%, 0.1)`);
+    root.style.setProperty("--ext-glow-accent",   `hsla(${accentHue}, 85%, 55%, 0.5)`);
+  } else {
+    root.style.setProperty("--ext-accent",       `hsl(${accentHue}, 70%, 40%)`);
+    root.style.setProperty("--ext-accent-dark",   `hsl(${accentHue}, 75%, 30%)`);
+    root.style.setProperty("--ext-accent-light",  `hsl(${accentHue}, 65%, 50%)`);
+    root.style.setProperty("--ext-accent-bg",     `hsla(${accentHue}, 70%, 45%, 0.08)`);
+    root.style.setProperty("--ext-glow-accent",   `hsla(${accentHue}, 70%, 40%, 0.3)`);
+  }
+}
+
 async function load() {
   const searchParams = new URL(window.location).searchParams;
   const redirectUrl = searchParams.get("url");

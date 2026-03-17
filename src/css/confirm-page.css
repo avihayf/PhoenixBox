@@ -1,83 +1,77 @@
-/* General Rules and Resets */
-.title {
-  background-image: none;
+/* Phoenix Box — Confirm-page styles.
+ * Overrides Firefox native aboutNetError.css (loaded before this file). */
+
+html,
+body {
+  background: var(--ext-bg) !important;
+  color: var(--ext-text) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-size: 14px !important;
 }
 
 main {
-  background: url("/img/onboarding-4.png") no-repeat;
-  background-position: 200px 0;
-  background-size: 120px;
-  margin-inline-start: -350px;
-  padding-inline-start: 350px;
+  background: none !important;
+  background-image: none !important;
+  margin-inline-start: 0 !important;
+  padding-inline-start: 0 !important;
+  max-inline-size: 640px;
+  margin: 0 auto;
+  padding: 24px 20px;
 }
 
-.container-name {
-  font-weight: bold;
+.title {
+  background-image: none !important;
+  margin-block-end: 16px;
 }
 
-button .container-name,
+.title-text {
+  font-family: Audiowide, sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ext-accent);
+  margin: 0;
+}
+
+p {
+  color: var(--ext-text-muted);
+  font-size: 13px;
+  margin-block: 8px;
+  line-height: 1.5;
+}
+
+.container-name,
 #current-container-name {
   font-weight: bold;
-}
-
-@media only screen and (width <= 900px) {
-  main {
-    background: none;
-  }
-
-  /* for a mid sized window we have enough for this but not our image */
-  .title {
-    background-image: url('chrome://global/skin/icons/info.svg');
-  }
-}
-
-html {
-  box-sizing: border-box;
-  font: message-box;
+  color: var(--ext-accent);
 }
 
 #redirect-url,
 #redirect-origin {
-  font-weight: bold;
-
-  /* max-inline-size is needed to force this text smaller than the layout at a mid-sized window */
-  max-inline-size: 40rem;
+  font-weight: 500;
+  max-inline-size: 100%;
   word-break: break-all;
 }
 
 #redirect-url {
-  background: #efedf0; /* Grey 20 */
-  border: 1px solid rgb(0 240 255 / 0.18);
-  border-radius: 2px;
+  display: block;
+  background: var(--ext-bg-secondary);
+  border: 1px solid var(--ext-border);
+  border-radius: 6px;
+  color: var(--ext-text);
   line-height: 1.5;
   padding-block: 0.5rem;
-  padding-inline: 0.5rem;
+  padding-inline: 0.75rem;
+  margin-block: 10px;
+  font-size: 13px;
 }
-
-/* stylelint-disable media-feature-name-no-unknown */
-@media (prefers-color-scheme: dark) {
-  html,
-  body {
-    background:
-      radial-gradient(900px 420px at 20% 0%, rgb(0 240 255 / 0.1), transparent 55%),
-      radial-gradient(800px 480px at 80% 10%, rgb(255 0 170 / 0.06), transparent 60%),
-      linear-gradient(180deg, rgb(18 18 26 / 0.92), rgb(10 10 15 / 0.98));
-    color: #f7f7ff;
-  }
-
-  #redirect-url {
-    background: rgb(255 255 255 / 0.06);
-    color: rgb(247 247 255 / 0.88);
-    border-color: rgb(0 240 255 / 0.22);
-  }
-}
-/* stylelint-enable */
 
 #redirect-url img {
   block-size: 16px;
   inline-size: 16px;
   margin-inline-end: 6px;
-  offset-block-start: 3px;
+  inset-block-start: 3px;
   position: relative;
 }
 
@@ -85,16 +79,80 @@ dfn {
   font-style: normal;
 }
 
-#deny,
-#confirm {
-  flex-grow: 1;
-}
-
-.button-container > button {
-  min-inline-size: 240px;
-}
-
 .check-label {
   align-items: center;
   display: flex;
+  gap: 8px;
+  color: var(--ext-text-muted);
+  font-size: 13px;
+  margin-block: 10px;
+}
+
+.check-label input[type="checkbox"] {
+  accent-color: var(--ext-accent);
+  inline-size: 15px;
+  block-size: 15px;
+  flex-shrink: 0;
+}
+
+.button-container {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-block-start: 16px;
+}
+
+.button-container > button {
+  min-inline-size: 0;
+  flex: 1;
+}
+
+/* Override Firefox native .button styles */
+#deny,
+#deny-no-container {
+  padding: 8px 16px !important;
+  border-radius: 6px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: border-color 0.15s, color 0.15s !important;
+  background: transparent !important;
+  border: 1px solid var(--ext-border) !important;
+  color: var(--ext-text-muted) !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+#deny:hover,
+#deny-no-container:hover {
+  border-color: var(--ext-accent) !important;
+  color: var(--ext-accent) !important;
+}
+
+#confirm {
+  padding: 8px 16px !important;
+  border-radius: 6px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: opacity 0.15s !important;
+  background: var(--ext-accent) !important;
+  border: 1px solid var(--ext-accent) !important;
+  color: #000 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+#confirm:hover {
+  opacity: 0.85 !important;
+}
+
+@media only screen and (width <= 900px) {
+  main {
+    background: none !important;
+  }
+
+  .title {
+    background-image: none !important;
+  }
 }

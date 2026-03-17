@@ -131,12 +131,11 @@ async function init() {
 
   MozillaVPN.handleContainerList(identities);
 
-  // Set the theme
+  // Set the theme — applyTheme() sets both data-theme attribute and .dark class
   await Utils.applyTheme();
-  const theme = document.documentElement.getAttribute("data-theme");
-  document.documentElement.classList.toggle("dark", theme === "dark");
+  const isDark = document.documentElement.classList.contains("dark");
 
-  // Apply accent color from main popup UI
+  // Apply accent color from main popup UI (mirrors accentColors.ts formula)
   const ACCENT_HUES = { cyan: 187, green: 142, purple: 271, pink: 330, red: 0, orange: 25, yellow: 48, indigo: 235 };
   const rawAccent = localStorage.getItem("accentColor");
   let accentHue = 187;
@@ -146,8 +145,20 @@ async function init() {
     accentHue = ACCENT_HUES[rawAccent];
   }
   const root = document.documentElement;
-  root.style.setProperty("--color-accent", `hsl(${accentHue}, 85%, 60%)`);
-  root.style.setProperty("--icon-hue-rotate", `${accentHue - 27}deg`);
+  if (isDark) {
+    root.style.setProperty("--ext-accent",       `hsl(${accentHue}, 85%, 60%)`);
+    root.style.setProperty("--ext-accent-dark",   `hsl(${accentHue}, 80%, 45%)`);
+    root.style.setProperty("--ext-accent-light",  `hsl(${accentHue}, 90%, 72%)`);
+    root.style.setProperty("--ext-accent-bg",     `hsla(${accentHue}, 80%, 55%, 0.1)`);
+    root.style.setProperty("--ext-glow-accent",   `hsla(${accentHue}, 85%, 55%, 0.5)`);
+  } else {
+    root.style.setProperty("--ext-accent",       `hsl(${accentHue}, 70%, 40%)`);
+    root.style.setProperty("--ext-accent-dark",   `hsl(${accentHue}, 75%, 30%)`);
+    root.style.setProperty("--ext-accent-light",  `hsl(${accentHue}, 65%, 50%)`);
+    root.style.setProperty("--ext-accent-bg",     `hsla(${accentHue}, 70%, 45%, 0.08)`);
+    root.style.setProperty("--ext-glow-accent",   `hsla(${accentHue}, 70%, 40%, 0.3)`);
+  }
+  root.style.setProperty("--icon-hue-rotate",   `${accentHue - 27}deg`);
 }
 
 async function initExtractEndpoints() {
