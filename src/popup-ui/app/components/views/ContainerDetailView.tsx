@@ -161,11 +161,6 @@ export function ContainerDetailView({
                   onMouseEnter={e => (e.currentTarget.style.background = `${colorHex}0d`)}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  {tab.favicon ? (
-                    <img src={tab.favicon} alt="" className="w-3.5 h-3.5 flex-shrink-0 rounded-sm" />
-                  ) : (
-                    <div className="w-3.5 h-3.5 flex-shrink-0 bg-[var(--ext-bg-tertiary)] rounded-sm" />
-                  )}
                   <span className="text-xs text-[var(--ext-text)] flex-1 truncate font-medium">{tab.title || tab.url}</span>
                   <button
                     onClick={(e) => {
