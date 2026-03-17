@@ -1102,6 +1102,8 @@ function App() {
           }}
           proxyPresets={customProxyPresets}
           activeProxyPresetId={(() => {
+            // "Disable Proxy" — container has a direct entry overriding global proxy
+            if (selectedContainer.proxyUrl === "direct://") return "__direct__";
             // Check per-container proxy first, then fall back to global proxy
             const effectiveUrl = selectedContainer.proxyUrl || (globalProxyEnabled ? proxyUrl : "");
             if (!effectiveUrl) return undefined;
@@ -1114,6 +1116,13 @@ function App() {
           onSelectProxyPreset={async (preset) => {
             if (!preset) {
               await setProxyForContainer(selectedContainer.cookieStoreId, null);
+            } else if (preset.id === "__direct__") {
+              await setProxyForContainer(selectedContainer.cookieStoreId, {
+                type: "direct",
+                host: "",
+                port: 0,
+                mozProxyEnabled: false,
+              });
             } else {
               await setProxyForContainer(selectedContainer.cookieStoreId, {
                 type: preset.scheme,

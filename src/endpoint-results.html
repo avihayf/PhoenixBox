@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Phoenix Box — Endpoint Scan</title>
+  <link rel="stylesheet" href="css/endpoint-results.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <div class="header-left">
+        <img src="img/PhoenixLogo-New.png" alt="Phoenix Box" class="logo" />
+        <div>
+          <h1 class="title">Endpoint Scan</h1>
+          <p class="subtitle" id="page-url"></p>
+        </div>
+      </div>
+      <div class="header-right">
+        <span class="count" id="count">0 endpoints</span>
+        <button class="btn btn-primary" id="copy-all-btn">Copy All</button>
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <input
+        type="text"
+        id="filter-input"
+        class="filter-input"
+        placeholder="Filter endpoints…"
+      />
+      <button class="btn btn-sort" id="sort-btn" title="Toggle sort order">A→Z</button>
+      <div class="color-swatches" id="color-swatches" title="Endpoint text color">
+        <button class="swatch active" data-color="#00c8ff" title="Accent"></button>
+        <button class="swatch" data-color="#3fb950" title="Green"></button>
+        <button class="swatch" data-color="#e6edf3" title="White"></button>
+        <button class="swatch" data-color="#f0e040" title="Yellow"></button>
+        <button class="swatch" data-color="#ff7b3d" title="Orange"></button>
+      </div>
+      <span class="scanned-at" id="scanned-at"></span>
+    </div>
+
+    <main class="results" id="results-list">
+      <div class="empty" id="empty-state">No endpoints found.</div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast">Copied!</div>
+
+  <script src="js/endpoint-results.js"></script>
+</body>
+</html>

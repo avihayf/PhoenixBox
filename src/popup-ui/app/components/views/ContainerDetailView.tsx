@@ -117,12 +117,14 @@ export function ContainerDetailView({
         {onSelectProxyPreset && proxyPresets.length > 0 && (
           <div className="px-2.5 pb-2.5 flex-shrink-0">
             <div className="flex items-center gap-2 p-2 rounded-lg border border-[var(--ext-border)] bg-[var(--ext-bg-secondary)]">
-              <span className="text-xs text-[var(--ext-text-muted)] uppercase tracking-wider flex-shrink-0">Proxy</span>
+              <span className="text-xs text-[var(--ext-text-muted)] uppercase tracking-wider flex-shrink-0">Proxy Preset</span>
               <select
                 value={activeProxyPresetId || ""}
                 onChange={(e) => {
                   if (e.target.value === "") {
                     onSelectProxyPreset(null);
+                  } else if (e.target.value === "__direct__") {
+                    onSelectProxyPreset({ id: "__direct__", name: "Disable Proxy", scheme: "direct", host: "", port: 0 });
                   } else {
                     const preset = proxyPresets.find(p => p.id === e.target.value) || null;
                     onSelectProxyPreset(preset);
@@ -134,6 +136,7 @@ export function ContainerDetailView({
                 {proxyPresets.map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
+                <option value="__direct__">Disable Proxy</option>
               </select>
             </div>
           </div>

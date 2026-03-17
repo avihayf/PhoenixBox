@@ -63,10 +63,11 @@ copyDir(path.join(srcDir, "img"), path.join(distDir, "img"));
 copyDir(path.join(srcDir, "fonts"), path.join(distDir, "fonts"));
 copyDir(path.join(srcDir, "_locales"), path.join(distDir, "_locales"));
 
-// - other html pages (options, pageAction, confirm)
+// - other html pages (options, pageAction, confirm, endpoint-results)
 copyFile(path.join(srcDir, "options.html"), path.join(distDir, "options.html"));
 copyFile(path.join(srcDir, "pageActionPopup.html"), path.join(distDir, "pageActionPopup.html"));
 copyFile(path.join(srcDir, "confirm-page.html"), path.join(distDir, "confirm-page.html"));
+copyFile(path.join(srcDir, "endpoint-results.html"), path.join(distDir, "endpoint-results.html"));
 // confirm-page.js is already included via copyDir(src/js -> dist/js)
 
 // 4) Copy and patch manifest.json into dist

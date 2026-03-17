@@ -151,7 +151,11 @@ export function OnboardingView({ onComplete, initialStep = 0 }: OnboardingViewPr
       const browser = requireWebExt();
       if (step.id === 4) {
         await browser.storage.local.set({ syncEnabled: false });
-        await browser.runtime.sendMessage({ method: "resetSync" });
+        try {
+          await browser.runtime.sendMessage({ method: "resetSync" });
+        } catch {
+          // Don't block onboarding completion if sync reset fails.
+        }
       }
       await goToNextStep(browser);
     } finally {
@@ -165,7 +169,11 @@ export function OnboardingView({ onComplete, initialStep = 0 }: OnboardingViewPr
     try {
       const browser = requireWebExt();
       await browser.storage.local.set({ "onboarding-stage": 9, syncEnabled: false });
-      await browser.runtime.sendMessage({ method: "resetSync" });
+      try {
+        await browser.runtime.sendMessage({ method: "resetSync" });
+      } catch {
+        // Don't block finishing onboarding if sync reset fails.
+      }
       onComplete();
     } finally {
       setBusy(false);

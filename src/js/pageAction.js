@@ -135,6 +135,51 @@ async function init() {
   await Utils.applyTheme();
   const theme = document.documentElement.getAttribute("data-theme");
   document.documentElement.classList.toggle("dark", theme === "dark");
+
+  // Apply accent color from main popup UI
+  const ACCENT_HUES = { cyan: 187, green: 142, purple: 271, pink: 330, red: 0, orange: 25, yellow: 48, indigo: 235 };
+  const rawAccent = localStorage.getItem("accentColor");
+  let accentHue = 187;
+  if (rawAccent && rawAccent.startsWith("hue:")) {
+    accentHue = Math.max(0, Math.min(360, Number(rawAccent.slice(4)) || 0));
+  } else if (rawAccent && ACCENT_HUES[rawAccent] !== undefined) {
+    accentHue = ACCENT_HUES[rawAccent];
+  }
+  const root = document.documentElement;
+  root.style.setProperty("--color-accent", `hsl(${accentHue}, 85%, 60%)`);
+  root.style.setProperty("--icon-hue-rotate", `${accentHue - 27}deg`);
+}
+
+async function initExtractEndpoints() {
+  const btn = document.getElementById("extract-endpoints-btn");
+  if (!btn) return;
+  btn.addEventListener("click", async () => {
+    btn.textContent = "Scanning…";
+    btn.disabled = true;
+    try {
+      const lastWindow = await browser.windows.getLastFocused({ populate: false });
+      const tabs = lastWindow
+        ? await browser.tabs.query({ active: true, windowId: lastWindow.id })
+        : [];
+      const currentTab = tabs[0];
+      if (!currentTab || !currentTab.id) {
+        btn.textContent = "No active tab";
+        btn.disabled = false;
+        return;
+      }
+      await browser.runtime.sendMessage({
+        method: "extractEndpoints",
+        tabId: currentTab.id,
+        pageUrl: currentTab.url,
+      });
+    } catch (e) {
+      btn.textContent = "Error — try again";
+      btn.disabled = false;
+      return;
+    }
+    window.close();
+  });
 }
 
 init();
+initExtractEndpoints();

@@ -54,3 +54,30 @@ h3.title {
 .menu {
   padding-block-end: 0 !important;
 }
+
+.extract-endpoints-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-accent, #00c8ff);
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.extract-endpoints-btn:hover {
+  background: color-mix(in srgb, var(--color-accent, #00c8ff) 10%, transparent);
+}
+
+.extract-endpoints-icon {
+  width: 16px;
+  height: 16px;
+  opacity: 0.8;
+  filter: invert(70%) sepia(80%) saturate(400%) hue-rotate(var(--icon-hue-rotate, 160deg));
+}
