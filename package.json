@@ -64,7 +64,7 @@
     "lint:html": "html-validate \"src/**/*.html\"",
     "lint:js": "eslint .",
     "package": "rm -rf web-ext-artifacts addon.xpi && npm run build && mv web-ext-artifacts/*.zip addon.xpi",
-    "package:source": "zip -r source-code.zip src/ scripts/ docs/ burp/ package.json package-lock.json tsconfig.json vite.config.mts eslint.config.js .stylelintrc .htmlvalidate.json README.md LICENSE PRIVACY.md -x '*.DS_Store' '*/node_modules/*' '*/.git/*' '*/dist/*' '*/.vscode/*' '*/.cursor/*' '*/.claude/*'",
+    "package:source": "zip -r source-code.zip src/ scripts/ docs/ package.json package-lock.json tsconfig.json vite.config.mts eslint.config.js .stylelintrc .htmlvalidate.json README.md LICENSE PRIVACY.md -x '*.DS_Store' '*/node_modules/*' '*/.git/*' '*/dist/*' '*/.vscode/*' '*/.cursor/*' '*/.claude/*'",
     "test": "npm-run-all lint test:unit",
     "test:unit": "mocha test/**/*.test.js"
   }
