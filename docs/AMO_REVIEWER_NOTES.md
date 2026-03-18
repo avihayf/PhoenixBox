@@ -1,4 +1,4 @@
-# Notes to AMO Reviewer — Phoenix Box v1.2.0
+# Notes to AMO Reviewer — Phoenix Box v1.3.0
 
 ## What This Extension Does
 
@@ -126,22 +126,22 @@ The content script (`js/content-script.js`) is 55 lines and does only one thing:
 
 - **OS**: macOS, Linux, or Windows
 - **Node.js**: v18 or higher (tested with v18.12.1) — download from https://nodejs.org
-- **npm**: v8 or higher (included with Node.js)
+- **Yarn**: v1.22 or higher — install with `npm install -g yarn`
 
 ### Steps
 
 ```bash
 # 1. Install dependencies
-npm install
+yarn install
 
-# 2. Build the extension (outputs XPI to web-ext-artifacts/)
-npm run build
+# 2. Build the extension (outputs zip to web-ext-artifacts/)
+yarn build
 
 # 3. Run linters and unit tests (optional verification)
-npm test
+yarn test
 ```
 
-The built extension will be in `dist/` and the packaged XPI in `web-ext-artifacts/phoenix_box-1.0.0.zip`.
+The built extension will be in `dist/` and the packaged zip in `web-ext-artifacts/phoenix_box-1.3.0.zip`.
 
 ### What the build does
 
