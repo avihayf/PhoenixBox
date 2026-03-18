@@ -47,7 +47,6 @@
   src: url("/fonts/JetBrainsMono-Bold.woff2") format("woff2");
 }
 
-[data-theme="light"],
 :root {
   --fontInter: "Inter", sans-serif;
   --fontInterMedium: "Inter-Medium", sans-serif;
@@ -137,8 +136,7 @@
 
   /* ------------------------------------------------------------
    * Phoenix "hacker" palette + shared tokens
-   * We keep existing variable names intact and override them here
-   * (later declarations win), to avoid functional/layout risk.
+   * Accent-aware: dynamic values use --ext-accent (set by JS from localStorage).
    * ------------------------------------------------------------ */
   --fontMono: "JetBrains Mono", ui-monospace, "SFMono-Regular", "Menlo", "Monaco", "Consolas", "Liberation Mono", "Courier New", monospace;
   --accent-cyan: #00f0ff;
@@ -161,11 +159,11 @@
   --text-normal-color: rgb(12 12 18 / 0.78);
   --badge-destructive-bg-color: var(--accent-magenta);
   --badge-destructive-text-color: #0a0a0f;
-  --button-bg-color-primary: var(--accent-cyan);
-  --button-bg-hover-color-primary: #80f6ff;
-  --button-bg-active-color-primary: #aafcff;
-  --button-bg-focus-color-primary: var(--accent-cyan);
-  --button-text-color-primary: #051014;
+  --button-bg-color-primary: var(--ext-accent);
+  --button-bg-hover-color-primary: var(--ext-accent-light);
+  --button-bg-active-color-primary: var(--ext-accent-light);
+  --button-bg-focus-color-primary: var(--ext-accent);
+  --button-text-color-primary: #000;
   --button-bg-color-secondary: rgb(12 12 18 / 0.06);
   --button-bg-hover-color-secondary: rgb(12 12 18 / 0.1);
   --button-bg-active-color-secondary: rgb(12 12 18 / 0.14);
@@ -178,21 +176,21 @@
   --input-bg-focus-color: #fff;
   --input-bg-active-color: #fff;
   --input-border-color: rgb(12 12 18 / 0.25);
-  --input-border-focus-color: var(--accent-cyan);
-  --input-border-active-color: var(--accent-cyan);
-  --menu-bg-hover-color: rgb(0 240 255 / 0.08);
-  --menu-bg-active-color: rgb(0 240 255 / 0.12);
-  --toggle-on-bg-color: var(--accent-cyan);
-  --toggle-on-bg-hover-color: #80f6ff;
-  --toggle-on-bg-active-color: #aafcff;
-  --toggle-on-bg-focus-color: var(--accent-cyan);
-  --toggle-on-border-color: var(--accent-cyan);
-  --usercontext-bg-hover-color: rgb(0 240 255 / 0.08);
-  --usercontext-bg-focus-color: rgb(0 240 255 / 0.1);
-  --usercontext-bg-active-color: rgb(0 240 255 / 0.12);
+  --input-border-focus-color: var(--ext-accent);
+  --input-border-active-color: var(--ext-accent);
+  --menu-bg-hover-color: var(--ext-accent-bg);
+  --menu-bg-active-color: var(--ext-accent-bg);
+  --toggle-on-bg-color: var(--ext-accent);
+  --toggle-on-bg-hover-color: var(--ext-accent-light);
+  --toggle-on-bg-active-color: var(--ext-accent-light);
+  --toggle-on-bg-focus-color: var(--ext-accent);
+  --toggle-on-border-color: var(--ext-accent);
+  --usercontext-bg-hover-color: var(--ext-accent-bg);
+  --usercontext-bg-focus-color: var(--ext-accent-bg);
+  --usercontext-bg-active-color: var(--ext-accent-bg);
 }
 
-[data-theme="dark"] {
+.dark {
   --iconCloseX: url("/img/close-light.svg");
   --iconGear: url("/img/gear-icon-light.svg");
   --iconArrowRight: url("/img/arrow-icon-right-light.svg");
@@ -260,52 +258,52 @@
   --usercontext-bg-focus-color: #2b2a33;
   --usercontext-bg-hover-color: #52525e;
 
-  /* Phoenix "hacker" dark theme overrides */
-  --bgColor: #0a0a0f;
-  --bgDark: #12121a;
-  --panel-bg-color: #12121a;
-  --panel-separator-color: rgb(0 240 255 / 0.14);
-  --text-color-primary: #f7f7ff;
-  --text-normal-color: rgb(247 247 255 / 0.78);
-  --primaryCtaDefault: var(--accent-cyan);
-  --primaryCtaHover: #80f6ff;
-  --primaryCtaActive: #aafcff;
-  --controllerActive: rgb(0 240 255 / 0.14);
+  /* Phoenix "hacker" dark theme overrides — uses --ext-* tokens */
+  --bgColor: var(--ext-bg);
+  --bgDark: var(--ext-bg-secondary);
+  --panel-bg-color: var(--ext-bg-secondary);
+  --panel-separator-color: var(--ext-border);
+  --text-color-primary: var(--ext-text);
+  --text-normal-color: var(--ext-text-muted);
+  --primaryCtaDefault: var(--ext-accent);
+  --primaryCtaHover: var(--ext-accent-light);
+  --primaryCtaActive: var(--ext-accent-light);
+  --controllerActive: var(--ext-accent-bg);
   --badge-destructive-bg-color: var(--accent-magenta);
   --badge-destructive-text-color: #0a0a0f;
-  --button-bg-color-primary: var(--accent-cyan);
-  --button-bg-hover-color-primary: #80f6ff;
-  --button-bg-active-color-primary: #aafcff;
-  --button-bg-focus-color-primary: var(--accent-cyan);
-  --button-text-color-primary: #051014;
-  --button-bg-color-secondary: rgb(255 255 255 / 0.06);
-  --button-bg-hover-color-secondary: rgb(0 240 255 / 0.1);
-  --button-bg-active-color-secondary: rgb(0 240 255 / 0.14);
+  --button-bg-color-primary: var(--ext-accent);
+  --button-bg-hover-color-primary: var(--ext-accent-light);
+  --button-bg-active-color-primary: var(--ext-accent-light);
+  --button-bg-focus-color-primary: var(--ext-accent);
+  --button-text-color-primary: #000;
+  --button-bg-color-secondary: var(--ext-bg-tertiary);
+  --button-bg-hover-color-secondary: var(--ext-accent-bg);
+  --button-bg-active-color-secondary: var(--ext-accent-bg);
   --button-destructive-bg-color: var(--accent-magenta);
   --button-destructive-bg-hover-color: #ff4bc0;
   --button-destructive-bg-active-color: #ff80d3;
   --button-destructive-bg-focus-color: var(--accent-magenta);
   --button-destructive-text-color: #0a0a0f;
-  --input-bg-color: rgb(255 255 255 / 0.05);
-  --input-bg-focus-color: rgb(255 255 255 / 0.07);
-  --input-bg-active-color: rgb(255 255 255 / 0.07);
-  --input-border-color: rgb(0 240 255 / 0.22);
-  --input-border-focus-color: var(--accent-cyan);
-  --input-border-active-color: var(--accent-cyan);
-  --link-color: var(--accent-cyan);
-  --link-hover-color: #80f6ff;
-  --menu-bg-hover-color: rgb(0 240 255 / 0.08);
-  --menu-bg-active-color: rgb(0 240 255 / 0.12);
-  --toggle-off-border-color: rgb(0 240 255 / 0.22);
-  --toggle-on-bg-color: var(--accent-cyan);
-  --toggle-on-bg-hover-color: #80f6ff;
-  --toggle-on-bg-active-color: #aafcff;
-  --toggle-on-bg-focus-color: var(--accent-cyan);
-  --toggle-on-border-color: var(--accent-cyan);
-  --toggle-on-handle-bg-color: #0a0a0f;
-  --usercontext-bg-hover-color: rgb(0 240 255 / 0.08);
-  --usercontext-bg-focus-color: rgb(0 240 255 / 0.1);
-  --usercontext-bg-active-color: rgb(0 240 255 / 0.12);
+  --input-bg-color: var(--ext-bg-secondary);
+  --input-bg-focus-color: var(--ext-bg-tertiary);
+  --input-bg-active-color: var(--ext-bg-tertiary);
+  --input-border-color: var(--ext-border);
+  --input-border-focus-color: var(--ext-accent);
+  --input-border-active-color: var(--ext-accent);
+  --link-color: var(--ext-accent);
+  --link-hover-color: var(--ext-accent-light);
+  --menu-bg-hover-color: var(--ext-accent-bg);
+  --menu-bg-active-color: var(--ext-accent-bg);
+  --toggle-off-border-color: var(--ext-border);
+  --toggle-on-bg-color: var(--ext-accent);
+  --toggle-on-bg-hover-color: var(--ext-accent-light);
+  --toggle-on-bg-active-color: var(--ext-accent-light);
+  --toggle-on-bg-focus-color: var(--ext-accent);
+  --toggle-on-border-color: var(--ext-accent);
+  --toggle-on-handle-bg-color: var(--ext-bg);
+  --usercontext-bg-hover-color: var(--ext-accent-bg);
+  --usercontext-bg-focus-color: var(--ext-accent-bg);
+  --usercontext-bg-active-color: var(--ext-accent-bg);
 }
 
 /* General Rules and Resets */
@@ -336,16 +334,16 @@ body {
 }
 
 /* stylelint-disable no-descending-specificity */
-[data-theme="dark"] body {
-  background-color: #0a0a0f;
+.dark body {
+  background-color: var(--ext-bg);
 }
 
-[data-theme="dark"] .panel {
+.dark .panel {
   background-color: transparent !important;
 }
 
 /* Rising ember particles effect */
-[data-theme="dark"] .menu-panel::after {
+.dark .menu-panel::after {
   animation: embers-rise 8s ease-in-out infinite;
   background:
     radial-gradient(2px 2px at 20% 90%, rgb(255 120 0 / 0.4), transparent),
@@ -362,7 +360,7 @@ body {
   z-index: 0;
 }
 
-[data-theme="dark"] .menu-panel:hover::after {
+.dark .menu-panel:hover::after {
   opacity: 1;
 }
 
@@ -380,7 +378,7 @@ body {
 }
 
 /* Scanline effect removed to keep the background clean */
-[data-theme="dark"] body::after {
+.dark body::after {
   content: none;
 }
 
@@ -398,36 +396,36 @@ body {
 /* stylelint-enable no-descending-specificity */
 
 /* Hack for menu icons to use a light color without affecting container icons */
-[data-theme="light"] img.delete-assignment,
-[data-theme="dark"] img.reset-assignment,
-[data-theme="dark"] .trash-button,
-[data-theme="dark"] img.menu-icon,
-[data-theme="dark"] .menu-icon > img,
-[data-theme="dark"] .menu-arrow > img,
-[data-theme="dark"] .info-icon > img {
+:not(.dark) img.delete-assignment,
+.dark img.reset-assignment,
+.dark .trash-button,
+.dark img.menu-icon,
+.dark .menu-icon > img,
+.dark .menu-arrow > img,
+.dark .info-icon > img {
   filter: invert(1) brightness(1.2);
   opacity: 0.9;
 }
 
 /* Cyan glow on hover for dark mode icons */
-[data-theme="dark"] .menu-item:hover img.menu-icon,
-[data-theme="dark"] .menu-item:hover .menu-icon > img {
+.dark .menu-item:hover img.menu-icon,
+.dark .menu-item:hover .menu-icon > img {
   filter: invert(1) brightness(1.5) drop-shadow(0 0 4px rgb(0 240 255 / 0.6));
   opacity: 1;
 }
 
-[data-theme="dark"] img.clear-storage-icon,
-[data-theme="dark"] img.delete-assignment,
-[data-theme="dark"] #edit-sites-assigned .menu-icon,
-[data-theme="dark"] #container-info-table .menu-icon {
+.dark img.clear-storage-icon,
+.dark img.delete-assignment,
+.dark #edit-sites-assigned .menu-icon,
+.dark #container-info-table .menu-icon {
   filter: invert(0);
 }
 
-[data-theme="dark"] [data-identity-color="grey"] {
+.dark [data-identity-color="grey"] {
   --identity-icon-color: var(--text-color-primary);
 }
 
-[data-theme="dark"] [data-identity-color="grey"]:hover {
+.dark [data-identity-color="grey"]:hover {
   --identity-icon-color: var(--text-color-primary);
 }
 
@@ -481,7 +479,7 @@ table {
   max-block-size: 200px; /* Limit height so button stays visible */
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: rgb(0 240 255 / 0.45) transparent;
+  scrollbar-color: var(--ext-accent) transparent;
 }
 
 .offpage {
@@ -556,7 +554,7 @@ table {
   --identity-icon-color: #39ff14;
 }
 
-/* We disable no-descending-specificity so we can keep [data-theme="dark"]
+/* We disable no-descending-specificity so we can keep .dark
  * rules grouped together at the beginning of the file
  */
 /* stylelint-disable no-descending-specificity */
@@ -812,7 +810,7 @@ input:checked + .slider::before {
 }
 
 /* Extra glow for enabled state in dark mode */
-[data-theme="dark"] input:checked + .slider {
+.dark input:checked + .slider {
   box-shadow:
     0 0 0 2px var(--toggle-on-border-color),
     0 0 12px rgb(0 240 255 / 0.35);
@@ -859,15 +857,26 @@ input:checked:hover:focus + .slider {
   transition: background-color 0.2s ease-in-out;
 }
 
-[data-theme="dark"] .primary-cta,
-[data-theme="dark"] .button.primary {
-  box-shadow:
-    0 0 0 1px rgb(0 240 255 / 0.25) inset,
-    0 0 18px rgb(0 240 255 / 0.18);
-  animation: neon-pulse 2.4s ease-in-out infinite;
+.dark .primary-cta,
+.dark .button.primary {
+  position: relative;
 }
 
-[data-theme="dark"] .button.secondary {
+.dark .primary-cta::after,
+.dark .button.primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    0 0 0 1px var(--ext-accent-bg) inset,
+    0 0 18px var(--ext-glow-accent);
+  animation: neon-pulse 2.4s ease-in-out infinite;
+  pointer-events: none;
+  will-change: opacity;
+}
+
+.dark .button.secondary {
   box-shadow: 0 0 0 1px rgb(0 240 255 / 0.18) inset;
 }
 
@@ -1058,14 +1067,11 @@ input.proxies {
 @keyframes neon-pulse {
   0%,
   100% {
-    box-shadow:
-      0 0 0 1px rgb(0 240 255 / 0.25) inset,
-      0 0 12px rgb(0 240 255 / 0.2),
-      0 0 24px rgb(0 240 255 / 0.1);
+    opacity: 1;
   }
 
   50% {
-    box-shadow: 0 0 18px rgb(0 240 255 / 0.22);
+    opacity: 0.35;
   }
 }
 
@@ -1322,7 +1328,7 @@ input.proxies {
   transition: box-shadow 0.5s ease;
 }
 
-[data-theme="dark"] .proxy-panel-title.drop-shadow {
+.dark .proxy-panel-title.drop-shadow {
   box-shadow: 0 8px 22px rgb(0 0 0 / 0.55);
 }
 
@@ -1721,7 +1727,7 @@ input[type="text"] {
   padding-inline: 8px;
 }
 
-[data-theme="dark"] input[type="text"] {
+.dark input[type="text"] {
   font-family: var(--fontMono);
   letter-spacing: 0.2px;
 }
@@ -2070,7 +2076,7 @@ manage things like container crud */
   padding-inline: 16px;
 }
 
-/* We disable no-descending-specificity so we can keep [data-theme="dark"]
+/* We disable no-descending-specificity so we can keep .dark
  * rules grouped together at the beginning of the file
  */
 /* stylelint-disable no-descending-specificity */
@@ -2297,7 +2303,7 @@ h3.title .title-icon {
   display: none;
 }
 
-[data-theme="dark"] h3.title .title-icon {
+.dark h3.title .title-icon {
   filter: brightness(1.2);
   opacity: 0.9;
 }
@@ -2400,7 +2406,7 @@ h3.title .title-icon {
 }
 
 /* Hacker terminal: mono font for menu items in dark mode */
-[data-theme="dark"] .menu-text {
+.dark .menu-text {
   font-family: var(--fontMono);
   font-size: 13px;
   letter-spacing: 0.3px;
@@ -2455,7 +2461,7 @@ h3.title .title-icon {
   cursor: default;
 }
 
-/* We disable no-descending-specificity so we can keep [data-theme="dark"]
+/* We disable no-descending-specificity so we can keep .dark
  * rules grouped together at the beginning of the file
  */
 /* stylelint-disable no-descending-specificity */
@@ -2492,7 +2498,7 @@ h3.title .title-icon {
 }
 
 /* Stronger glow for container count in dark mode */
-[data-theme="dark"] .container-count {
+.dark .container-count {
   color: var(--accent-cyan);
   opacity: 0.85;
   text-shadow: 0 0 6px rgb(0 240 255 / 0.4);
@@ -2509,7 +2515,7 @@ h3.title .title-icon {
   text-align: center;
 }
 
-/* We disable no-descending-specificity so we can keep [data-theme="dark"]
+/* We disable no-descending-specificity so we can keep .dark
  * rules grouped together at the beginning of the file
  */
 /* stylelint-disable no-descending-specificity */
@@ -2537,7 +2543,7 @@ hr {
 }
 
 /* Neon glow for hr dividers in dark mode */
-[data-theme="dark"] hr {
+.dark hr {
   border-block-start-color: rgb(0 240 255 / 0.25);
   box-shadow: 0 0 8px rgb(0 240 255 / 0.15);
 }
@@ -2559,7 +2565,7 @@ hr + .sub-header-wrapper {
 }
 
 /* Hacker terminal: sub-headers with accent glow */
-[data-theme="dark"] .sub-header {
+.dark .sub-header {
   color: var(--accent-cyan);
   font-family: var(--fontInterMedium);
   font-size: 11px;
@@ -2604,23 +2610,32 @@ hr + .sub-header-wrapper {
 }
 
 /* Hacker terminal: bottom button with strong glow */
-[data-theme="dark"] .bottom-btn {
-  animation: neon-pulse 2.4s ease-in-out infinite;
-  background: linear-gradient(135deg, rgb(0 240 255 / 0.12), rgb(0 240 255 / 0.06));
-  border: 1px solid rgb(0 240 255 / 0.3);
-  color: var(--accent-cyan);
+.dark .bottom-btn {
+  position: relative;
+  background: linear-gradient(135deg, var(--ext-accent-bg), transparent);
+  border: 1px solid var(--ext-border);
+  color: var(--ext-accent);
   font-family: var(--fontMono);
   font-size: 11px;
   letter-spacing: 1.5px;
-  text-shadow: 0 0 8px rgb(0 240 255 / 0.4);
+  text-shadow: 0 0 8px var(--ext-glow-accent);
   text-transform: uppercase;
 }
 
-[data-theme="dark"] .bottom-btn:hover {
-  background: linear-gradient(135deg, rgb(0 240 255 / 0.2), rgb(0 240 255 / 0.1));
-  box-shadow:
-    0 0 0 1px var(--accent-cyan) inset,
-    0 0 20px rgb(0 240 255 / 0.3);
+.dark .bottom-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 1px var(--ext-accent-bg) inset, 0 0 20px var(--ext-glow-accent);
+  animation: neon-pulse 2.4s ease-in-out infinite;
+  pointer-events: none;
+  will-change: opacity;
+}
+
+.dark .bottom-btn:hover {
+  background: linear-gradient(135deg, var(--ext-accent-bg), var(--ext-accent-bg));
+  border-color: var(--ext-accent);
 }
 
 .confirmation-destructive-ok-btn {
@@ -2644,8 +2659,8 @@ hr + .sub-header-wrapper {
   pointer-events: all;
 }
 
-[data-theme="dark"] .confirmation-destructive-ok-btn,
-[data-theme="dark"] .delete-btn {
+.dark .confirmation-destructive-ok-btn,
+.dark .delete-btn {
   box-shadow:
     0 0 0 1px rgb(255 0 170 / 0.22) inset,
     0 0 18px rgb(255 0 170 / 0.14);
@@ -2726,7 +2741,7 @@ input {
   align-items: center;
 }
 
-[data-theme="dark"] .options-label {
+.dark .options-label {
   font-family: var(--fontMono);
   font-size: 14px;
   letter-spacing: 0.3px;
@@ -2793,7 +2808,7 @@ input {
   padding-inline: 0;
 }
 
-/* We disable no-descending-specificity so we can keep [data-theme="dark"]
+/* We disable no-descending-specificity so we can keep .dark
  * rules grouped together at the beginning of the file
  */
 /* stylelint-disable no-descending-specificity */
@@ -2889,7 +2904,7 @@ tr:hover > td > .reset-button {
 
 /* Hacker terminal: searchbar styling in dark mode */
 /* stylelint-disable property-disallowed-list -- Phoenix Box searchbar padding */
-[data-theme="dark"] .searchbar input {
+.dark .searchbar input {
   background: rgb(0 240 255 / 0.04);
   border: 1px solid rgb(0 240 255 / 0.18);
   border-radius: 4px;
@@ -2901,12 +2916,12 @@ tr:hover > td > .reset-button {
 }
 /* stylelint-enable property-disallowed-list */
 
-[data-theme="dark"] .searchbar input::placeholder {
+.dark .searchbar input::placeholder {
   color: rgb(0 240 255 / 0.4);
   font-family: var(--fontMono);
 }
 
-[data-theme="dark"] .searchbar input:focus {
+.dark .searchbar input:focus {
   background: rgb(0 240 255 / 0.06);
   border-color: var(--accent-cyan);
   box-shadow: 0 0 12px rgb(0 240 255 / 0.2);

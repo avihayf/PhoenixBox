@@ -49,7 +49,27 @@ async function addMessage(message) {
 browser.runtime.onMessage.addListener((message, sender) => {
   // Only accept messages from our own extension's background script.
   if (sender.id !== browser.runtime.id) return;
+
   if (message && typeof message.text === "string") {
     addMessage(message);
+    return;
+  }
+
+  if (message && message.method === "scanEndpoints") {
+    // Same regex as the endlets bookmarklet — path must be wrapped in quotes on both sides.
+    // Backtick is safe in a regex literal (no special meaning).
+    const re = /(?<=["'`])\/[a-zA-Z0-9_?&=/\-#.]*(?=["'`])/g;
+    const found = new Set();
+    const html = document.documentElement.outerHTML;
+    for (const m of html.matchAll(re)) { found.add(m[0]); }
+    for (const s of document.getElementsByTagName("script")) {
+      if (!s.src && s.textContent) {
+        for (const m of s.textContent.matchAll(re)) { found.add(m[0]); }
+      }
+    }
+    const noAssets = /\.(png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|css|map)$/i;
+    return Promise.resolve(
+      Array.from(found).filter(p => p.length > 0 && !noAssets.test(p)).sort()
+    );
   }
 });

@@ -131,10 +131,66 @@ async function init() {
 
   MozillaVPN.handleContainerList(identities);
 
-  // Set the theme
+  // Set the theme — applyTheme() sets both data-theme attribute and .dark class
   await Utils.applyTheme();
-  const theme = document.documentElement.getAttribute("data-theme");
-  document.documentElement.classList.toggle("dark", theme === "dark");
+  const isDark = document.documentElement.classList.contains("dark");
+
+  // Apply accent color from main popup UI (mirrors accentColors.ts formula)
+  const ACCENT_HUES = { cyan: 187, green: 142, purple: 271, pink: 330, red: 0, orange: 25, yellow: 48, indigo: 235 };
+  const rawAccent = localStorage.getItem("accentColor");
+  let accentHue = 187;
+  if (rawAccent && rawAccent.startsWith("hue:")) {
+    accentHue = Math.max(0, Math.min(360, Number(rawAccent.slice(4)) || 0));
+  } else if (rawAccent && ACCENT_HUES[rawAccent] !== undefined) {
+    accentHue = ACCENT_HUES[rawAccent];
+  }
+  const root = document.documentElement;
+  if (isDark) {
+    root.style.setProperty("--ext-accent",       `hsl(${accentHue}, 85%, 60%)`);
+    root.style.setProperty("--ext-accent-dark",   `hsl(${accentHue}, 80%, 45%)`);
+    root.style.setProperty("--ext-accent-light",  `hsl(${accentHue}, 90%, 72%)`);
+    root.style.setProperty("--ext-accent-bg",     `hsla(${accentHue}, 80%, 55%, 0.1)`);
+    root.style.setProperty("--ext-glow-accent",   `hsla(${accentHue}, 85%, 55%, 0.5)`);
+  } else {
+    root.style.setProperty("--ext-accent",       `hsl(${accentHue}, 70%, 40%)`);
+    root.style.setProperty("--ext-accent-dark",   `hsl(${accentHue}, 75%, 30%)`);
+    root.style.setProperty("--ext-accent-light",  `hsl(${accentHue}, 65%, 50%)`);
+    root.style.setProperty("--ext-accent-bg",     `hsla(${accentHue}, 70%, 45%, 0.08)`);
+    root.style.setProperty("--ext-glow-accent",   `hsla(${accentHue}, 70%, 40%, 0.3)`);
+  }
+  root.style.setProperty("--icon-hue-rotate",   `${accentHue - 27}deg`);
+}
+
+async function initExtractEndpoints() {
+  const btn = document.getElementById("extract-endpoints-btn");
+  if (!btn) return;
+  btn.addEventListener("click", async () => {
+    btn.textContent = "Scanning…";
+    btn.disabled = true;
+    try {
+      const lastWindow = await browser.windows.getLastFocused({ populate: false });
+      const tabs = lastWindow
+        ? await browser.tabs.query({ active: true, windowId: lastWindow.id })
+        : [];
+      const currentTab = tabs[0];
+      if (!currentTab || !currentTab.id) {
+        btn.textContent = "No active tab";
+        btn.disabled = false;
+        return;
+      }
+      await browser.runtime.sendMessage({
+        method: "extractEndpoints",
+        tabId: currentTab.id,
+        pageUrl: currentTab.url,
+      });
+    } catch (e) {
+      btn.textContent = "Error — try again";
+      btn.disabled = false;
+      return;
+    }
+    window.close();
+  });
 }
 
 init();
+initExtractEndpoints();

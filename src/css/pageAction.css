@@ -2,14 +2,6 @@
  * Base layout comes from popup.css; this file only tunes the
  * compact "Always open this site in…" picker. */
 
-@font-face {
-  font-family: Audiowide;
-  src: url("/fonts/Audiowide-Regular.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
 html,
 body {
   inline-size: 280px !important;
@@ -36,6 +28,7 @@ h3.title {
   font-size: 13px !important;
   letter-spacing: 0.05em !important;
   text-transform: uppercase !important;
+  color: var(--ext-accent) !important;
   block-size: auto !important;
   line-height: 1.4 !important;
   padding-block: 10px !important;
@@ -53,4 +46,34 @@ h3.title {
 
 .menu {
   padding-block-end: 0 !important;
+}
+
+.extract-endpoints-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: calc(100% - 20px);
+  margin: 4px 10px;
+  padding: 3px 12px;
+  background: transparent;
+  border: 2px solid var(--ext-accent, #00c8ff);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ext-accent, #00c8ff);
+  letter-spacing: 0.02em;
+  transition: background 0.15s;
+}
+
+.extract-endpoints-btn:hover {
+  background: var(--ext-accent-bg, hsl(187deg 80% 55% / 0.1));
+}
+
+.extract-endpoints-icon {
+  width: 16px;
+  height: 16px;
+  opacity: 0.8;
+  filter: invert(70%) sepia(80%) saturate(400%) hue-rotate(var(--icon-hue-rotate, 160deg));
 }

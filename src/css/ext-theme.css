@@ -1,0 +1,117 @@
+/* Phoenix Box — Shared theme for plain-JS pages.
+ * Dark-first: :root provides dark defaults; .dark class (applied by JS) is
+ * redundant but explicit for specificity clarity.
+ * JS overrides --ext-accent-* at runtime from localStorage accentColor. */
+
+@font-face {
+  font-family: Audiowide;
+  src: url("../fonts/Audiowide-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --ext-bg:           #050510;
+  --ext-bg-secondary: #0f0f1e;
+  --ext-bg-tertiary:  #1a1a2e;
+  --ext-border:       #2d2d4a;
+  --ext-text:         #f0f9ff;
+  --ext-text-muted:   #94a3b8;
+  --ext-accent:       hsl(187deg 85% 60%);
+  --ext-accent-dark:  hsl(187deg 80% 45%);
+  --ext-accent-light: hsl(187deg 90% 72%);
+  --ext-accent-bg:    hsl(187deg 80% 55% / 0.1);
+  --ext-glow-accent:  hsl(187deg 85% 55% / 0.5);
+  --ext-purple:       #a855f7;
+  --ext-green:        #22c55e;
+  --ext-red:          #ef4444;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--ext-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ext-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ext-text-muted);
+}
+
+/* Shared button styles */
+.ext-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  background: transparent;
+  border: 1px solid var(--ext-border);
+  color: var(--ext-text-muted);
+}
+
+.ext-btn:hover {
+  border-color: var(--ext-accent);
+  color: var(--ext-accent);
+}
+
+.ext-btn-primary {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  background: var(--ext-accent);
+  border: 1px solid var(--ext-accent);
+  color: #000;
+}
+
+.ext-btn-primary:hover {
+  opacity: 0.85;
+}
+
+/* Shared input styles */
+.ext-input {
+  padding: 7px 12px;
+  background: var(--ext-bg-secondary);
+  border: 1px solid var(--ext-border);
+  border-radius: 6px;
+  color: var(--ext-text);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.ext-input:focus {
+  border-color: var(--ext-accent);
+}
+
+/* Shared select styles */
+.ext-select {
+  padding: 5px 10px;
+  background: var(--ext-bg-secondary);
+  border: 1px solid var(--ext-border);
+  border-radius: 6px;
+  color: var(--ext-text);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+}
+
+.ext-select:focus {
+  border-color: var(--ext-accent);
+}

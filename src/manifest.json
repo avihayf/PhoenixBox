@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Phoenix Box",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "author": "0xR3dB0mb",
   "incognito": "not_allowed",
   "description": "__MSG_extensionDescription__",

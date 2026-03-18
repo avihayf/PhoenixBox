@@ -32,6 +32,8 @@ interface EditContainerViewProps {
   onClearContainerUserAgent: () => void;
 }
 
+const noScrollbarStyle = { scrollbarWidth: 'none' as const };
+
 const CONTAINER_ICONS = [
   'fingerprint',
   'skull',
@@ -72,6 +74,7 @@ export function EditContainerView({
   const [vpnExpanded, setVpnExpanded] = useState(false);
   const [showUserAgentModal, setShowUserAgentModal] = useState(false);
   const [containerUserAgentType, setContainerUserAgentType] = useState<'all' | 'desktop' | 'mobile'>('all');
+  const [pendingDelete, setPendingDelete] = useState(false);
 
   const handleSave = () => {
     const trimmedName = name.trim();
@@ -100,7 +103,8 @@ export function EditContainerView({
 
       {/* Form Content */}
       <div
-        className="flex-1 min-h-0 p-3 space-y-3 overflow-y-auto custom-scrollbar"
+        className="flex-1 min-h-0 p-3 space-y-3 overflow-y-auto [&::-webkit-scrollbar]:hidden"
+        style={noScrollbarStyle}
       >
         {/* Name Input */}
         <div>
@@ -244,16 +248,6 @@ export function EditContainerView({
           </div>
         )}
 
-        {/* Delete Button (only for existing containers) */}
-        {container && container.cookieStoreId !== 'new' && onDelete && (
-          <button
-            onClick={onDelete}
-            className="w-full flex items-center justify-center gap-2 py-2 bg-[#2a0a1a] hover:bg-[#3a0a2a] border border-[var(--ext-pink)] text-[var(--ext-pink)] rounded-lg transition-colors text-sm"
-          >
-            <Trash2 className="w-4 h-4" />
-            Delete This Container
-          </button>
-        )}
       </div>
 
       {!isNew && (
@@ -270,17 +264,50 @@ export function EditContainerView({
         />
       )}
 
+      {/* Delete Confirmation Strip */}
+      {pendingDelete && (
+        <div className="px-2.5 py-2 border-t border-[var(--ext-pink)]/40 bg-[#2a0a1a] flex items-center justify-between gap-2">
+          <span className="text-xs text-[var(--ext-pink)] flex items-center gap-1.5">
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete this container?
+          </span>
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => setPendingDelete(false)}
+              className="px-2.5 py-1 text-xs border border-[var(--ext-border)] text-[var(--ext-text)] rounded hover:bg-[var(--ext-bg-secondary)] transition-colors"
+            >
+              No
+            </button>
+            <button
+              onClick={() => { onDelete?.(); setPendingDelete(false); }}
+              className="px-2.5 py-1 text-xs bg-[var(--ext-pink)] text-white rounded hover:opacity-90 transition-colors font-semibold"
+            >
+              Yes, Delete
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Bottom Buttons */}
-      <div className="p-2.5 border-t border-[var(--ext-border)] bg-[var(--ext-bg)] flex gap-2.5">
+      <div className="p-2.5 border-t border-[var(--ext-border)] bg-[var(--ext-bg)] flex gap-2">
         <button
           onClick={onBack}
-          className="flex-1 flex items-center justify-center py-2.5 border border-[var(--ext-border)] text-[var(--ext-text)] rounded-lg hover:bg-[var(--ext-bg-secondary)] transition-colors uppercase tracking-wider text-sm"
+          className="flex-1 flex items-center justify-center py-2 border border-[var(--ext-border)] text-[var(--ext-text)] rounded-lg hover:bg-[var(--ext-bg-secondary)] transition-colors uppercase tracking-wider text-xs"
         >
           Cancel
         </button>
+        {container && container.cookieStoreId !== 'new' && onDelete && (
+          <button
+            onClick={() => setPendingDelete(true)}
+            aria-label="Delete this container"
+            className={`flex items-center justify-center px-3 py-2 border rounded-lg transition-colors ${pendingDelete ? 'bg-[#3a0a2a] border-[var(--ext-pink)] text-[var(--ext-pink)]' : 'bg-[#2a0a1a] hover:bg-[#3a0a2a] border-[var(--ext-pink)] text-[var(--ext-pink)]'}`}
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
         <button
           onClick={handleSave}
-          className="flex-1 flex items-center justify-center py-2.5 bg-[var(--ext-accent)] text-[var(--primary-foreground)] rounded-lg hover:opacity-90 btn-brand-primary disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 flex items-center justify-center py-2 bg-[var(--ext-accent)] text-[var(--primary-foreground)] rounded-lg hover:opacity-90 btn-brand-primary disabled:opacity-50 disabled:cursor-not-allowed text-xs uppercase tracking-wider"
           disabled={!name.trim()}
         >
           Save Identity

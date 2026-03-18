@@ -68,6 +68,7 @@ interface SiteActionsViewProps {
   onSaveProxyPreset: (preset: Omit<ProxyPreset, 'id'>) => void;
   onUpdateProxyPreset: (id: string, preset: Omit<ProxyPreset, 'id'>) => void;
   onDeleteProxyPreset: (id: string) => void;
+  onQuickDeleteContainer: (container: Container) => void;
 }
 
 export function SiteActionsView({
@@ -106,6 +107,7 @@ export function SiteActionsView({
   onSaveProxyPreset,
   onUpdateProxyPreset,
   onDeleteProxyPreset,
+  onQuickDeleteContainer,
 }: SiteActionsViewProps) {
   const [showUserAgentModal, setShowUserAgentModal] = useState(false);
   const [isQuickActionsExpanded, setIsQuickActionsExpanded] = useState(false);
@@ -115,6 +117,7 @@ export function SiteActionsView({
   const [showProxyModal, setShowProxyModal] = useState(false);
   const [editingPreset, setEditingPreset] = useState<ProxyPreset | null>(null);
   const [showPaintBurpFirstTimeMessage, setShowPaintBurpFirstTimeMessage] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const presetDropdownRef = useRef<HTMLDivElement>(null);
   const accentPickerRef = useRef<HTMLDivElement>(null);
 
@@ -477,44 +480,78 @@ export function SiteActionsView({
               <div className="space-y-1">
                 {filteredContainers.map(container => {
                   const cHex = getContainerColorHex(container.color);
+                  const isConfirming = confirmDeleteId === container.cookieStoreId;
                   return (
                     <div
                       key={container.cookieStoreId}
                       className="relative group container-item"
                     >
-                      <button
-                        type="button"
-                        onClick={() => onSelectContainer(container)}
-                        className="w-full flex items-center gap-2.5 p-2 pr-8 border border-transparent rounded transition-colors text-left"
-                        onMouseEnter={e => {
-                          e.currentTarget.style.borderColor = `${cHex}66`;
-                          e.currentTarget.style.background = `${cHex}0d`;
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.borderColor = 'transparent';
-                          e.currentTarget.style.background = 'transparent';
-                        }}
-                      >
-                        <ContainerIcon iconKey={container.displayIcon || container.icon} colorHex={cHex} />
-                        <span className="text-sm text-[var(--ext-text)] flex-1">{container.name}</span>
-                        <span className="text-xs min-w-[1.5rem] text-center" style={{ color: cHex }}>
-                          {container.tabCount}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onContainerDetails(container);
-                        }}
-                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded transition-colors"
-                        style={{ color: 'var(--ext-text-muted)' }}
-                        onMouseEnter={e => { e.currentTarget.style.background = `${cHex}1a`; e.currentTarget.style.color = cHex; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--ext-text-muted)'; }}
-                        aria-label={`Edit ${container.name}`}
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
+                      {isConfirming ? (
+                        <div
+                          className="flex items-center gap-2 p-2 rounded border"
+                          style={{ borderColor: `${cHex}66`, background: `${cHex}0d` }}
+                        >
+                          <ContainerIcon iconKey={container.displayIcon || container.icon} colorHex={cHex} />
+                          <span className="text-xs text-[var(--ext-text)] flex-1 truncate">
+                            Delete <strong>{container.name}</strong>?
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => { onQuickDeleteContainer(container); setConfirmDeleteId(null); }}
+                            className="px-2 py-0.5 text-xs font-medium bg-[var(--ext-red)] text-white rounded hover:opacity-80 transition-opacity"
+                          >
+                            Yes
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="px-2 py-0.5 text-xs font-medium border border-[var(--ext-border)] text-[var(--ext-text-muted)] rounded hover:text-[var(--ext-text)] transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => onSelectContainer(container)}
+                            className="w-full flex items-center gap-2.5 p-2 pr-14 border border-transparent rounded transition-colors text-left"
+                            onMouseEnter={e => {
+                              e.currentTarget.style.borderColor = `${cHex}66`;
+                              e.currentTarget.style.background = `${cHex}0d`;
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.borderColor = 'transparent';
+                              e.currentTarget.style.background = 'transparent';
+                            }}
+                          >
+                            <ContainerIcon iconKey={container.displayIcon || container.icon} colorHex={cHex} />
+                            <span className="text-sm text-[var(--ext-text)] flex-1">{container.name}</span>
+                            <span className="text-xs min-w-[1.5rem] text-center" style={{ color: cHex }}>
+                              {container.tabCount}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(container.cookieStoreId); }}
+                            className="absolute right-8 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity text-[var(--ext-text-muted)] hover:text-[var(--ext-red)] hover:bg-[var(--ext-red)]/10"
+                            aria-label={`Delete ${container.name}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onContainerDetails(container); }}
+                            className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded transition-colors"
+                            style={{ color: 'var(--ext-text-muted)' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = `${cHex}1a`; e.currentTarget.style.color = cHex; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--ext-text-muted)'; }}
+                            aria-label={`Open ${container.name}`}
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   );
                 })}

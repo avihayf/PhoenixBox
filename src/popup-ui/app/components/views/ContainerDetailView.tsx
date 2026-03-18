@@ -1,6 +1,7 @@
 import { ArrowLeft, Plus, Eye, ArrowLeftRight, Hourglass, Trash2, X } from 'lucide-react';
 import { ContainerIcon } from '../ContainerIcon';
 import { getContainerColorHex } from '../../../lib/containerColors';
+import type { ProxyPreset } from '../../../data/mockData';
 
 interface Tab {
   id: number;
@@ -14,6 +15,8 @@ interface ContainerDetailViewProps {
   containerColor: string;
   containerIcon?: string;
   tabs: Tab[];
+  activeProxyPresetId?: string;
+  proxyPresets?: ProxyPreset[];
   onBack: () => void;
   onManageContainer: () => void;
   onOpenNewTab: () => void;
@@ -22,6 +25,7 @@ interface ContainerDetailViewProps {
   onManageSites: () => void;
   onClearStorage: () => void;
   onCloseTab: (tabId: number) => void;
+  onSelectProxyPreset?: (preset: ProxyPreset | null) => void;
 }
 
 export function ContainerDetailView({
@@ -29,6 +33,8 @@ export function ContainerDetailView({
   containerColor,
   containerIcon,
   tabs,
+  activeProxyPresetId,
+  proxyPresets = [],
   onBack,
   onManageContainer,
   onOpenNewTab,
@@ -37,6 +43,7 @@ export function ContainerDetailView({
   onManageSites,
   onClearStorage,
   onCloseTab,
+  onSelectProxyPreset,
 }: ContainerDetailViewProps) {
   const colorHex = getContainerColorHex(containerColor);
 
@@ -106,6 +113,35 @@ export function ContainerDetailView({
           />
         </div>
 
+        {/* Proxy Quick-Switch */}
+        {onSelectProxyPreset && proxyPresets.length > 0 && (
+          <div className="px-2.5 pb-2.5 flex-shrink-0">
+            <div className="flex items-center gap-2 p-2 rounded-lg border border-[var(--ext-border)] bg-[var(--ext-bg-secondary)]">
+              <span className="text-xs text-[var(--ext-text-muted)] uppercase tracking-wider flex-shrink-0">Proxy Preset</span>
+              <select
+                value={activeProxyPresetId || ""}
+                onChange={(e) => {
+                  if (e.target.value === "") {
+                    onSelectProxyPreset(null);
+                  } else if (e.target.value === "__direct__") {
+                    onSelectProxyPreset({ id: "__direct__", name: "Disable Proxy", scheme: "direct", host: "", port: 0 });
+                  } else {
+                    const preset = proxyPresets.find(p => p.id === e.target.value) || null;
+                    onSelectProxyPreset(preset);
+                  }
+                }}
+                className="flex-1 min-w-0 text-xs bg-transparent border-none text-[var(--ext-text)] focus:outline-none cursor-pointer"
+              >
+                <option value="">— None —</option>
+                {proxyPresets.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+                <option value="__direct__">Disable Proxy</option>
+              </select>
+            </div>
+          </div>
+        )}
+
         {/* Open Tabs Section */}
         <div className="p-2.5 border-t border-[var(--ext-border)] flex-1 flex flex-col min-h-0 space-y-1">
           <h2 className="text-xs uppercase tracking-wider mb-2.5 font-bold opacity-80 flex-shrink-0" style={{ color: colorHex }}>
@@ -125,11 +161,6 @@ export function ContainerDetailView({
                   onMouseEnter={e => (e.currentTarget.style.background = `${colorHex}0d`)}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  {tab.favicon ? (
-                    <img src={tab.favicon} alt="" className="w-3.5 h-3.5 flex-shrink-0 rounded-sm" />
-                  ) : (
-                    <div className="w-3.5 h-3.5 flex-shrink-0 bg-[var(--ext-bg-tertiary)] rounded-sm" />
-                  )}
                   <span className="text-xs text-[var(--ext-text)] flex-1 truncate font-medium">{tab.title || tab.url}</span>
                   <button
                     onClick={(e) => {

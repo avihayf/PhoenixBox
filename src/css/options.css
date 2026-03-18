@@ -1,90 +1,151 @@
+/* Phoenix Box — Options page styles */
+
 body {
-  --grey10: #e7e7e7;
-
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  background: #fff;
-  color: #0c0c12;
+  background: var(--ext-bg);
+  color: var(--ext-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 13px;
+  padding: 16px 20px;
+  margin: 0;
   overflow: hidden;
-}
-
-/* Dark hacker theme */
-@media (prefers-color-scheme: dark) {
-  body {
-    background:
-      radial-gradient(900px 420px at 20% 0%, rgb(0 240 255 / 0.1), transparent 55%),
-      radial-gradient(800px 480px at 80% 10%, rgb(255 0 170 / 0.06), transparent 60%),
-      linear-gradient(180deg, rgb(18 18 26 / 0.92), rgb(10 10 15 / 0.98));
-    color: #f7f7ff;
-  }
-
-  p {
-    color: rgb(247 247 255 / 0.78);
-  }
-}
-
-h3:first-of-type {
-  margin-block-start: 2.5rem;
-}
-
-label {
-  display: flex;
-  align-items: center;
-  font-size: 14px;
-}
-
-label > span {
-  padding-inline-end: 4px;
-}
-
-.settings-group {
-  margin-block-end: 16px;
 }
 
 form {
   display: flex;
   flex-direction: column;
   padding-block-end: 1rem;
+  max-inline-size: 600px;
+}
+
+h3 {
+  font-family: Audiowide, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ext-accent);
+  margin-block: 20px 8px;
+  padding-block-end: 6px;
+  border-block-end: 1px solid var(--ext-border);
+}
+
+h3:first-of-type {
+  margin-block-start: 0;
+}
+
+.settings-group {
+  margin-block-end: 6px;
+  padding: 10px 12px;
+  background: var(--ext-bg-secondary);
+  border: 1px solid var(--ext-border);
+  border-radius: 8px;
 }
 
 .settings-group p {
-  margin-inline-start: 24px;
-  margin-block: 4px 8px;
+  margin-inline-start: 23px;
+  margin-block: 4px 0;
+  color: var(--ext-text-muted);
+  font-size: 12px;
+}
+
+label {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: var(--ext-text);
+}
+
+label > span {
+  padding-inline-end: 4px;
 }
 
 input[type="checkbox"] {
   margin-inline: 0 8px;
   margin-block: 1px auto;
-  inline-size: 16px;
-  block-size: 16px;
-}
-
-button {
-  margin-inline: 0 auto;
-}
-
-.keyboard-shortcut {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  max-inline-size: 70%;
-  align-items: center;
+  inline-size: 15px;
+  block-size: 15px;
+  accent-color: var(--ext-accent);
+  flex-shrink: 0;
 }
 
 .bold {
   font-weight: 600;
 }
 
+p {
+  margin-block: 6px;
+  color: var(--ext-text-muted);
+  font-size: 12px;
+}
+
+button {
+  padding: 6px 14px;
+  background: transparent;
+  border: 1px solid var(--ext-border);
+  border-radius: 6px;
+  color: var(--ext-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  margin-inline: 0 auto;
+  margin-block: 6px 0;
+}
+
+button:hover {
+  border-color: var(--ext-accent);
+  color: var(--ext-accent);
+}
+
+select {
+  padding: 4px 8px;
+  background: var(--ext-bg-secondary);
+  border: 1px solid var(--ext-border);
+  border-radius: 6px;
+  color: var(--ext-text);
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+}
+
+select:focus {
+  border-color: var(--ext-accent);
+}
+
+/* Keyboard shortcut rows */
+.keyboard-shortcut {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 12px;
+  background: var(--ext-bg-secondary);
+  border: 1px solid var(--ext-border);
+  border-radius: 6px;
+  margin-block-end: 6px;
+  max-inline-size: 480px;
+}
+
+.keyboard-shortcut > span {
+  font-family: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
+  font-size: 12px;
+  color: var(--ext-text-muted);
+  flex: 1;
+}
+
+/* VPN/proxy permissions section */
 .moz-vpn-proxy-permissions {
   margin-block: 0 2rem;
   padding-block-end: 1rem;
-  border-block-end: 1px solid var(--grey10);
+  border-block-end: 1px solid var(--ext-border);
   display: flex;
   flex-direction: column;
 }
 
 h3.moz-vpn-proxy-permissions-title {
   margin-block-start: 0;
+  border-block-end: none;
   position: relative;
   display: flex;
   align-items: center;
@@ -109,7 +170,7 @@ h3.moz-vpn-proxy-permissions-title {
 
 .moz-vpn-proxy-permissions-title::before,
 .moz-vpn-proxy-permissions-title::after {
-  background-color: var(--grey10);
+  background-color: var(--ext-border);
   content: "";
   height: 1px;
   flex: 1 1 0%;
@@ -121,8 +182,4 @@ h3.moz-vpn-proxy-permissions-title::before {
 
 h3.moz-vpn-proxy-permissions-title::after {
   margin-inline: 2rem -50%;
-}
-
-@media (prefers-color-scheme: dark) {
-  /* overridden above for cyber theme */
 }

@@ -1100,6 +1100,39 @@ function App() {
             await browser.tabs.remove(tabId);
             await refreshContainers();
           }}
+          proxyPresets={customProxyPresets}
+          activeProxyPresetId={(() => {
+            // "Disable Proxy" — container has a direct entry overriding global proxy
+            if (selectedContainer.proxyUrl === "direct://") return "__direct__";
+            // Check per-container proxy first, then fall back to global proxy
+            const effectiveUrl = selectedContainer.proxyUrl || (globalProxyEnabled ? proxyUrl : "");
+            if (!effectiveUrl) return undefined;
+            const match = customProxyPresets.find(p => {
+              const presetUrl = `${p.scheme}://${p.host}:${p.port}`;
+              return effectiveUrl === presetUrl;
+            });
+            return match?.id;
+          })()}
+          onSelectProxyPreset={async (preset) => {
+            if (!preset) {
+              await setProxyForContainer(selectedContainer.cookieStoreId, null);
+            } else if (preset.id === "__direct__") {
+              await setProxyForContainer(selectedContainer.cookieStoreId, {
+                type: "direct",
+                host: "",
+                port: 0,
+                mozProxyEnabled: false,
+              });
+            } else {
+              await setProxyForContainer(selectedContainer.cookieStoreId, {
+                type: preset.scheme,
+                host: preset.host,
+                port: preset.port,
+                mozProxyEnabled: true,
+              });
+            }
+            await refreshContainers();
+          }}
         />
       </PopupWrapper>
     );
@@ -1128,6 +1161,18 @@ function App() {
         onManageContainers={() => setCurrentView("manage")}
         onSelectContainer={handleContainerClick}
         onContainerDetails={handleContainerDetails}
+        onQuickDeleteContainer={async (container) => {
+          const browser = requireWebExt();
+          const userContextId = Number(container.cookieStoreId.split("-").pop());
+          await browser.runtime.sendMessage({ method: "deleteContainer", message: { userContextId } });
+          const stored = await browser.storage.local.get({ containerDisplayIconOverrides: {} });
+          const overrides = (stored.containerDisplayIconOverrides && typeof stored.containerDisplayIconOverrides === "object" ? stored.containerDisplayIconOverrides : {}) || {};
+          if (overrides[container.cookieStoreId]) {
+            delete overrides[container.cookieStoreId];
+            await browser.storage.local.set({ containerDisplayIconOverrides: overrides });
+          }
+          await refreshContainers();
+        }}
         proxyEnabled={globalProxyEnabled}
         onToggleProxy={async (enabled, urlOverride) => {
           if (proxyToggleBusyRef.current) return false;

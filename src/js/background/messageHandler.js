@@ -139,6 +139,35 @@ const messageHandler = {
         case "MozillaVPN_getInstallationStatus":
           response = MozillaVPN_Background.getInstallationStatus();
           break;
+        case "extractEndpoints": {
+          const tabId = m.tabId;
+          if (!tabId) break;
+          // Re-fetch URL from the tabs API rather than trusting the message payload.
+          let pageUrl = "";
+          try {
+            const tab = await browser.tabs.get(tabId);
+            pageUrl = tab?.url || "";
+          } catch {
+            // Tab may have closed between click and handler; pageUrl stays empty.
+          }
+          let endpoints = [];
+          try {
+            const reply = await browser.tabs.sendMessage(tabId, { method: "scanEndpoints" });
+            endpoints = Array.isArray(reply) ? reply : [];
+            console.log("[PhoenixBox] extractEndpoints: found", endpoints.length, "on", pageUrl);
+          } catch (scanErr) {
+            console.error("[PhoenixBox] extractEndpoints: scan failed:", scanErr);
+          }
+          await browser.storage.local.set({
+            endpointScanResults: {
+              endpoints,
+              pageUrl,
+              scannedAt: Date.now(),
+            }
+          });
+          await browser.tabs.create({ url: browser.runtime.getURL("endpoint-results.html") });
+          break;
+        }
         }
         return response;
       } catch (e) {
@@ -157,6 +186,7 @@ const messageHandler = {
 
     browser.tabs.onActivated.addListener((info) => {
       assignManager.removeContextMenu();
+      browser.pageAction.show(info.tabId).catch(() => {});
       browser.tabs.get(info.tabId).then((tab) => {
         assignManager.calculateContextMenu(tab);
       }).catch((e) => {
@@ -173,6 +203,7 @@ const messageHandler = {
         return {};
       }
       assignManager.removeContextMenu();
+      browser.pageAction.show(details.tabId).catch(() => {});
 
       browser.tabs.get(details.tabId).then((tab) => {
         assignManager.calculateContextMenu(tab);
