@@ -1,4 +1,4 @@
-# Notes to AMO Reviewer — Phoenix Box v1.3.0
+# Notes to AMO Reviewer — Phoenix Box v2.0.0
 
 ## What This Extension Does
 
@@ -141,7 +141,7 @@ yarn build
 yarn test
 ```
 
-The built extension will be in `dist/` and the packaged zip in `web-ext-artifacts/phoenix_box-1.3.0.zip`.
+The built extension will be in `dist/` and the packaged zip in `web-ext-artifacts/phoenix_box-2.0.0.zip`.
 
 ### What the build does
 
