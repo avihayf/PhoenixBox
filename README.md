@@ -39,7 +39,7 @@ Works on any Firefox (release, ESR, Developer Edition, or Nightly).
 Search for "Phoenix Box" on [addons.mozilla.org](https://addons.mozilla.org) and click **Add to Firefox**.
 
 **Option B — Manual install from GitHub Releases:**
-1. Download `PhoenixBox.xpi` and `PhoenixBoxHighlighter.jar` from [GitHub Releases](https://github.com/avihayf/PhoenixBox/releases).
+1. Download `PhoenixBox.xpi` from [GitHub Releases](https://github.com/avihayf/PhoenixBox/releases) and `PhoenixBoxHighlighter.jar` from the [PhoenixBox-Highlighter releases page](https://github.com/avihayf/PhoenixBox-Highlighter/releases/tag/v1.0.0).
 2. Drag `PhoenixBox.xpi` into Firefox and confirm the installation prompt.
 3. Pin the Phoenix Box toolbar icon if needed.
 
