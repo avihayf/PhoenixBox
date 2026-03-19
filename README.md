@@ -17,15 +17,15 @@
 
 ## Features
 
-- Preconfigured Container like **Attacker**, **Victim**, **Admin**, and **Member**.
-- Per-container and global **proxy routing** for Burp or other tools
-- **Burp Suite highlighting** via `X-MAC-Container-Color` and the companion JAR
-- Global and per-container **User-Agent overrides**
-- **Site assignments** and site-isolation workflows
-- Full **cookie and storage separation** between containers
-- **Mozilla VPN integration** for optional per-container VPN routing
-- Dark/light themes, accent colors, keyboard shortcuts, and multi-language support
-- Extended icon set including security-focused icons (skull, user-x, user-cog, user-minus) — these display correctly in the Phoenix Box UI, but Firefox's URL bar and tab indicator will show **fingerprint** as a fallback since custom icons are not part of the native `contextualIdentities` API
+- **Ready-to-go containers** — Attacker, Victim, Admin, Member ship out of the box. Create as many custom ones as you need.
+- **Proxy routing (global + per-container)** — send everything through Burp, or route only one role through a proxy while keeping the rest clean. Save custom presets and switch with one click.
+- **User-Agent spoofing** — swap browser identity globally or per-container. Pick from a live top-100 list (desktop, mobile, all), paste a custom string, or save presets for quick switching.
+- **Burp Suite highlighting** — the `X-MAC-Container-Color` header lets the companion JAR color-code HTTP history by container so you instantly see which role fired each request.
+- **Site assignments** — lock a domain to a container and it always opens there. No more "wrong session" surprises.
+- **Full session isolation** — cookies, storage, and cache stay walled off between containers. Zero bleed.
+- **Mozilla VPN integration** — route specific containers through VPN while the rest go direct.
+- **Dark/light themes, accent colors, keyboard shortcuts** — make it yours.
+- **Security-focused icons** (skull, user-x, user-cog, user-minus) — display correctly in the Phoenix Box UI; Firefox's URL bar falls back to **fingerprint** since custom icons aren't part of the native `contextualIdentities` API.
 
 ---
 
@@ -83,7 +83,7 @@ Popular workflows:
 - Always open a site in one container
 - Route all traffic through Burp with the global proxy toggle
 - Route only one role through a proxy with per-container settings
-- Spoof browser identity with global or per-container User-Agent overrides
+- Spoof User-Agent globally or per-container — pick from the top-100 list, paste a custom string, or load a saved preset
 - Clear cookies/storage to reset a test flow
 
 ---
@@ -117,7 +117,7 @@ The Burp companion extension strips the header before the request reaches the ta
 - **Test different privilege levels side by side** with separate Attacker, Victim, Admin, and Member flows
 - **Replay the same workflow as different users** without logging in and out all day
 - **Route specific roles through Burp or another proxy** while keeping the rest of your browsing clean
-- **Spoof different User-Agents on demand** to check mobile-only paths, browser-specific logic, and fingerprint-based behavior
+- **Spoof User-Agents on demand** — flip to a mobile string for one container, keep desktop on another, or save presets so you switch in one click
 - **Track traffic visually in Burp** so you instantly know which container, role, or scenario produced each request
 
 ---
