@@ -5,7 +5,7 @@
 
 **Run different sessions side by side in Firefox, create any custom containers you want, route the right traffic through Burp and Highlight your traffic, and test faster without session collisions.**
 
-https://github.com/user-attachments/assets/6cbaa292-b913-4a7b-a827-34cd31995d57
+https://github.com/user-attachments/assets/a523d122-7a06-4dc4-a637-e08beb440f68
 
 ---
 
