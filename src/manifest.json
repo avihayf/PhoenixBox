@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "name": "Phoenix Box",
+  "name": "PhoenixBox",
   "version": "2.0.0",
   "author": "0xR3dB0mb",
   "incognito": "not_allowed",
@@ -117,7 +117,7 @@
   "browser_action": {
     "browser_style": true,
     "default_icon": "img/icon-128.png",
-    "default_title": "Phoenix Box",
+    "default_title": "PhoenixBox",
     "default_popup": "popup/index.html",
     "default_area": "navbar"
   },

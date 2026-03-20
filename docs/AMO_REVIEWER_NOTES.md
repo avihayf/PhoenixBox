@@ -1,8 +1,8 @@
-# Notes to AMO Reviewer — Phoenix Box v2.0.0
+# Notes to AMO Reviewer — PhoenixBox v2.0.0
 
 ## What This Extension Does
 
-Phoenix Box is a multi-container browser extension for security testing and penetration testing workflows. It is based on Mozilla's Multi-Account Containers and adds:
+PhoenixBox is a multi-container browser extension for security testing and penetration testing workflows. It is based on Mozilla's Multi-Account Containers and adds:
 
 - Per-container proxy configuration (HTTP, HTTPS, SOCKS4, SOCKS5)
 - A global proxy toggle for routing all container traffic through Burp Suite
@@ -151,4 +151,4 @@ The React popup (`src/popup-ui/`) is compiled by Vite into `dist/popup/`. The bu
 
 ## Relationship to Multi-Account Containers
 
-Phoenix Box is based on Mozilla's [Multi-Account Containers](https://github.com/mozilla/multi-account-containers) (MPL-2.0). It retains the core container management, site assignment, and tab routing logic, and adds security-testing-specific features (proxy management, Burp Suite integration, User-Agent spoofing, security-profile containers). The popup UI has been rewritten in React/TypeScript.
+PhoenixBox is based on Mozilla's [Multi-Account Containers](https://github.com/mozilla/multi-account-containers) (MPL-2.0). It retains the core container management, site assignment, and tab routing logic, and adds security-testing-specific features (proxy management, Burp Suite integration, User-Agent spoofing, security-profile containers). The popup UI has been rewritten in React/TypeScript.

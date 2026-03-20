@@ -1,6 +1,6 @@
 {
   "extensionDescription": {
-      "message": "Phoenix Box helps security professionals isolate penetration testing sessions using containers. Color-coded profiles like Attacker, Victim, and Member keep your security research organized and separated from normal browsing.",
+      "message": "PhoenixBox — multi-container browser for penetration testing and bug bounty workflows. Isolate sessions by role (Attacker, Victim, Admin), route traffic through Burp Suite or custom proxies, spoof User-Agents, and assign sites to containers — all with zero session collisions.",
       "description": "Description of the extension."
   },
   "openInNewTabTitle": {
@@ -193,7 +193,7 @@
     }
   },
   "confirmNavigationTitle": {
-    "message": "Phoenix Box — Confirm Navigation",
+    "message": "PhoenixBox — Confirm Navigation",
     "description": "This is the title of a confirmation page."
   },
   "openInContainer": {

@@ -1,7 +1,7 @@
-# Phoenix Box
+# PhoenixBox
 
 [![License](https://img.shields.io/badge/License-MPL%202.0-blue.svg)](https://opensource.org/licenses/MPL-2.0)
-[![Version](https://img.shields.io/badge/version-1.2.0-green.svg)](https://github.com/avihayf/PhoenixBox/releases)
+[![Version](https://img.shields.io/badge/version-2.0.0-green.svg)](https://github.com/avihayf/PhoenixBox/releases)
 
 **Run different sessions side by side in Firefox, create any custom containers you want, route the right traffic through Burp and Highlight your traffic, and test faster without session collisions.**
 
@@ -11,8 +11,8 @@ https://github.com/user-attachments/assets/a523d122-7a06-4dc4-a637-e08beb440f68
 
 ## Quick Start
 
-1. Install Phoenix Box from [Firefox Add-ons (AMO)](https://addons.mozilla.org/firefox/addon/phoenix-box/) or download `PhoenixBox.xpi` from [Releases](https://github.com/avihayf/PhoenixBox/releases).
-2. Open the Phoenix Box popup and start testing with the built-in Attacker, Victim, Admin, and Member containers.
+1. Install PhoenixBox from [Firefox Add-ons (AMO)](https://addons.mozilla.org/firefox/addon/phoenix-box/) or download `PhoenixBox.xpi` from [Releases](https://github.com/avihayf/PhoenixBox/releases).
+2. Open the PhoenixBox popup and start testing with the built-in Attacker, Victim, Admin, and Member containers.
 3. For Burp highlighting, also install `PhoenixBoxHighlighter.jar` in Burp Suite and enable **PhoenixBox Highlighter**.
 
 ---
@@ -27,7 +27,7 @@ https://github.com/user-attachments/assets/a523d122-7a06-4dc4-a637-e08beb440f68
 - **Full session isolation** — cookies, storage, and cache stay walled off between containers. Zero bleed.
 - **Mozilla VPN integration** — route specific containers through VPN while the rest go direct.
 - **Dark/light themes, accent colors, keyboard shortcuts** — make it yours.
-- **Security-focused icons** (skull, user-x, user-cog, user-minus) — display correctly in the Phoenix Box UI; Firefox's URL bar falls back to **fingerprint** since custom icons aren't part of the native `contextualIdentities` API.
+- **Security-focused icons** (skull, user-x, user-cog, user-minus) — display correctly in the PhoenixBox UI; Firefox's URL bar falls back to **fingerprint** since custom icons aren't part of the native `contextualIdentities` API.
 
 ---
 
@@ -38,12 +38,12 @@ https://github.com/user-attachments/assets/a523d122-7a06-4dc4-a637-e08beb440f68
 Works on any Firefox (release, ESR, Developer Edition, or Nightly).
 
 **Option A — Firefox Add-ons (recommended):**
-Search for "Phoenix Box" on [addons.mozilla.org](https://addons.mozilla.org) and click **Add to Firefox**.
+Search for "PhoenixBox" on [addons.mozilla.org](https://addons.mozilla.org) and click **Add to Firefox**.
 
 **Option B — Manual install from GitHub Releases:**
 1. Download `PhoenixBox.xpi` from [GitHub Releases](https://github.com/avihayf/PhoenixBox/releases) and `PhoenixBoxHighlighter.jar` from the [PhoenixBox-Highlighter releases page](https://github.com/avihayf/PhoenixBox-Highlighter/releases/tag/v1.0.0).
 2. Drag `PhoenixBox.xpi` into Firefox and confirm the installation prompt.
-3. Pin the Phoenix Box toolbar icon if needed.
+3. Pin the PhoenixBox toolbar icon if needed.
 
 If you want Burp integration, also install `PhoenixBoxHighlighter.jar` in Burp Suite:
 
@@ -51,7 +51,7 @@ If you want Burp integration, also install `PhoenixBoxHighlighter.jar` in Burp S
 2. Go to **Extender** → **Extensions** → **Add**.
 3. Select **Java** as the extension type.
 4. Choose `PhoenixBoxHighlighter.jar`.
-5. Click **Next** and verify that “Phoenix Box” loads successfully.
+5. Click **Next** and verify that “PhoenixBox” loads successfully.
 
 ### Developers
 
@@ -73,7 +73,7 @@ Then load the built extension:
 
 ## How To Use
 
-1. Click the Phoenix Box toolbar icon.
+1. Click the PhoenixBox toolbar icon.
 2. Use the preconfigured containers or create your own.
 3. Open tabs in different containers to separate roles, sessions, and identities.
 4. Assign sites to containers so important targets always reopen in the right context.
@@ -92,13 +92,13 @@ Popular workflows:
 
 ## Burp Suite Integration
 
-Phoenix Box can add an `X-MAC-Container-Color` header to requests so Burp can visually separate traffic by container role.
+PhoenixBox can add an `X-MAC-Container-Color` header to requests so Burp can visually separate traffic by container role.
 
 Basic setup:
 
 1. Download and install `PhoenixBoxHighlighter.jar` from the [PhoenixBox-Highlighter releases page](https://github.com/avihayf/PhoenixBox-Highlighter/releases/tag/v1.0.0) into Burp Suite via **Extender → Extensions → Add**.
 2. Configure Firefox to send traffic through Burp.
-3. Enable **Add container color header** in Phoenix Box.
+3. Enable **Add container color header** in PhoenixBox.
 4. Browse in different containers and check Burp HTTP history.
 
 The Burp companion extension strips the header before the request reaches the target server.

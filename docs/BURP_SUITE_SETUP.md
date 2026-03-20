@@ -1,10 +1,10 @@
 # Burp Suite Integration Guide
 
-Phoenix Box automatically adds `X-MAC-Container-Color` headers to HTTP requests, allowing you to visually distinguish traffic from different containers in Burp Suite.
+PhoenixBox automatically adds `X-MAC-Container-Color` headers to HTTP requests, allowing you to visually distinguish traffic from different containers in Burp Suite.
 
 ## Requirements
 
-To enable automatic request highlighting in Burp Suite, you **must** install the Phoenix Box Burp Extension (JAR file).
+To enable automatic request highlighting in Burp Suite, you **must** install the PhoenixBox Burp Extension (JAR file).
 
 ## Installation
 
@@ -16,11 +16,11 @@ To enable automatic request highlighting in Burp Suite, you **must** install the
 4. Select **"Java"** as the extension type
 5. Click **"Select file"** and choose the downloaded JAR file
 6. Click **"Next"** to load the extension
-7. Verify "Phoenix Box" appears in the extensions list with a checkmark
+7. Verify "PhoenixBox" appears in the extensions list with a checkmark
 
 ### Step 2: Enable Container Color Headers in Firefox
 
-1. Click the Phoenix Box icon in Firefox toolbar
+1. Click the PhoenixBox icon in Firefox toolbar
 2. Toggle **"Add container color header"** to ON
 3. All requests from containers will now include the `X-MAC-Container-Color` header
 
@@ -42,7 +42,7 @@ When both the Firefox extension and Burp extension are installed:
 
 ```mermaid
 sequenceDiagram
-    participant Firefox as Firefox<br/>(Phoenix Box)
+    participant Firefox as Firefox<br/>(PhoenixBox)
     participant Burp as Burp Suite<br/>(Extension)
     participant Target as Target Server
     
@@ -88,7 +88,7 @@ The Burp extension automatically maps container colors to Burp's highlight color
 **Problem**: Requests don't include `X-MAC-Container-Color` header
 
 **Solutions**:
-- Verify "Add container color header" is enabled in Phoenix Box popup
+- Verify "Add container color header" is enabled in PhoenixBox popup
 - Check Firefox is routing traffic through Burp (proxy settings)
 - Ensure you're opening tabs in a container (not regular tabs)
 - Try disabling and re-enabling the header option
@@ -108,7 +108,7 @@ The Burp extension automatically maps container colors to Burp's highlight color
 **Problem**: Requests are highlighted but in wrong colors
 
 **Solutions**:
-- Verify container color in Phoenix Box matches expected color
+- Verify container color in PhoenixBox matches expected color
 - Check the `X-MAC-Container-Color` header value in Burp
 - Burp's color mapping is case-insensitive
 - Some Burp themes may display colors differently
@@ -125,7 +125,7 @@ The Burp extension automatically maps container colors to Burp's highlight color
 
 ## Important Security Note
 
-If you enable `X-MAC-Container-Color` without routing traffic through Burp, the header will be sent to the target server. This can reveal that you are using Phoenix Box and may leak role information such as `red` for an attacker workflow. For live targets, only enable this feature when the Burp extension is installed and actively stripping the header.
+If you enable `X-MAC-Container-Color` without routing traffic through Burp, the header will be sent to the target server. This can reveal that you are using PhoenixBox and may leak role information such as `red` for an attacker workflow. For live targets, only enable this feature when the Burp extension is installed and actively stripping the header.
 
 ## Advanced Usage
 
@@ -165,4 +165,4 @@ The Burp extension source code is available in the [PhoenixBox-Highlighter repos
 
 ## License
 
-This guide and the Burp extension are part of Phoenix Box, licensed under MPL-2.0.
+This guide and the Burp extension are part of PhoenixBox, licensed under MPL-2.0.

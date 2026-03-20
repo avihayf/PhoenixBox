@@ -1,13 +1,13 @@
-# Privacy Policy for Phoenix Box
+# Privacy Policy for PhoenixBox
 
 
 ## Overview
 
-Phoenix Box is a browser extension designed for security testing and penetration testing workflows. This privacy policy explains our commitment to protecting your privacy.
+PhoenixBox is a browser extension designed for security testing and penetration testing workflows. This privacy policy explains our commitment to protecting your privacy.
 
 ## Data Collection
 
-**Phoenix Box does not collect telemetry or send your data to developer-controlled servers.**
+**PhoenixBox does not collect telemetry or send your data to developer-controlled servers.**
 
 Core extension data stays within your local Firefox browser unless you explicitly enable optional sync:
 
@@ -18,9 +18,9 @@ Core extension data stays within your local Firefox browser unless you explicitl
 - User-Agent settings are stored locally
 - No analytics, telemetry, or tracking of any kind
 
-Phoenix Box's content script does not read page content, form data, or credentials. It only displays extension-triggered notification toasts on pages when the extension sends a message to it.
+PhoenixBox's content script does not read page content, form data, or credentials. It only displays extension-triggered notification toasts on pages when the extension sends a message to it.
 
-Phoenix Box does, however, intentionally interact with the sites you browse as part of its core functionality:
+PhoenixBox does, however, intentionally interact with the sites you browse as part of its core functionality:
 
 - It can modify outbound requests by overriding the `User-Agent` header
 - It can add the `X-MAC-Container-Color` header when Burp highlighting is enabled
@@ -30,7 +30,7 @@ These behaviors are product features for security testing workflows, not telemet
 
 ## Permissions Justification
 
-Phoenix Box requires certain browser permissions to function:
+PhoenixBox requires certain browser permissions to function:
 
 ### Core Permissions
 
@@ -50,7 +50,7 @@ Phoenix Box requires certain browser permissions to function:
 
 - **`activeTab`**: Required to determine the current tab's container for page-specific actions.
 
-- **`history`**: Required only to remove internal confirmation-page URLs from your browsing history so they don't clutter the address bar. Phoenix Box does not read or query your browsing history.
+- **`history`**: Required only to remove internal confirmation-page URLs from your browsing history so they don't clutter the address bar. PhoenixBox does not read or query your browsing history.
 
 ### Optional Permissions
 
@@ -65,13 +65,13 @@ The extension may make the following external connections:
 
 1. **User-Agent List Updates**: The extension fetches a pinned, public list of top user agents from `https://cdn.jsdelivr.net` (the microlinkhq/top-user-agents CDN) only when you use the User-Agent override feature. This request is lazy, cached locally for 7 days, and does not transmit browsing history, container configuration, or user identifiers.
 
-This is the only external network connection Phoenix Box makes. It is explicitly allowed in the Content Security Policy and can be avoided by not using the User-Agent override feature.
+This is the only external network connection PhoenixBox makes. It is explicitly allowed in the Content Security Policy and can be avoided by not using the User-Agent override feature.
 
-2. **Optional Firefox Sync**: If you explicitly enable sync, Phoenix Box stores supported configuration data in `browser.storage.sync`, which is tied to your Mozilla account. Passwords are not synced, and proxy authentication passwords are never written to extension storage.
+2. **Optional Firefox Sync**: If you explicitly enable sync, PhoenixBox stores supported configuration data in `browser.storage.sync`, which is tied to your Mozilla account. Passwords are not synced, and proxy authentication passwords are never written to extension storage.
 
 ## Third-Party Services
 
-Phoenix Box does not integrate with any third-party analytics, advertising, or tracking services. Its Firefox manifest also declares `data_collection_permissions.required` as `["none"]`.
+PhoenixBox does not integrate with any third-party analytics, advertising, or tracking services. Its Firefox manifest also declares `data_collection_permissions.required` as `["none"]`.
 
 ### Mozilla VPN Integration (Optional)
 
@@ -88,7 +88,7 @@ This is intentional for security testing workflows. The Burp Suite extension (`P
 
 ## Data Sharing
 
-Phoenix Box does not share telemetry or analytics data with third parties. Extension configuration remains local unless you explicitly enable Firefox Sync.
+PhoenixBox does not share telemetry or analytics data with third parties. Extension configuration remains local unless you explicitly enable Firefox Sync.
 
 ## Your Rights
 
@@ -111,8 +111,8 @@ If you have questions about this privacy policy, please:
 
 ## Open Source
 
-Phoenix Box is open source under the Mozilla Public License 2.0. You can review the complete source code at [https://github.com/avihayf/PhoenixBox](https://github.com/avihayf/PhoenixBox).
+PhoenixBox is open source under the Mozilla Public License 2.0. You can review the complete source code at [https://github.com/avihayf/PhoenixBox](https://github.com/avihayf/PhoenixBox).
 
 ---
 
-**Summary**: Phoenix Box does not collect telemetry or track users. It operates locally, keeps proxy passwords in memory only, and makes only one optional external request for User-Agent lists, plus optional Firefox Sync when you choose to enable it.
+**Summary**: PhoenixBox does not collect telemetry or track users. It operates locally, keeps proxy passwords in memory only, and makes only one optional external request for User-Agent lists, plus optional Firefox Sync when you choose to enable it.

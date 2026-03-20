@@ -1,6 +1,6 @@
-# Phoenix Box Features
+# PhoenixBox Features
 
-Comprehensive guide to all features available in Phoenix Box.
+Comprehensive guide to all features available in PhoenixBox.
 
 ---
 
@@ -20,7 +20,7 @@ Comprehensive guide to all features available in Phoenix Box.
 
 ### Container Colors (8 Total)
 
-Phoenix Box supports 8 Firefox-native container colors for visual organization. These colors are limited to what Firefox's `contextualIdentities` API supports:
+PhoenixBox supports 8 Firefox-native container colors for visual organization. These colors are limited to what Firefox's `contextualIdentities` API supports:
 
 | Color      | Hex Code  | Use Case Example           |
 |------------|-----------|----------------------------|
@@ -37,7 +37,7 @@ Phoenix Box supports 8 Firefox-native container colors for visual organization. 
 
 ### Pre-configured Containers
 
-Phoenix Box comes with four pre-configured containers for security testing:
+PhoenixBox comes with four pre-configured containers for security testing:
 
 1. **Attacker** (Red) - For sending malicious payloads and attack vectors
 2. **Victim** (Blue) - For testing as a normal, unauthenticated user
@@ -87,7 +87,7 @@ Cyberpunk-inspired dark theme perfect for low-light environments:
 
 ### Typography
 
-Phoenix Box uses **Audiowide** as its brand font - a retro-futuristic, bold typeface that gives the extension its distinctive identity. The font is included locally (not loaded from external sources) to comply with Firefox extension Content Security Policy requirements.
+PhoenixBox uses **Audiowide** as its brand font - a retro-futuristic, bold typeface that gives the extension its distinctive identity. The font is included locally (not loaded from external sources) to comply with Firefox extension Content Security Policy requirements.
 
 - **Brand Font**: Audiowide (local file)
 - **Font Style**: Retro-futuristic, bold
@@ -136,7 +136,7 @@ Choose from five distinct accent color themes:
 
 ### Overview
 
-Phoenix Box includes advanced user-agent spoofing capabilities with real-world data.
+PhoenixBox includes advanced user-agent spoofing capabilities with real-world data.
 
 ### Data Source
 
@@ -228,7 +228,7 @@ Seamless integration with Burp Suite for request highlighting and identification
 
 ### X-MAC-Container-Color Header
 
-Phoenix Box adds a custom header to all requests:
+PhoenixBox adds a custom header to all requests:
 
 ```
 X-MAC-Container-Color: red
@@ -362,7 +362,7 @@ Available in 50+ languages including:
 
 ### UI Improvements
 
-Phoenix Box features a modern, responsive user interface:
+PhoenixBox features a modern, responsive user interface:
 
 - **Dynamic Height Adjustment** - Popup automatically adjusts to content size using `ResizeObserver`
 - **Smart Scrolling** - Content areas scroll independently when needed, keeping footer buttons accessible

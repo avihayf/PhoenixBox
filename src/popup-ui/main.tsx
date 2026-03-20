@@ -43,7 +43,7 @@ if (rootEl) {
           boxSizing: "border-box",
         }}
       >
-        <h1 style={{ fontSize: 16, margin: "0 0 8px" }}>Phoenix Box</h1>
+        <h1 style={{ fontSize: 16, margin: "0 0 8px" }}>PhoenixBox</h1>
         <p style={{ margin: "0 0 8px", fontSize: 13 }}>
           This extension requires Firefox and the Multi-Account Containers API.
         </p>

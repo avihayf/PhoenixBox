@@ -1,6 +1,6 @@
 # Installation Guide
 
-Complete installation instructions for Phoenix Box.
+Complete installation instructions for PhoenixBox.
 
 ---
 
@@ -55,7 +55,7 @@ Complete installation instructions for Phoenix Box.
    - Click "Add" when prompted
 
 4. **Verify Installation**
-   - Look for Phoenix Box icon in toolbar
+   - Look for PhoenixBox icon in toolbar
    - Click icon to open popup
    - You should see pre-configured containers
 
@@ -133,7 +133,7 @@ npm run lint:html   # HTML only
 
 ### Testing
 
-Phoenix Box includes a comprehensive test suite using Vitest:
+PhoenixBox includes a comprehensive test suite using Vitest:
 
 ```bash
 npm run test        # Run all tests
@@ -214,18 +214,18 @@ npm run package
 
 3. **Verify Installation**
    - Check Extensions list
-   - "Phoenix Box" should appear with checkmark
-   - Output window shows "Phoenix Box Loaded"
+   - "PhoenixBox" should appear with checkmark
+   - Output window shows "PhoenixBox Loaded"
 
 4. **Enable in Firefox**
-   - Click Phoenix Box icon in Firefox
+   - Click PhoenixBox icon in Firefox
    - Toggle "Add container color header" to ON
 
 ### Requirements
 
 - Burp Suite Community or Professional
 - Java 11 or higher
-- Phoenix Box Firefox extension installed
+- PhoenixBox Firefox extension installed
 
 See [BURP_SUITE_SETUP.md](BURP_SUITE_SETUP.md) for detailed setup.
 
@@ -287,7 +287,7 @@ See [BURP_SUITE_SETUP.md](BURP_SUITE_SETUP.md) for detailed setup.
 1. Verify Burp is listening on configured port (usually 8080)
 2. Check Firefox proxy settings (should be configured by extension)
 3. Ensure "Intercept" is off in Burp Proxy tab
-4. Try toggling proxy off and on in Phoenix Box
+4. Try toggling proxy off and on in PhoenixBox
 5. Check for conflicting proxy extensions
 
 ---
