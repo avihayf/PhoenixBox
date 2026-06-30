@@ -5,6 +5,8 @@ const {
   getNativeMessagingPermissionPlan,
   sanitizeHiddenTab,
   shouldEnablePaintBurpAfterProxy,
+  shouldAllowGlobalProxyFallback,
+  countVisibleAndHiddenTabs,
   resolveUserAgentSelection,
 } = require("../src/js/shared/reviewHelpers");
 
@@ -86,6 +88,28 @@ describe("reviewHelpers", () => {
       expect(shouldEnablePaintBurpAfterProxy(true, true)).to.equal(true);
       expect(shouldEnablePaintBurpAfterProxy(true, false)).to.equal(false);
       expect(shouldEnablePaintBurpAfterProxy(false, true)).to.equal(false);
+    });
+  });
+
+  describe("shouldAllowGlobalProxyFallback", () => {
+    it("allows global fallback when no container is promoted", () => {
+      expect(shouldAllowGlobalProxyFallback("firefox-container-1", "")).to.equal(true);
+      expect(shouldAllowGlobalProxyFallback("firefox-container-2", null)).to.equal(true);
+    });
+
+    it("allows global fallback only for the promoted container", () => {
+      const promoted = "firefox-container-2";
+      expect(shouldAllowGlobalProxyFallback("firefox-container-2", promoted)).to.equal(true);
+      expect(shouldAllowGlobalProxyFallback("firefox-container-1", promoted)).to.equal(false);
+      expect(shouldAllowGlobalProxyFallback("firefox-container-3", promoted)).to.equal(false);
+    });
+  });
+
+  describe("countVisibleAndHiddenTabs", () => {
+    it("counts visible and hidden tabs together", () => {
+      expect(countVisibleAndHiddenTabs([{ id: 1 }, { id: 2 }], [{ id: 3 }])).to.equal(3);
+      expect(countVisibleAndHiddenTabs([], [{ id: 3 }, { id: 4 }])).to.equal(2);
+      expect(countVisibleAndHiddenTabs([{ id: 1 }], null)).to.equal(1);
     });
   });
 

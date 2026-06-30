@@ -15,6 +15,7 @@ type Container = {
   displayIcon: string;
   tabCount: number;
   proxyUrl?: string;
+  proxySource?: string;
   isIsolated?: boolean;
   userAgent?: string;
 };
@@ -25,7 +26,7 @@ interface EditContainerViewProps {
   onSave: (name: string, color: string, icon: string, proxyUrl: string, siteIsolation: boolean) => void;
   onDelete?: () => void;
   onManageSites?: () => void;
-  onAdvancedProxy?: () => void;
+  onAdvancedProxyToggle?: (enabled: boolean) => void;
   userAgentsData: UserAgentData;
   onRefreshUserAgents: () => void;
   onSelectContainerUserAgent: (userAgent: string) => void;
@@ -60,7 +61,7 @@ export function EditContainerView({
   onSave,
   onDelete,
   onManageSites,
-  onAdvancedProxy,
+  onAdvancedProxyToggle,
   userAgentsData,
   onRefreshUserAgents,
   onSelectContainerUserAgent,
@@ -84,6 +85,7 @@ export function EditContainerView({
 
   const selectedColorHex = getContainerColorHex(color);
   const isNew = container?.cookieStoreId === 'new';
+  const advancedProxyEnabled = container?.proxySource === "advanced";
 
   return (
     <div className="w-full h-auto max-h-[600px] flex flex-col bg-[var(--ext-bg)] border border-[var(--ext-border)] rounded-xl shadow-xl overflow-hidden">
@@ -181,24 +183,22 @@ export function EditContainerView({
         {/* Advanced Proxy Settings */}
         {!isNew && (
           <div className="space-y-2">
-            <button
-              type="button"
-              onClick={onAdvancedProxy}
-              className="w-full flex items-center justify-between p-2.5 bg-[var(--ext-bg-secondary)] rounded-lg hover:bg-[var(--ext-bg-tertiary)] transition-colors"
-            >
+            <div className="w-full flex items-center justify-between p-2.5 bg-[var(--ext-bg-secondary)] rounded-lg hover:bg-[var(--ext-bg-tertiary)] transition-colors">
               <span className="flex items-center gap-2">
                 <Settings className="w-4 h-4 text-[var(--ext-purple)]" />
                 <span className="text-sm text-[var(--ext-text)]">Advanced Proxy Settings</span>
               </span>
-              <span className="text-xs text-[var(--ext-text-muted)]">Configure</span>
-            </button>
-            <input
-              type="text"
-              value={proxyUrl}
-              readOnly
-              placeholder="Set via Advanced Proxy Settings"
-              className="w-full px-2.5 py-1.5 bg-[var(--ext-bg-secondary)] border border-[var(--ext-border)] rounded-lg text-[var(--ext-text)] placeholder:text-[var(--ext-text-muted)] focus:outline-none focus:border-[var(--ext-accent)] transition-colors"
-            />
+              <Switch
+                aria-label="Advanced proxy settings"
+                checked={advancedProxyEnabled}
+                onCheckedChange={(enabled) => {
+                  if (!enabled) {
+                    setProxyUrl("");
+                  }
+                  onAdvancedProxyToggle?.(enabled);
+                }}
+              />
+            </div>
           </div>
         )}
 

@@ -181,11 +181,11 @@ export function AdvancedProxySettingsView({
         </button>
         <button
           onClick={handleSave}
-          className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[var(--ext-accent)] text-[var(--primary-foreground)] rounded-lg hover:opacity-90 btn-brand-primary disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[var(--ext-accent)] text-[var(--primary-foreground)] rounded-lg hover:opacity-90 btn-brand-primary disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider text-xs"
           disabled={!hasPermission || !canSave}
         >
           <Save className="w-4 h-4" />
-          Save
+          Save and Enable
         </button>
       </div>
     </div>

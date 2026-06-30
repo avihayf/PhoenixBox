@@ -56,9 +56,6 @@ export function ContainerDetailView({
 
   return (
     <div className="w-full h-auto max-h-[720px] flex flex-col bg-[var(--ext-bg)] border border-[var(--ext-border)] rounded-xl shadow-xl overflow-hidden" style={themed}>
-      {/* Accent top stripe */}
-      <div className="h-[2px] w-full flex-shrink-0" style={{ background: 'var(--ext-accent)' }} />
-
       {/* Header */}
       <div className="flex items-center gap-3 px-3 py-2 border-b border-[var(--ext-border)] z-20" style={{ background: `${colorHex}08` }}>
         <button

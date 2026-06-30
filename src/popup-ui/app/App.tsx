@@ -23,7 +23,10 @@ type Container = {
   icon: string;
   displayIcon: string;
   tabCount: number;
+  visibleTabCount: number;
+  hiddenTabCount: number;
   proxyUrl?: string;
+  proxySource?: string;
   isIsolated?: boolean;
   userAgent?: string;
 };
@@ -39,6 +42,12 @@ type AssignedSite = {
   key: string;
   hostname: string;
 };
+
+function countVisibleAndHiddenTabs(visibleTabs: unknown[], hiddenTabs: unknown) {
+  const visibleCount = Array.isArray(visibleTabs) ? visibleTabs.length : 0;
+  const hiddenCount = Array.isArray(hiddenTabs) ? hiddenTabs.length : 0;
+  return visibleCount + hiddenCount;
+}
 
 // Enforce standard Firefox container colors for our security profiles.
 const FIREFOX_DEFAULT_ICONS = new Set([
@@ -119,7 +128,9 @@ function App() {
   const [globalProxyError, setGlobalProxyError] = useState<string>("");
   const [proxyToggleBusy, setProxyToggleBusy] = useState(false);
   const proxyToggleBusyRef = useRef(false);
+  const quickHideBusyRef = useRef(new Set<string>());
   const [paintBurp, setPaintBurp] = useState(false);
+  const [promotedProxyContainerId, setPromotedProxyContainerId] = useState("");
   const [globalUserAgent, setGlobalUserAgent] = useState(false);
   const [userAgentType, setUserAgentType] = useState<'all' | 'desktop' | 'mobile'>('all');
   const [selectedUserAgent, setSelectedUserAgent] = useState("");
@@ -461,13 +472,29 @@ function App() {
       
       const containerStateKey = `identitiesState@@_${id.cookieStoreId}`;
       const containerState = await browser.storage.local.get(containerStateKey);
-      const isIsolated = !!containerState[containerStateKey]?.isIsolated;
+      const storedContainerState = containerState[containerStateKey] || {};
+      const isIsolated = !!storedContainerState.isIsolated;
+      const visibleTabs = tabsGrouped[id.cookieStoreId] || [];
+      const hiddenTabs = Array.isArray(storedContainerState.hiddenTabs)
+        ? storedContainerState.hiddenTabs
+        : [];
+      const tabCount = countVisibleAndHiddenTabs(
+        visibleTabs,
+        hiddenTabs,
+      );
       
       const proxyObj = proxifiedMap.get(id.cookieStoreId);
       let proxyUrlStr = "";
       if (proxyObj) {
         proxyUrlStr = `${proxyObj.type}://${proxyObj.host}${proxyObj.port ? ":" + proxyObj.port : ""}`;
       }
+      const legacyAdvancedProxy =
+        proxyObj &&
+        !proxyObj.source &&
+        proxyObj.type !== "direct" &&
+        proxyObj.host &&
+        proxyObj.port &&
+        proxyObj.mozProxyEnabled === false;
 
       return {
         cookieStoreId: id.cookieStoreId,
@@ -478,8 +505,11 @@ function App() {
           overrideIcon ||
           getSecurityProfileIcon(id.cookieStoreId, id.name) ||
           uiFallbackIcon,
-        tabCount: (tabsGrouped[id.cookieStoreId] || []).length,
+        tabCount,
+        visibleTabCount: visibleTabs.length,
+        hiddenTabCount: hiddenTabs.length,
         proxyUrl: proxyUrlStr,
+        proxySource: proxyObj?.source || (legacyAdvancedProxy ? "advanced" : undefined),
         isIsolated,
         userAgent: containerUserAgents[id.cookieStoreId] || "",
       };
@@ -515,7 +545,7 @@ function App() {
 
   const setProxyForContainer = async (
     cookieStoreId: string,
-    proxy: { type: string; host: string; port: number; mozProxyEnabled: boolean; proxyDNS?: boolean } | null,
+    proxy: { type: string; host: string; port: number; mozProxyEnabled: boolean; proxyDNS?: boolean; source?: string } | null,
   ) => {
     try {
       const browser = requireWebExt();
@@ -612,6 +642,7 @@ function App() {
         globalProxyUrl: "",
         globalProxyParsed: null,
         addContainerColorHeaderEnabled: false,
+        promotedProxyContainerId: "",
         globalUserAgentEnabled: false,
         globalUserAgentType: 'all',
         globalUserAgent: "",
@@ -649,6 +680,7 @@ function App() {
       setProxyUrl(sanitizedStoredProxyUrl);
 
       setPaintBurp(!!stored.addContainerColorHeaderEnabled);
+      setPromotedProxyContainerId(String(stored.promotedProxyContainerId || ""));
       setGlobalUserAgent(!!stored.globalUserAgentEnabled);
       setUserAgentType(stored.globalUserAgentType as any);
       setSelectedUserAgent(String(stored.globalUserAgent || ""));
@@ -710,6 +742,9 @@ function App() {
         }
         if (changes.addContainerColorHeaderEnabled) {
           setPaintBurp(!!changes.addContainerColorHeaderEnabled.newValue);
+        }
+        if (changes.promotedProxyContainerId) {
+          setPromotedProxyContainerId(String(changes.promotedProxyContainerId.newValue || ""));
         }
         if (changes.containerUserAgents) {
           refreshContainers().catch((e) => logError("Failed to refresh container UAs:", e));
@@ -825,6 +860,7 @@ function App() {
                 host: value.host,
                 port: Number(value.port),
                 mozProxyEnabled: false,
+                source: "advanced",
                 // Always store proxyDNS for SOCKS proxies so the background
                 // handler can distinguish "explicitly false" from "not set".
                 ...((value.type === "socks" || value.type === "socks4")
@@ -864,6 +900,8 @@ function App() {
               icon: "circle",
               displayIcon: "circle",
               tabCount: 0,
+              visibleTabCount: 0,
+              hiddenTabCount: 0,
             });
             setCurrentView("edit");
           }}
@@ -1014,8 +1052,16 @@ function App() {
             setCurrentView("assignedSites");
             await loadAssignedSites(selectedContainer.cookieStoreId);
           }}
-          onAdvancedProxy={async () => {
+          onAdvancedProxyToggle={async (enabled) => {
             if (!selectedContainer?.cookieStoreId) return;
+            if (!enabled) {
+              if (selectedContainer.proxySource !== "advanced") return;
+              await setProxyForContainer(selectedContainer.cookieStoreId, null);
+              const updated = await refreshContainers();
+              const next = updated.find((c) => c.cookieStoreId === selectedContainer.cookieStoreId);
+              if (next) setSelectedContainer(next);
+              return;
+            }
             setAdvancedProxyInitial(null); // Clear stale data from previous container
             setReturnView("edit");
             setCurrentView("advancedProxy");
@@ -1122,6 +1168,7 @@ function App() {
                 host: "",
                 port: 0,
                 mozProxyEnabled: false,
+                source: "direct",
               });
             } else {
               await setProxyForContainer(selectedContainer.cookieStoreId, {
@@ -1129,6 +1176,7 @@ function App() {
                 host: preset.host,
                 port: preset.port,
                 mozProxyEnabled: true,
+                source: "preset",
               });
             }
             await refreshContainers();
@@ -1165,13 +1213,62 @@ function App() {
           const browser = requireWebExt();
           const userContextId = Number(container.cookieStoreId.split("-").pop());
           await browser.runtime.sendMessage({ method: "deleteContainer", message: { userContextId } });
-          const stored = await browser.storage.local.get({ containerDisplayIconOverrides: {} });
+          const stored = await browser.storage.local.get({ containerDisplayIconOverrides: {}, promotedProxyContainerId: "" });
           const overrides = (stored.containerDisplayIconOverrides && typeof stored.containerDisplayIconOverrides === "object" ? stored.containerDisplayIconOverrides : {}) || {};
           if (overrides[container.cookieStoreId]) {
             delete overrides[container.cookieStoreId];
             await browser.storage.local.set({ containerDisplayIconOverrides: overrides });
           }
+          if (stored.promotedProxyContainerId === container.cookieStoreId) {
+            await browser.storage.local.set({ promotedProxyContainerId: "" });
+            setPromotedProxyContainerId("");
+          }
           await refreshContainers();
+        }}
+        onQuickHideContainer={async (container) => {
+          const browser = requireWebExt();
+          if (quickHideBusyRef.current.has(container.cookieStoreId)) return;
+          quickHideBusyRef.current.add(container.cookieStoreId);
+          try {
+            let hasOpenTabs = container.visibleTabCount > 0;
+            let hasHiddenTabs = container.hiddenTabCount > 0;
+            try {
+              const stateByContainer = await browser.runtime.sendMessage({
+                method: "queryIdentitiesState",
+                message: { windowId },
+              });
+              const state = stateByContainer?.[container.cookieStoreId];
+              if (state) {
+                hasOpenTabs = !!state.hasOpenTabs;
+                hasHiddenTabs = !!state.hasHiddenTabs;
+              }
+            } catch {
+              // Fall back to UI snapshot if state query fails.
+            }
+
+            if (hasOpenTabs) {
+              await browser.runtime.sendMessage({
+                method: "hideTabs",
+                cookieStoreId: container.cookieStoreId,
+                windowId,
+              });
+            } else if (hasHiddenTabs) {
+              await browser.runtime.sendMessage({
+                method: "showTabs",
+                cookieStoreId: container.cookieStoreId,
+              });
+            }
+            await refreshContainers();
+          } finally {
+            quickHideBusyRef.current.delete(container.cookieStoreId);
+          }
+        }}
+        promotedProxyContainerId={promotedProxyContainerId}
+        onTogglePromotedProxyContainer={async (container) => {
+          const browser = requireWebExt();
+          const nextId = promotedProxyContainerId === container.cookieStoreId ? "" : container.cookieStoreId;
+          setPromotedProxyContainerId(nextId);
+          await browser.storage.local.set({ promotedProxyContainerId: nextId });
         }}
         proxyEnabled={globalProxyEnabled}
         onToggleProxy={async (enabled, urlOverride) => {
@@ -1224,11 +1321,6 @@ function App() {
               globalProxyEnabled: false,
               globalProxyUserDisabled: true,
             });
-            // Auto-disable Paint the Burp when proxy is disabled
-            if (paintBurp) {
-              setPaintBurp(false);
-              await browser.storage.local.set({ addContainerColorHeaderEnabled: false });
-            }
             return true;
           } finally {
             proxyToggleBusyRef.current = false;

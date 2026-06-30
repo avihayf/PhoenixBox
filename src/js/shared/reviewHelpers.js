@@ -52,6 +52,20 @@
     return !!autoEnablePaintBurp && !!proxyEnabled;
   }
 
+  function shouldAllowGlobalProxyFallback(cookieStoreId, promotedProxyContainerId) {
+    const promoted = String(promotedProxyContainerId || "");
+    if (!promoted) {
+      return true;
+    }
+    return String(cookieStoreId || "") === promoted;
+  }
+
+  function countVisibleAndHiddenTabs(visibleTabs, hiddenTabs) {
+    const visibleCount = Array.isArray(visibleTabs) ? visibleTabs.length : 0;
+    const hiddenCount = Array.isArray(hiddenTabs) ? hiddenTabs.length : 0;
+    return visibleCount + hiddenCount;
+  }
+
   function resolveUserAgentSelection(savedUserAgent, availableUserAgents) {
     const saved = String(savedUserAgent || "");
     const list = Array.isArray(availableUserAgents) ? availableUserAgents : [];
@@ -84,6 +98,8 @@
     getNativeMessagingPermissionPlan,
     sanitizeHiddenTab,
     shouldEnablePaintBurpAfterProxy,
+    shouldAllowGlobalProxyFallback,
+    countVisibleAndHiddenTabs,
     resolveUserAgentSelection,
   };
 });
