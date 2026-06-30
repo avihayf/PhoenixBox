@@ -2,7 +2,7 @@
   "name": "phoenix-box",
   "title": "PhoenixBox",
   "description": "PhoenixBox is a powerful multi-container extension specifically designed for security testing and penetration testing workflows with seamless Burp Suite integration.",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "author": "0xR3dB0mb",
   "bugs": {
     "url": "https://github.com/avihayf/PhoenixBox/issues"
@@ -47,6 +47,10 @@
   "homepage": "https://github.com/avihayf/PhoenixBox#readme",
   "license": "MPL-2.0",
   "main": "index.js",
+  "packageManager": "npm@11.8.0",
+  "engines": {
+    "node": ">=22 <25"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/avihayf/PhoenixBox.git"
@@ -56,10 +60,10 @@
     "micromatch": "^4.0.8"
   },
   "scripts": {
-    "build": "node scripts/build-extension.mjs && web-ext build -s dist/ --overwrite-dest",
-    "dev": "node scripts/build-extension.mjs && web-ext run -s dist/ ${FIREFOX_BIN:+--firefox=\"$FIREFOX_BIN\"}",
+    "build": "node scripts/build-extension.mjs && NO_UPDATE_NOTIFIER=1 web-ext build -s dist/ --overwrite-dest",
+    "dev": "node scripts/build-extension.mjs && NO_UPDATE_NOTIFIER=1 web-ext run -s dist/ ${FIREFOX_BIN:+--firefox=\"$FIREFOX_BIN\"}",
     "lint": "npm-run-all lint:*",
-    "lint:addon": "node scripts/build-extension.mjs && web-ext lint -s dist/",
+    "lint:addon": "node scripts/build-extension.mjs && NO_UPDATE_NOTIFIER=1 web-ext lint -s dist/",
     "lint:css": "stylelint src/css/*.css",
     "lint:html": "html-validate \"src/**/*.html\"",
     "lint:js": "eslint .",

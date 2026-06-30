@@ -1,4 +1,4 @@
-import { Plus, RotateCcw, ArrowUpDown, Hourglass, Sun, Moon, Info, Search, ChevronRight, ChevronDown, ChevronUp, Palette, Trash2, Edit2, X, AlertCircle } from 'lucide-react';
+import { Plus, RotateCcw, ArrowUpDown, Hourglass, Sun, Moon, Info, Search, ChevronRight, ChevronDown, ChevronUp, Palette, Trash2, Edit2, X, AlertCircle, ArrowUp, Eye, EyeOff } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { ContainerIcon } from '../ContainerIcon';
 import { Switch } from '../ui/switch';
@@ -18,6 +18,8 @@ type Container = {
   icon: string;
   displayIcon: string;
   tabCount: number;
+  visibleTabCount: number;
+  hiddenTabCount: number;
 };
 
 interface SiteActionsViewProps {
@@ -69,6 +71,9 @@ interface SiteActionsViewProps {
   onUpdateProxyPreset: (id: string, preset: Omit<ProxyPreset, 'id'>) => void;
   onDeleteProxyPreset: (id: string) => void;
   onQuickDeleteContainer: (container: Container) => void;
+  onQuickHideContainer: (container: Container) => void;
+  promotedProxyContainerId: string;
+  onTogglePromotedProxyContainer: (container: Container) => void;
 }
 
 export function SiteActionsView({
@@ -108,6 +113,9 @@ export function SiteActionsView({
   onUpdateProxyPreset,
   onDeleteProxyPreset,
   onQuickDeleteContainer,
+  onQuickHideContainer,
+  promotedProxyContainerId,
+  onTogglePromotedProxyContainer,
 }: SiteActionsViewProps) {
   const [showUserAgentModal, setShowUserAgentModal] = useState(false);
   const [isQuickActionsExpanded, setIsQuickActionsExpanded] = useState(false);
@@ -426,7 +434,6 @@ export function SiteActionsView({
                     }
                   }
                 }}
-                disabled={!proxyEnabled}
               />
             </div>
 
@@ -481,6 +488,10 @@ export function SiteActionsView({
                 {filteredContainers.map(container => {
                   const cHex = getContainerColorHex(container.color);
                   const isConfirming = confirmDeleteId === container.cookieStoreId;
+                  const isPromoted = promotedProxyContainerId === container.cookieStoreId;
+                  const hasVisibleTabs = container.visibleTabCount > 0;
+                  const hasHiddenTabs = container.hiddenTabCount > 0;
+                  const hideActionLabel = hasVisibleTabs ? "Hide" : "Show";
                   return (
                     <div
                       key={container.cookieStoreId}
@@ -515,7 +526,7 @@ export function SiteActionsView({
                           <button
                             type="button"
                             onClick={() => onSelectContainer(container)}
-                            className="w-full flex items-center gap-2.5 p-2 pr-14 border border-transparent rounded transition-colors text-left"
+                            className="w-full flex items-center gap-2.5 p-2 pr-[10rem] border border-transparent rounded transition-colors text-left"
                             onMouseEnter={e => {
                               e.currentTarget.style.borderColor = `${cHex}66`;
                               e.currentTarget.style.background = `${cHex}0d`;
@@ -526,30 +537,65 @@ export function SiteActionsView({
                             }}
                           >
                             <ContainerIcon iconKey={container.displayIcon || container.icon} colorHex={cHex} />
-                            <span className="text-sm text-[var(--ext-text)] flex-1">{container.name}</span>
-                            <span className="text-xs min-w-[1.5rem] text-center" style={{ color: cHex }}>
+                            <span className="text-sm text-[var(--ext-text)] flex-1 truncate">{container.name}</span>
+                            {isPromoted && (
+                              <span className="text-[10px] uppercase tracking-wide font-medium shrink-0" style={{ color: cHex }}>
+                                Proxy
+                              </span>
+                            )}
+                          </button>
+                          <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                            <span
+                              className="text-xs min-w-[1.5rem] text-center pointer-events-none"
+                              style={{ color: cHex }}
+                              title={`${container.visibleTabCount} open, ${container.hiddenTabCount} hidden`}
+                            >
                               {container.tabCount}
                             </span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(container.cookieStoreId); }}
-                            className="absolute right-8 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity text-[var(--ext-text-muted)] hover:text-[var(--ext-red)] hover:bg-[var(--ext-red)]/10"
-                            aria-label={`Delete ${container.name}`}
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); onContainerDetails(container); }}
-                            className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded transition-colors"
-                            style={{ color: 'var(--ext-text-muted)' }}
-                            onMouseEnter={e => { e.currentTarget.style.background = `${cHex}1a`; e.currentTarget.style.color = cHex; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--ext-text-muted)'; }}
-                            aria-label={`Open ${container.name}`}
-                          >
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); onTogglePromotedProxyContainer(container); }}
+                              className={`p-1 rounded transition-colors ${
+                                isPromoted
+                                  ? 'text-[var(--ext-accent)] bg-[var(--ext-accent-bg)]'
+                                  : 'text-[var(--ext-accent)] hover:bg-[var(--ext-accent-bg)] focus-visible:bg-[var(--ext-accent-bg)]'
+                              }`}
+                              aria-label={isPromoted ? `Unpromote ${container.name} from proxy` : `Promote ${container.name} for proxy`}
+                              title={isPromoted ? 'Unpromote from proxy' : 'Promote for proxy'}
+                            >
+                              <ArrowUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); onQuickHideContainer(container); }}
+                              className="p-1 rounded transition-colors text-[var(--ext-purple)] hover:bg-[var(--ext-purple)]/10 focus-visible:bg-[var(--ext-purple)]/10"
+                              aria-label={`${hideActionLabel} ${container.name}`}
+                              title={hasVisibleTabs ? "Hide open tabs" : hasHiddenTabs ? "Show hidden tabs" : "No tabs to hide"}
+                            >
+                              {hasVisibleTabs ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(container.cookieStoreId); }}
+                              className="p-1 rounded transition-colors text-[var(--ext-red)] hover:bg-[var(--ext-red)]/10 focus-visible:bg-[var(--ext-red)]/10"
+                              aria-label={`Delete ${container.name}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); onContainerDetails(container); }}
+                              className="p-1 rounded transition-colors"
+                              style={{ color: cHex }}
+                              onMouseEnter={e => { e.currentTarget.style.background = `${cHex}1a`; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                              onFocus={e => { e.currentTarget.style.background = `${cHex}1a`; }}
+                              onBlur={e => { e.currentTarget.style.background = 'transparent'; }}
+                              aria-label={`Open ${container.name}`}
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </div>
                         </>
                       )}
                     </div>

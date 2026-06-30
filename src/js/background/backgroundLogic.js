@@ -354,13 +354,16 @@ const backgroundLogic = {
       return;
     }
 
-    return browser.tabs.create({
+    const createProperties = PhoenixBoxReviewHelpers.buildHiddenTabCreateProperties({
       url,
       active,
       discarded,
       pinned: options.pinned || false,
-      cookieStoreId
+      cookieStoreId,
+      title: options.title,
     });
+
+    return browser.tabs.create(createProperties);
   },
 
   isPermissibleURL(url) {
@@ -401,11 +404,16 @@ const backgroundLogic = {
   async unhideContainer(cookieStoreId, alreadyShowingUrl) {
     if (!this.unhideQueue.includes(cookieStoreId)) {
       this.unhideQueue.push(cookieStoreId);
-      await this.showTabs({
-        cookieStoreId,
-        alreadyShowingUrl
-      });
-      this.unhideQueue.splice(this.unhideQueue.indexOf(cookieStoreId), 1);
+      try {
+        await this.showTabs({
+          cookieStoreId,
+          alreadyShowingUrl
+        });
+      } finally {
+        // Always release the queue slot, even if showTabs throws, otherwise
+        // the container stays stuck and future un-hide attempts no-op.
+        this.unhideQueue.splice(this.unhideQueue.indexOf(cookieStoreId), 1);
+      }
     }
   },
 
@@ -651,6 +659,7 @@ const backgroundLogic = {
         promises.push(this.openNewTab({
           userContextId: userContextId,
           url: object.url,
+          title: object.title,
           nofocus: options.nofocus || false,
           noload: noload,
           pinned: object.pinned,

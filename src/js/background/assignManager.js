@@ -12,11 +12,13 @@ window.assignManager = {
   GLOBAL_PROXY_ENABLED_KEY: "globalProxyEnabled",
   GLOBAL_PROXY_URL_KEY: "globalProxyUrl",
   GLOBAL_PROXY_PARSED_KEY: "globalProxyParsed",
+  PROMOTED_PROXY_CONTAINER_ID_KEY: "promotedProxyContainerId",
   _sessionGlobalProxyPassword: null,
   globalProxy: {
     enabled: false,
     proxy: null,
   },
+  promotedProxyContainerId: "",
 
   _sanitizeGlobalProxyUrl(rawUrl) {
     const raw = String(rawUrl || "").trim();
@@ -259,7 +261,7 @@ window.assignManager = {
     // The following blocks potentially dangerous requests for privacy that come without a tabId
 
     if(requestInfo.tabId === -1) {
-      return {};
+      return { type: "direct" };
     }
 
     let tab;
@@ -269,7 +271,7 @@ window.assignManager = {
       // Tab may have been closed between request dispatch and lookup.
       // Fail safely (DIRECT) instead of throwing and breaking proxy resolution.
       LOG.warn("handleProxifiedRequest: tab lookup failed", requestInfo.tabId);
-      return {};
+      return { type: "direct" };
     }
 
     // 1) Container-specific proxy has priority (existing behavior).
@@ -293,7 +295,11 @@ window.assignManager = {
     }
 
     // 2) Global proxy fallback (only when no container-specific proxy exists).
-    if (this.globalProxy.enabled && this.globalProxy.proxy) {
+    const globalFallbackAllowed = PhoenixBoxReviewHelpers.shouldAllowGlobalProxyFallback(
+      tab.cookieStoreId,
+      this.promotedProxyContainerId
+    );
+    if (globalFallbackAllowed && this.globalProxy.enabled && this.globalProxy.proxy) {
       const proxy = { ...this.globalProxy.proxy };
       if (!proxy.password && this._sessionGlobalProxyPassword) {
         proxy.password = this._sessionGlobalProxyPassword;
@@ -308,7 +314,7 @@ window.assignManager = {
       return proxy;
     }
 
-    return {};
+    return { type: "direct" };
   },
 
   // Before a request is handled by the browser we decide if we should
@@ -560,8 +566,10 @@ window.assignManager = {
       [this.GLOBAL_PROXY_ENABLED_KEY]: false,
       [this.GLOBAL_PROXY_URL_KEY]: "",
       [this.GLOBAL_PROXY_PARSED_KEY]: null,
+      [this.PROMOTED_PROXY_CONTAINER_ID_KEY]: "",
     });
     this.globalProxy.enabled = !!stored[this.GLOBAL_PROXY_ENABLED_KEY];
+    this.promotedProxyContainerId = String(stored[this.PROMOTED_PROXY_CONTAINER_ID_KEY] || "");
     const sanitizedProxy = this.setGlobalProxyConfig(stored[this.GLOBAL_PROXY_PARSED_KEY] || null);
     const sanitizedUrl = this._sanitizeGlobalProxyUrl(stored[this.GLOBAL_PROXY_URL_KEY]);
     const needsProxyScrub = JSON.stringify(sanitizedProxy) !== JSON.stringify(stored[this.GLOBAL_PROXY_PARSED_KEY] || null);
@@ -587,6 +595,9 @@ window.assignManager = {
       }
       if (this.GLOBAL_PROXY_PARSED_KEY in changes) {
         this.globalProxy.proxy = this._cacheGlobalProxySecret(changes[this.GLOBAL_PROXY_PARSED_KEY].newValue || null);
+      }
+      if (this.PROMOTED_PROXY_CONTAINER_ID_KEY in changes) {
+        this.promotedProxyContainerId = String(changes[this.PROMOTED_PROXY_CONTAINER_ID_KEY].newValue || "");
       }
     });
   },

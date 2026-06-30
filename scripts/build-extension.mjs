@@ -5,6 +5,12 @@ import path from "node:path";
 const repoRoot = process.cwd();
 const distDir = path.join(repoRoot, "dist");
 const srcDir = path.join(repoRoot, "src");
+const viteBin = path.join(
+  repoRoot,
+  "node_modules",
+  ".bin",
+  process.platform === "win32" ? "vite.cmd" : "vite",
+);
 
 function rmRF(p) {
   fs.rmSync(p, { recursive: true, force: true });
@@ -50,7 +56,7 @@ ensureDir(distDir);
 // 2) Build popup UI (Vite)
 // Note: Vite `--outDir` is resolved relative to `root` (src/popup-ui),
 // so we need to go back to repo root to place output in /dist/popup.
-execSync("npx --yes vite build --config vite.config.mts --outDir ../../dist/popup --emptyOutDir", {
+execSync(`"${viteBin}" build --config vite.config.mts --outDir ../../dist/popup --emptyOutDir`, {
   stdio: "inherit",
   env: { ...process.env, NODE_ENV: "production" },
 });
