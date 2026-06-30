@@ -66,6 +66,28 @@
     return visibleCount + hiddenCount;
   }
 
+  function buildHiddenTabCreateProperties(options) {
+    const opts = options || {};
+    const url = opts.url;
+    const discarded = !!opts.discarded;
+    const createProperties = {
+      url,
+      active: !!opts.active,
+      discarded,
+      pinned: !!opts.pinned,
+      cookieStoreId: opts.cookieStoreId,
+    };
+
+    // Firefox only permits `title` when a tab is created discarded, and it
+    // *requires* a title when a discarded tab is created with a URL. Fall back
+    // to the URL when no stored title is available so un-hide never rejects.
+    if (discarded) {
+      createProperties.title = opts.title || url;
+    }
+
+    return createProperties;
+  }
+
   function resolveUserAgentSelection(savedUserAgent, availableUserAgents) {
     const saved = String(savedUserAgent || "");
     const list = Array.isArray(availableUserAgents) ? availableUserAgents : [];
@@ -100,6 +122,7 @@
     shouldEnablePaintBurpAfterProxy,
     shouldAllowGlobalProxyFallback,
     countVisibleAndHiddenTabs,
+    buildHiddenTabCreateProperties,
     resolveUserAgentSelection,
   };
 });

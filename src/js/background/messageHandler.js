@@ -66,10 +66,10 @@ const messageHandler = {
           backgroundLogic.sortTabs();
           break;
         case "showTabs":
-          backgroundLogic.unhideContainer(m.cookieStoreId);
+          response = backgroundLogic.unhideContainer(m.cookieStoreId);
           break;
         case "hideTabs":
-          backgroundLogic.hideTabs({
+          response = backgroundLogic.hideTabs({
             cookieStoreId: m.cookieStoreId,
             windowId: m.windowId
           });

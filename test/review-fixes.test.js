@@ -7,6 +7,7 @@ const {
   shouldEnablePaintBurpAfterProxy,
   shouldAllowGlobalProxyFallback,
   countVisibleAndHiddenTabs,
+  buildHiddenTabCreateProperties,
   resolveUserAgentSelection,
 } = require("../src/js/shared/reviewHelpers");
 
@@ -110,6 +111,57 @@ describe("reviewHelpers", () => {
       expect(countVisibleAndHiddenTabs([{ id: 1 }, { id: 2 }], [{ id: 3 }])).to.equal(3);
       expect(countVisibleAndHiddenTabs([], [{ id: 3 }, { id: 4 }])).to.equal(2);
       expect(countVisibleAndHiddenTabs([{ id: 1 }], null)).to.equal(1);
+    });
+  });
+
+  describe("buildHiddenTabCreateProperties", () => {
+    it("includes the stored title when re-creating a discarded tab", () => {
+      const props = buildHiddenTabCreateProperties({
+        url: "https://example.test/page",
+        title: "Example Page",
+        discarded: true,
+        pinned: false,
+        active: false,
+        cookieStoreId: "firefox-container-2",
+      });
+
+      expect(props).to.deep.equal({
+        url: "https://example.test/page",
+        active: false,
+        discarded: true,
+        pinned: false,
+        cookieStoreId: "firefox-container-2",
+        title: "Example Page",
+      });
+    });
+
+    it("falls back to the URL as title when a discarded tab has no stored title", () => {
+      const props = buildHiddenTabCreateProperties({
+        url: "https://example.test/page",
+        title: "",
+        discarded: true,
+        cookieStoreId: "firefox-container-2",
+      });
+
+      // Firefox rejects a discarded tab created with a URL but no title, so a
+      // non-empty title must always be present on the discarded path.
+      expect(props.title).to.equal("https://example.test/page");
+      expect(props.discarded).to.equal(true);
+    });
+
+    it("omits title entirely for non-discarded (e.g. pinned) tabs", () => {
+      const props = buildHiddenTabCreateProperties({
+        url: "https://example.test/page",
+        title: "Example Page",
+        discarded: false,
+        pinned: true,
+        cookieStoreId: "firefox-container-2",
+      });
+
+      // `title` is only allowed when discarded is true; setting it otherwise
+      // makes tabs.create reject.
+      expect(props).to.not.have.property("title");
+      expect(props.pinned).to.equal(true);
     });
   });
 
