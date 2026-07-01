@@ -108,6 +108,26 @@ export function EditContainerView({
         className="flex-1 min-h-0 p-3 space-y-3 overflow-y-auto [&::-webkit-scrollbar]:hidden"
         style={noScrollbarStyle}
       >
+        {/* Live identity preview */}
+        <div
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+          style={{ background: `${selectedColorHex}12`, border: `1px solid ${selectedColorHex}40` }}
+        >
+          <span
+            className="flex items-center justify-center w-9 h-9 rounded-[10px] flex-shrink-0"
+            style={{ background: `${selectedColorHex}26` }}
+          >
+            <ContainerIcon iconKey={icon} colorHex={selectedColorHex} />
+          </span>
+          <span
+            className="flex-1 text-[15px] font-semibold truncate"
+            style={{ color: name.trim() ? 'var(--ext-text)' : 'var(--ext-text-muted)' }}
+          >
+            {name.trim() || 'Container name'}
+          </span>
+          <span className="text-[10px] uppercase tracking-wider text-[var(--ext-text-muted)] flex-shrink-0">Preview</span>
+        </div>
+
         {/* Name Input */}
         <div>
           <label className="block text-sm uppercase tracking-wider text-[var(--ext-accent)] mb-2 font-bold opacity-80 pl-2">
@@ -127,23 +147,28 @@ export function EditContainerView({
           <label className="block text-sm uppercase tracking-wider text-[var(--ext-accent)] mb-2 font-bold opacity-80 pl-2">
             Color
           </label>
-          <div className="grid grid-cols-4 gap-x-2 gap-y-3 items-start pl-2"> {/* aligned with icon grid */}
-            {CONTAINER_COLORS.map(c => (
-              <button
-                key={c.value}
-                onClick={() => setColor(c.value)}
-                className={`p-1.5 rounded-lg transition-all flex items-center justify-center ${color === c.value
-                  ? 'bg-[var(--ext-bg-secondary)] ring-2 ring-white'
-                  : 'bg-[var(--ext-bg-secondary)] hover:bg-[var(--ext-bg-tertiary)] opacity-60 hover:opacity-100'
-                  }`}
-                title={c.label}
-              >
-                <span
-                  className="block w-4 h-4 rounded-full"
-                  style={{ backgroundColor: c.hex }}
+          <div className="flex gap-0 justify-between px-2">
+            {CONTAINER_COLORS.map(c => {
+              const sel = color === c.value;
+              return (
+                <button
+                  key={c.value}
+                  onClick={() => setColor(c.value)}
+                  title={c.label}
+                  aria-label={`Set color to ${c.label}`}
+                  className="rounded-full transition-transform flex-shrink-0"
+                  style={{
+                    width: '28px',
+                    height: '28px',
+                    backgroundColor: c.hex,
+                    border: sel ? '2px solid #f0f9ff' : '2px solid transparent',
+                    outline: sel ? `1px solid ${c.hex}` : 'none',
+                    outlineOffset: '2px',
+                    transform: sel ? 'scale(1.08)' : 'scale(1)',
+                  }}
                 />
-              </button>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -153,22 +178,26 @@ export function EditContainerView({
             Icon
           </label>
           <div className="grid grid-cols-6 gap-x-2 gap-y-3 items-start pl-2">
-            {CONTAINER_ICONS.map(i => (
-              <button
-                key={i}
-                onClick={() => setIcon(i)}
-                aria-label={`Set icon to ${i}`}
-                className={`p-1.5 rounded-lg transition-all flex items-center justify-center ${icon === i
-                  ? 'bg-[var(--ext-bg-secondary)] ring-2 ring-white'
-                  : 'bg-[var(--ext-bg-secondary)] hover:bg-[var(--ext-bg-tertiary)] opacity-60 hover:opacity-100'
-                  }`}
-              >
-                <ContainerIcon
-                  iconKey={i}
-                  colorHex={selectedColorHex}
-                />
-              </button>
-            ))}
+            {CONTAINER_ICONS.map(i => {
+              const sel = icon === i;
+              return (
+                <button
+                  key={i}
+                  onClick={() => setIcon(i)}
+                  aria-label={`Set icon to ${i}`}
+                  className="p-1.5 rounded-lg transition-all flex items-center justify-center"
+                  style={{
+                    background: sel ? `${selectedColorHex}26` : 'var(--ext-bg-secondary)',
+                    border: sel ? `1px solid ${selectedColorHex}` : '1px solid var(--ext-border)',
+                  }}
+                >
+                  <ContainerIcon
+                    iconKey={i}
+                    colorHex={selectedColorHex}
+                  />
+                </button>
+              );
+            })}
           </div>
         </div>
 

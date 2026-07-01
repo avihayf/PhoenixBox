@@ -507,7 +507,7 @@ export function SiteActionsView({
                   return (
                     <div
                       key={container.cookieStoreId}
-                      className="relative group container-item rounded transition-colors"
+                      className="relative group container-item rounded-lg overflow-hidden transition-colors"
                       style={{
                         border: `1px solid ${
                           hoveredContainerId === container.cookieStoreId

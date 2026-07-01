@@ -69,7 +69,12 @@ export function ContainerDetailView({
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="flex items-center gap-2.5 flex-1 overflow-hidden">
-          <ContainerIcon iconKey={containerIcon || 'circle'} colorHex={colorHex} className="w-[20px] h-[22px]" />
+          <span
+            className="flex items-center justify-center w-9 h-9 rounded-[11px] flex-shrink-0"
+            style={{ background: `${colorHex}24`, border: `1px solid ${colorHex}55` }}
+          >
+            <ContainerIcon iconKey={containerIcon || 'circle'} colorHex={colorHex} className="w-[20px] h-[22px]" />
+          </span>
           <h1 className="tracking-wide uppercase brand-title truncate" style={{ color: colorHex }}>{containerName}</h1>
         </div>
       </div>
@@ -83,25 +88,31 @@ export function ContainerDetailView({
             label="Open new tab in this container"
             onClick={onOpenNewTab}
             accentColor={colorHex}
+            chipColor="var(--ext-accent)"
           />
           <ActionButton
             icon={<Eye className="w-4 h-4 text-[var(--ext-purple)]" />}
             label="Hide this container"
             onClick={onHideContainer}
             accentColor={colorHex}
+            chipColor="var(--ext-purple)"
           />
           <ActionButton
             icon={<ArrowLeftRight className="w-4 h-4 text-[var(--ext-green)]" />}
             label="Move tabs to a new window"
             onClick={onMoveToWindow}
             accentColor={colorHex}
+            chipColor="var(--ext-green)"
           />
           <ActionButton
             icon={<Hourglass className="w-4 h-4 text-[var(--ext-yellow)]" />}
             label="Always open site in container"
             onClick={onManageSites}
             accentColor={colorHex}
+            chipColor="var(--ext-yellow)"
           />
+          {/* divider before the destructive action */}
+          <div className="h-px bg-[var(--ext-border)] mx-2 my-1.5" />
           <ActionButton
             icon={<Trash2 className="w-4 h-4 text-[var(--ext-red)]" />}
             label="Clear container storage"
@@ -180,8 +191,8 @@ export function ContainerDetailView({
         <button
           onClick={onManageContainer}
           className="w-full flex items-center justify-center py-2 border-2 rounded-lg font-medium text-sm transition-colors"
-          style={{ borderColor: 'var(--ext-accent)', color: 'var(--ext-accent)' }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'color-mix(in srgb, var(--ext-accent) 9%, transparent)')}
+          style={{ borderColor: colorHex, color: colorHex }}
+          onMouseEnter={e => (e.currentTarget.style.background = `${colorHex}14`)}
           onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
         >
           Manage This Container
@@ -198,16 +209,22 @@ interface ActionButtonProps {
   onClick: () => void;
   variant?: 'default' | 'danger';
   accentColor?: string;
+  chipColor?: string;
 }
 
-function ActionButton({ icon, label, onClick, variant = 'default', accentColor }: ActionButtonProps) {
+function ActionButton({ icon, label, onClick, variant = 'default', accentColor, chipColor }: ActionButtonProps) {
   if (variant === 'danger') {
     return (
       <button
         onClick={onClick}
-        className="w-full flex items-center gap-2.5 p-2 rounded transition-colors text-left group text-[var(--ext-red)] hover:bg-[var(--ext-red)]/5"
+        className="w-full flex items-center gap-2.5 p-2 rounded-lg transition-colors text-left group text-[var(--ext-red)] hover:bg-[var(--ext-red)]/5"
       >
-        <span className="flex items-center justify-center w-5 h-5 transition-transform group-hover:scale-110 shrink-0">{icon}</span>
+        <span
+          className="flex items-center justify-center w-[30px] h-[30px] rounded-full shrink-0 transition-transform group-hover:scale-105"
+          style={{ background: 'color-mix(in srgb, var(--ext-red) 20%, transparent)' }}
+        >
+          {icon}
+        </span>
         <span className="text-sm font-medium leading-none flex-1">{label}</span>
       </button>
     );
@@ -216,11 +233,16 @@ function ActionButton({ icon, label, onClick, variant = 'default', accentColor }
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-2.5 p-2 rounded transition-colors text-left group text-[var(--ext-text)]"
+      className="w-full flex items-center gap-2.5 p-2 rounded-lg transition-colors text-left group text-[var(--ext-text)]"
       onMouseEnter={e => { if (accentColor) e.currentTarget.style.background = `${accentColor}10`; }}
       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
     >
-      <span className="flex items-center justify-center w-5 h-5 transition-transform group-hover:scale-110 shrink-0">{icon}</span>
+      <span
+        className="flex items-center justify-center w-[30px] h-[30px] rounded-full shrink-0 transition-transform group-hover:scale-105"
+        style={{ background: chipColor ? `color-mix(in srgb, ${chipColor} 22%, transparent)` : 'transparent' }}
+      >
+        {icon}
+      </span>
       <span className="text-sm font-medium leading-none flex-1">{label}</span>
     </button>
   );

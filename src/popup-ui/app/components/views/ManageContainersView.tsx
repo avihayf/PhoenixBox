@@ -45,20 +45,50 @@ export function ManageContainersView({
       <div 
         className={`p-2.5 space-y-1 ${needsScroll ? 'max-h-[440px] overflow-y-auto custom-scrollbar' : ''}`}
       >
-        {containers.map(container => (
-          <button
-            key={container.cookieStoreId}
-            onClick={() => onSelectContainer(container)}
-            className="w-full flex items-center gap-2.5 p-2 bg-[var(--ext-bg-secondary)] hover:bg-[var(--ext-bg-tertiary)] border border-[var(--ext-border)]/50 rounded transition-colors group"
-          >
-            <ContainerIcon iconKey={container.displayIcon || container.icon} colorHex={getContainerColorHex(container.color)} />
-            <span className="text-sm text-[var(--ext-text)] flex-1 text-left font-medium leading-none">{container.name}</span>
-            <span className="text-xs text-[var(--ext-accent)] bg-[var(--ext-cyan-bg)] px-1.5 py-0.5 rounded-full min-w-[1.5rem] text-center font-medium">
-              {container.tabCount}
-            </span>
-            <ChevronRight className="w-4 h-4 text-[var(--ext-text-muted)] group-hover:text-[var(--ext-accent)] transition-colors" />
-          </button>
-        ))}
+        {containers.map(container => {
+          const hex = getContainerColorHex(container.color);
+          const hasTabs = container.tabCount > 0;
+          return (
+            <button
+              key={container.cookieStoreId}
+              onClick={() => onSelectContainer(container)}
+              className="relative w-full flex items-center gap-3 py-2.5 pl-4 pr-3 rounded-lg overflow-hidden transition-colors group"
+              style={{ background: `${hex}0d`, border: `1px solid ${hex}33` }}
+              onMouseEnter={e => (e.currentTarget.style.background = `${hex}1a`)}
+              onMouseLeave={e => (e.currentTarget.style.background = `${hex}0d`)}
+            >
+              {/* left color bar */}
+              <span className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: hex }} />
+              {/* color-tinted icon chip */}
+              <span
+                className="flex items-center justify-center w-9 h-9 rounded-full flex-shrink-0"
+                style={{ background: `${hex}26` }}
+              >
+                <ContainerIcon iconKey={container.displayIcon || container.icon} colorHex={hex} />
+              </span>
+              {/* name + tab status */}
+              <span className="flex-1 min-w-0 flex flex-col gap-0.5 text-left">
+                <span className="text-sm font-semibold text-[var(--ext-text)] truncate leading-none">{container.name}</span>
+                <span
+                  className="text-[11px] leading-none"
+                  style={{ color: hasTabs ? hex : 'var(--ext-text-muted)' }}
+                >
+                  {hasTabs ? `${container.tabCount} open ${container.tabCount === 1 ? 'tab' : 'tabs'}` : 'No open tabs'}
+                </span>
+              </span>
+              {/* count badge — hidden when zero */}
+              {hasTabs && (
+                <span
+                  className="text-xs font-bold px-2 py-0.5 rounded-full min-w-[1.6rem] text-center flex-shrink-0"
+                  style={{ background: hex, color: '#050510' }}
+                >
+                  {container.tabCount}
+                </span>
+              )}
+              <ChevronRight className="w-4 h-4 text-[var(--ext-text-muted)] group-hover:text-[var(--ext-accent)] transition-colors flex-shrink-0" />
+            </button>
+          );
+        })}
 
         {/* Add New Container - attached to last profile */}
         <button
