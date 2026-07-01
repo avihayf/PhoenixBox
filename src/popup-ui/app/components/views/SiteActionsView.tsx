@@ -1,4 +1,4 @@
-import { Plus, RotateCcw, ArrowUpDown, Hourglass, Sun, Moon, Info, Search, ChevronRight, ChevronDown, ChevronUp, Palette, Trash2, Edit2, X, AlertCircle, ArrowUp, Eye, EyeOff } from 'lucide-react';
+import { Plus, RotateCcw, ArrowUpDown, Hourglass, Sun, Moon, Info, Search, ChevronRight, ChevronDown, ChevronUp, Palette, Trash2, Edit2, X, AlertCircle, ArrowUp, Eye, EyeOff, Globe, Droplet, UserCog } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { ContainerIcon } from '../ContainerIcon';
 import { Switch } from '../ui/switch';
@@ -126,6 +126,7 @@ export function SiteActionsView({
   const [editingPreset, setEditingPreset] = useState<ProxyPreset | null>(null);
   const [showPaintBurpFirstTimeMessage, setShowPaintBurpFirstTimeMessage] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [hoveredContainerId, setHoveredContainerId] = useState<string | null>(null);
   const presetDropdownRef = useRef<HTMLDivElement>(null);
   const accentPickerRef = useRef<HTMLDivElement>(null);
 
@@ -282,14 +283,50 @@ export function SiteActionsView({
           </h2>
 
           <div className="space-y-2.5">
-            {/* Proxy Toggle */}
-            <div className="flex items-center justify-between">
-            <span className="text-[calc(0.875rem+0.5px)] leading-[1.25rem] text-[var(--ext-text)]">Proxy all tabs</span>
-              <Switch
-                checked={proxyEnabled}
-                onCheckedChange={onToggleProxy}
+            {/* Burp / Proxy control tiles */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => onToggleProxy(!proxyEnabled)}
                 disabled={!!proxyToggleDisabled}
-              />
+                className="flex-1 flex flex-col items-center gap-2 py-3 px-1.5 rounded-xl border transition-colors disabled:opacity-50"
+                style={{ borderColor: proxyEnabled ? 'var(--ext-accent)' : 'var(--ext-border)', background: proxyEnabled ? 'var(--ext-accent-bg)' : 'transparent' }}
+              >
+                <Globe className="w-5 h-5" style={{ color: proxyEnabled ? 'var(--ext-accent)' : 'var(--ext-text-muted)' }} />
+                <span className="text-[11px] font-medium leading-tight text-center" style={{ color: proxyEnabled ? 'var(--ext-accent)' : 'var(--ext-text-muted)' }}>Proxy</span>
+                <span className="text-[9px] uppercase tracking-wide font-semibold" style={{ color: proxyEnabled ? 'var(--ext-accent)' : '#64748b' }}>{proxyEnabled ? 'On' : 'Off'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const enabled = !paintBurp;
+                  await onTogglePaintBurp(enabled);
+                  if (enabled) {
+                    const browser = requireWebExt();
+                    const stored = await browser.storage.local.get({ paintBurpFirstTimeMessageShown: false });
+                    if (!stored.paintBurpFirstTimeMessageShown) {
+                      await browser.storage.local.set({ paintBurpFirstTimeMessageShown: true });
+                      setShowPaintBurpFirstTimeMessage(true);
+                    }
+                  }
+                }}
+                className="flex-1 flex flex-col items-center gap-2 py-3 px-1.5 rounded-xl border transition-colors"
+                style={{ borderColor: paintBurp ? 'var(--ext-accent)' : 'var(--ext-border)', background: paintBurp ? 'var(--ext-accent-bg)' : 'transparent' }}
+              >
+                <Droplet className="w-5 h-5" style={{ color: paintBurp ? 'var(--ext-accent)' : 'var(--ext-text-muted)' }} />
+                <span className="text-[11px] font-medium leading-tight text-center" style={{ color: paintBurp ? 'var(--ext-accent)' : 'var(--ext-text-muted)' }}>Paint</span>
+                <span className="text-[9px] uppercase tracking-wide font-semibold" style={{ color: paintBurp ? 'var(--ext-accent)' : '#64748b' }}>{paintBurp ? 'On' : 'Off'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleToggleUserAgent(!userAgentEnabled)}
+                className="flex-1 flex flex-col items-center gap-2 py-3 px-1.5 rounded-xl border transition-colors"
+                style={{ borderColor: userAgentEnabled ? 'var(--ext-accent)' : 'var(--ext-border)', background: userAgentEnabled ? 'var(--ext-accent-bg)' : 'transparent' }}
+              >
+                <UserCog className="w-5 h-5" style={{ color: userAgentEnabled ? 'var(--ext-accent)' : 'var(--ext-text-muted)' }} />
+                <span className="text-[11px] font-medium leading-tight text-center" style={{ color: userAgentEnabled ? 'var(--ext-accent)' : 'var(--ext-text-muted)' }}>User-Agent</span>
+                <span className="text-[9px] uppercase tracking-wide font-semibold" style={{ color: userAgentEnabled ? 'var(--ext-accent)' : '#64748b' }}>{userAgentEnabled ? 'On' : 'Off'}</span>
+              </button>
             </div>
 
             {/* Proxy URL Input with Presets */}
@@ -417,34 +454,9 @@ export function SiteActionsView({
               initialData={editingPreset || undefined}
             />
 
-            {/* Paint the Burp */}
-            <div className="flex items-center justify-between">
-            <span className="text-[calc(0.875rem+0.5px)] leading-[1.25rem] text-[var(--ext-text)]">Paint the Burp</span>
-              <Switch
-                checked={paintBurp}
-                onCheckedChange={async (enabled) => {
-                  await onTogglePaintBurp(enabled);
-                  // Check if this is the first time enabling
-                  if (enabled) {
-                    const browser = requireWebExt();
-                    const stored = await browser.storage.local.get({ paintBurpFirstTimeMessageShown: false });
-                    if (!stored.paintBurpFirstTimeMessageShown) {
-                      await browser.storage.local.set({ paintBurpFirstTimeMessageShown: true });
-                      setShowPaintBurpFirstTimeMessage(true);
-                    }
-                  }
-                }}
-              />
-            </div>
+            {/* Paint the Burp — moved into control tiles above */}
 
-            {/* User Agent Toggle */}
-            <div className="flex items-center justify-between">
-            <span className="text-[calc(0.875rem+0.5px)] leading-[1.25rem] text-[var(--ext-text)]">Set User-Agent</span>
-              <Switch
-                checked={userAgentEnabled}
-                onCheckedChange={handleToggleUserAgent}
-              />
-            </div>
+            {/* User Agent — moved into control tiles above */}
 
             {/* User Agent Configure Button (when enabled) */}
             {userAgentEnabled && (
@@ -495,8 +507,31 @@ export function SiteActionsView({
                   return (
                     <div
                       key={container.cookieStoreId}
-                      className="relative group container-item"
+                      className="relative group container-item rounded transition-colors"
+                      style={{
+                        border: `1px solid ${
+                          hoveredContainerId === container.cookieStoreId
+                            ? `${cHex}99`
+                            : isPromoted
+                              ? `${cHex}40`
+                              : 'transparent'
+                        }`,
+                        background:
+                          hoveredContainerId === container.cookieStoreId
+                            ? `${cHex}1a`
+                            : isPromoted
+                              ? `${cHex}0d`
+                              : 'transparent',
+                      }}
+                      onMouseEnter={() => setHoveredContainerId(container.cookieStoreId)}
+                      onMouseLeave={() => setHoveredContainerId(null)}
                     >
+                      {isPromoted && !isConfirming && (
+                        <div
+                          className="absolute left-[3px] top-2 bottom-2 w-[3px] rounded z-10"
+                          style={{ background: cHex }}
+                        />
+                      )}
                       {isConfirming ? (
                         <div
                           className="flex items-center gap-2 p-2 rounded border"
@@ -526,15 +561,7 @@ export function SiteActionsView({
                           <button
                             type="button"
                             onClick={() => onSelectContainer(container)}
-                            className="w-full flex items-center gap-2.5 p-2 pr-[10rem] border border-transparent rounded transition-colors text-left"
-                            onMouseEnter={e => {
-                              e.currentTarget.style.borderColor = `${cHex}66`;
-                              e.currentTarget.style.background = `${cHex}0d`;
-                            }}
-                            onMouseLeave={e => {
-                              e.currentTarget.style.borderColor = 'transparent';
-                              e.currentTarget.style.background = 'transparent';
-                            }}
+                            className="w-full flex items-center gap-2.5 p-2 pr-[10rem] rounded text-left"
                           >
                             <ContainerIcon iconKey={container.displayIcon || container.icon} colorHex={cHex} />
                             <span className="text-sm text-[var(--ext-text)] flex-1 truncate">{container.name}</span>
