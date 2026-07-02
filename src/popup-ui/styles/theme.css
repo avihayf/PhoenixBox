@@ -190,6 +190,11 @@
   --ext-accent-light: var(--ext-cyan-light);
   --ext-accent-bg: var(--ext-cyan-bg);
   --ext-glow-accent: var(--ext-glow-cyan);
+  /* Logo highlight (P, i, B). Defaults to the bar accent so the wordmark
+     follows the hue bar. The logo "picker" (if enabled) overrides this with a
+     fixed color; "Link" resets it back to var(--ext-accent). Rest of the
+     wordmark uses --ext-text (neutral, light/dark aware). */
+  --ext-logo-accent: var(--ext-accent);
 }
 
 /* Accent: Cyan (default) */

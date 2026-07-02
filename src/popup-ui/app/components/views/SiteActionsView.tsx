@@ -1,7 +1,6 @@
-import { Plus, RotateCcw, ArrowUpDown, Hourglass, Sun, Moon, Info, Search, ChevronRight, ChevronDown, ChevronUp, Palette, Trash2, Edit2, X, AlertCircle, ArrowUp, Eye, EyeOff, Globe, Droplet, UserCog } from 'lucide-react';
+import { Plus, RotateCcw, ArrowUpDown, Hourglass, Sun, Moon, Info, Search, ChevronRight, ChevronDown, ChevronUp, Palette, Trash2, Edit2, X, AlertCircle, ArrowUp, Eye, EyeOff, Globe, Droplet, UserCog, Download } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { ContainerIcon } from '../ContainerIcon';
-import { Switch } from '../ui/switch';
 import { UserAgentModal } from '../modals/UserAgentModal';
 import { ProxyPresetModal } from '../modals/ProxyPresetModal';
 import type { UserAgentData } from '../../../lib/userAgent';
@@ -9,7 +8,8 @@ import { getContainerColorHex } from '../../../lib/containerColors';
 import { DEFAULT_PROXY_PRESETS, type ProxyPreset } from '../../../data/mockData';
 import { requireWebExt } from '../../../lib/browser';
 import { HueAccentPicker } from '../HueAccentPicker';
-import type { AccentValue } from '../../../lib/accentColors';
+import { LogoAccentPicker } from '../LogoAccentPicker';
+import { accentToHue, type AccentValue, type LogoAccentValue } from '../../../lib/accentColors';
 
 type Container = {
   cookieStoreId: string;
@@ -64,6 +64,8 @@ interface SiteActionsViewProps {
   // Accent Color
   accentColor: AccentValue;
   onChangeAccent: (value: AccentValue) => void;
+  logoAccent: LogoAccentValue;
+  onChangeLogoAccent: (value: LogoAccentValue) => void;
 
   // Proxy Presets
   proxyPresets: ProxyPreset[];
@@ -108,6 +110,8 @@ export function SiteActionsView({
   onOpenOptions,
   accentColor,
   onChangeAccent,
+  logoAccent,
+  onChangeLogoAccent,
   proxyPresets,
   onSaveProxyPreset,
   onUpdateProxyPreset,
@@ -204,13 +208,22 @@ export function SiteActionsView({
             {showAccentPicker && (
               <div className="absolute top-full left-0 mt-1 p-3 bg-[var(--ext-bg-secondary)] border border-[var(--ext-border)] rounded-lg shadow-xl z-50 w-[220px]">
                 <HueAccentPicker value={accentColor} onChange={onChangeAccent} />
+                <LogoAccentPicker
+                  value={logoAccent}
+                  themeHue={accentToHue(accentColor)}
+                  onChange={onChangeLogoAccent}
+                />
               </div>
             )}
           </div>
         </div>
 
-        <h1 className="brand-main-title text-[32px] text-[var(--ext-accent)]">
-          PhoenixBox
+        <h1 className="brand-main-title text-[32px]">
+          {"PhoenixBox".split("").map((ch, i) => (
+            <span key={i} style={{ color: [0, 5, 7].includes(i) ? 'var(--ext-logo-accent)' : 'var(--ext-text)' }}>
+              {ch}
+            </span>
+          ))}
         </h1>
 
         <button
@@ -454,10 +467,6 @@ export function SiteActionsView({
               initialData={editingPreset || undefined}
             />
 
-            {/* Paint the Burp — moved into control tiles above */}
-
-            {/* User Agent — moved into control tiles above */}
-
             {/* User Agent Configure Button (when enabled) */}
             {userAgentEnabled && (
               <button
@@ -677,10 +686,20 @@ export function SiteActionsView({
               </div>
 
               {/* Content */}
-              <div className="p-4">
+              <div className="p-4 space-y-3">
                 <p className="text-xs text-[var(--ext-text)] leading-relaxed">
                   For this feature to work, make sure you load the <strong className="text-[var(--ext-accent)]">Phoenix JAR</strong> in your Burp extension.
                 </p>
+                <a
+                  href="https://github.com/avihayf/PhoenixBox-Highlighter/releases/download/v1.1.0/PhoenixBoxHighlighter.jar"
+                  download
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs border border-[var(--ext-accent)] text-[var(--ext-accent)] rounded-lg hover:bg-[var(--ext-accent-bg)] transition-all duration-200 font-medium"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download Phoenix JAR
+                </a>
               </div>
 
               {/* Actions */}

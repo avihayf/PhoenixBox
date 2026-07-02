@@ -88,6 +88,41 @@ export function clearCustomHue(): void {
   root.style.removeProperty('--ext-glow-accent');
 }
 
+/* ---------------------------------------------------------------------------
+   Logo highlight accent — colors the P, i, B letters of the PhoenixBox wordmark.
+   `linked` = follow the theme accent (the hue bar). Unlinked = a fixed hue set
+   by the logo picker. The rest of the wordmark always uses --ext-text.
+--------------------------------------------------------------------------- */
+export type LogoAccentValue =
+  | { linked: true }
+  | { linked: false; hue: number };
+
+export function applyLogoAccentToDOM(logo: LogoAccentValue, isDark: boolean): void {
+  const root = document.documentElement;
+  if (logo.linked) {
+    // Fall back to the stylesheet default (--ext-logo-accent: var(--ext-accent)),
+    // so the logo highlight tracks the hue bar live.
+    root.style.removeProperty('--ext-logo-accent');
+    return;
+  }
+  const h = ((Math.round(logo.hue) % 360) + 360) % 360;
+  // Match the lightness/saturation of applyCustomHue so it reads correctly in each mode.
+  root.style.setProperty('--ext-logo-accent', isDark ? `hsl(${h}, 85%, 60%)` : `hsl(${h}, 70%, 40%)`);
+}
+
+export function serializeLogoAccent(logo: LogoAccentValue): string {
+  return logo.linked ? 'linked' : `hue:${logo.hue}`;
+}
+
+export function deserializeLogoAccent(raw: string | null): LogoAccentValue {
+  if (!raw || raw === 'linked') return { linked: true };
+  if (raw.startsWith('hue:')) {
+    const hue = Math.max(0, Math.min(359, Number(raw.slice(4)) || 0));
+    return { linked: false, hue };
+  }
+  return { linked: true };
+}
+
 export function serializeAccent(accent: AccentValue): string {
   if (accent.type === 'preset') return accent.id;
   return `hue:${accent.hue}`;

@@ -12,7 +12,7 @@ import { parseGlobalProxyUrl, sanitizeProxyUrlForStorage, stripSensitiveProxyFie
 import { getUserAgents, type UserAgentData } from "../lib/userAgent";
 import { DEFAULT_PROXY_PRESETS, type ProxyPreset } from "../data/mockData";
 import { logError } from "../lib/logger";
-import { type AccentValue, ACCENT_PRESETS, applyCustomHue, clearCustomHue, serializeAccent, deserializeAccent } from "../lib/accentColors";
+import { type AccentValue, ACCENT_PRESETS, applyCustomHue, clearCustomHue, serializeAccent, deserializeAccent, type LogoAccentValue, applyLogoAccentToDOM, serializeLogoAccent, deserializeLogoAccent } from "../lib/accentColors";
 
 type View = "main" | "detail" | "edit" | "picker" | "manage" | "assignedSites" | "advancedProxy" | "onboarding";
 
@@ -142,6 +142,7 @@ function App() {
   const [containers, setContainers] = useState<Container[]>([]);
   const [isDark, setIsDark] = useState(true);
   const [accentColor, setAccentColor] = useState<AccentValue>({ type: 'preset', id: 'cyan' });
+  const [logoAccent, setLogoAccent] = useState<LogoAccentValue>({ linked: true });
   const [tabsByContainer, setTabsByContainer] = useState<Record<string, Tab[]>>({});
   const [windowId, setWindowId] = useState<number | null>(null);
   const [pickerTitle, setPickerTitle] = useState<string>("");
@@ -620,6 +621,11 @@ function App() {
     const accent = deserializeAccent(savedRaw);
     setAccentColor(accent);
     applyAccentToDOM(accent, document.documentElement.classList.contains('dark'));
+
+    // Load saved logo highlight (P, i, B) color
+    const savedLogo = deserializeLogoAccent(localStorage.getItem("logoAccent"));
+    setLogoAccent(savedLogo);
+    applyLogoAccentToDOM(savedLogo, document.documentElement.classList.contains('dark'));
 
     const run = async () => {
       const browser = requireWebExt();
@@ -1198,6 +1204,7 @@ function App() {
           document.documentElement.classList.toggle("dark", nextDark);
           localStorage.setItem("theme", nextDark ? "dark" : "light");
           applyAccentToDOM(accentColor, nextDark);
+          applyLogoAccentToDOM(logoAccent, nextDark);
         }}
         accentColor={accentColor}
         onChangeAccent={(value) => {
@@ -1205,6 +1212,13 @@ function App() {
           applyAccentToDOM(value, currentDark);
           setAccentColor(value);
           localStorage.setItem("accentColor", serializeAccent(value));
+        }}
+        logoAccent={logoAccent}
+        onChangeLogoAccent={(value) => {
+          const currentDark = document.documentElement.classList.contains('dark');
+          applyLogoAccentToDOM(value, currentDark);
+          setLogoAccent(value);
+          localStorage.setItem("logoAccent", serializeLogoAccent(value));
         }}
         onManageContainers={() => setCurrentView("manage")}
         onSelectContainer={handleContainerClick}
