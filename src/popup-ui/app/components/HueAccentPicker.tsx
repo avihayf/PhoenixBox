@@ -69,7 +69,7 @@ export function HueAccentPicker({ value, onChange }: HueAccentPickerProps) {
               className={`w-5 h-5 rounded-full transition-all hover:scale-110 ${
                 isActive ? 'ring-2 ring-white ring-offset-1 ring-offset-[var(--ext-bg)]' : ''
               }`}
-              style={{ backgroundColor: preset.hex }}
+              style={{ backgroundColor: preset.hex, border: preset.id === 'white' ? '1px solid var(--ext-border)' : undefined }}
               aria-label={preset.label}
               title={preset.label}
             />

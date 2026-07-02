@@ -220,7 +220,7 @@ export function SiteActionsView({
 
         <h1 className="brand-main-title text-[32px]">
           {"PhoenixBox".split("").map((ch, i) => (
-            <span key={i} style={{ color: [0, 5, 7].includes(i) ? 'var(--ext-logo-accent)' : 'var(--ext-text)' }}>
+            <span key={i} style={{ color: i >= 7 ? 'var(--ext-logo-accent)' : 'var(--ext-accent)' }}>
               {ch}
             </span>
           ))}

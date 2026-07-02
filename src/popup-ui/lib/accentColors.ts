@@ -13,6 +13,7 @@ export const ACCENT_PRESETS = [
   { id: 'orange', hue: 25,  hex: '#F97316', label: 'Orange' },
   { id: 'yellow', hue: 48,  hex: '#EAB308', label: 'Yellow' },
   { id: 'indigo', hue: 235, hex: '#6366F1', label: 'Indigo' },
+  { id: 'white',  hue: 0,   hex: '#FFFFFF', label: 'White' },
 ] as const;
 
 export type AccentPresetId = typeof ACCENT_PRESETS[number]['id'];
@@ -95,7 +96,8 @@ export function clearCustomHue(): void {
 --------------------------------------------------------------------------- */
 export type LogoAccentValue =
   | { linked: true }
-  | { linked: false; hue: number };
+  | { linked: false; white: true }
+  | { linked: false; hue: number; white?: false };
 
 export function applyLogoAccentToDOM(logo: LogoAccentValue, isDark: boolean): void {
   const root = document.documentElement;
@@ -105,17 +107,24 @@ export function applyLogoAccentToDOM(logo: LogoAccentValue, isDark: boolean): vo
     root.style.removeProperty('--ext-logo-accent');
     return;
   }
+  if ('white' in logo && logo.white) {
+    root.style.setProperty('--ext-logo-accent', '#ffffff');
+    return;
+  }
   const h = ((Math.round(logo.hue) % 360) + 360) % 360;
   // Match the lightness/saturation of applyCustomHue so it reads correctly in each mode.
   root.style.setProperty('--ext-logo-accent', isDark ? `hsl(${h}, 85%, 60%)` : `hsl(${h}, 70%, 40%)`);
 }
 
 export function serializeLogoAccent(logo: LogoAccentValue): string {
-  return logo.linked ? 'linked' : `hue:${logo.hue}`;
+  if (logo.linked) return 'linked';
+  if ('white' in logo && logo.white) return 'white';
+  return `hue:${logo.hue}`;
 }
 
 export function deserializeLogoAccent(raw: string | null): LogoAccentValue {
   if (!raw || raw === 'linked') return { linked: true };
+  if (raw === 'white') return { linked: false, white: true };
   if (raw.startsWith('hue:')) {
     const hue = Math.max(0, Math.min(359, Number(raw.slice(4)) || 0));
     return { linked: false, hue };
