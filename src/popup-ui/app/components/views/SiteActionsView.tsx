@@ -99,7 +99,7 @@ interface SiteActionsViewProps {
   onDeleteProxyPreset: (id: string) => void;
   onQuickDeleteContainer: (container: Container) => void;
   onQuickHideContainer: (container: Container) => void;
-  promotedProxyContainerId: string;
+  promotedProxyContainerIds: string[];
   onTogglePromotedProxyContainer: (container: Container) => void;
 }
 
@@ -143,7 +143,7 @@ export function SiteActionsView({
   onDeleteProxyPreset,
   onQuickDeleteContainer,
   onQuickHideContainer,
-  promotedProxyContainerId,
+  promotedProxyContainerIds,
   onTogglePromotedProxyContainer,
 }: SiteActionsViewProps) {
   const [showUserAgentModal, setShowUserAgentModal] = useState(false);
@@ -523,7 +523,7 @@ export function SiteActionsView({
                 {filteredContainers.map(container => {
                   const cHex = getContainerColorHex(container.color);
                   const isConfirming = confirmDeleteId === container.cookieStoreId;
-                  const isPromoted = promotedProxyContainerId === container.cookieStoreId;
+                  const isPromoted = promotedProxyContainerIds.includes(container.cookieStoreId);
                   const hasVisibleTabs = container.visibleTabCount > 0;
                   const hasHiddenTabs = container.hiddenTabCount > 0;
                   const hideActionLabel = hasVisibleTabs ? "Hide" : "Show";
@@ -602,9 +602,16 @@ export function SiteActionsView({
                             >
                               {container.tabCount}
                             </span>
+                            <div
+                              className={`flex items-center gap-1 transition-opacity duration-150 ${
+                                isPromoted
+                                  ? 'opacity-100'
+                                  : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto'
+                              }`}
+                            >
                             <button
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); onTogglePromotedProxyContainer(container); }}
+                              onClick={(e) => { e.stopPropagation(); e.currentTarget.blur(); onTogglePromotedProxyContainer(container); }}
                               className={`p-1 rounded transition-colors ${
                                 isPromoted
                                   ? 'text-[var(--ext-accent)] bg-[var(--ext-accent-bg)]'
@@ -617,7 +624,7 @@ export function SiteActionsView({
                             </button>
                             <button
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); onQuickHideContainer(container); }}
+                              onClick={(e) => { e.stopPropagation(); e.currentTarget.blur(); onQuickHideContainer(container); }}
                               className="p-1 rounded transition-colors text-[var(--ext-purple)] hover:bg-[var(--ext-purple)]/10 focus-visible:bg-[var(--ext-purple)]/10"
                               aria-label={`${hideActionLabel} ${container.name}`}
                               title={hasVisibleTabs ? "Hide open tabs" : hasHiddenTabs ? "Show hidden tabs" : "No tabs to hide"}
@@ -632,6 +639,7 @@ export function SiteActionsView({
                             >
                               <X className="w-3 h-3" />
                             </button>
+                            </div>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); onContainerDetails(container); }}

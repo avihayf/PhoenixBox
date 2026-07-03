@@ -130,7 +130,7 @@ function App() {
   const proxyToggleBusyRef = useRef(false);
   const quickHideBusyRef = useRef(new Set<string>());
   const [paintBurp, setPaintBurp] = useState(false);
-  const [promotedProxyContainerId, setPromotedProxyContainerId] = useState("");
+  const [promotedProxyContainerIds, setPromotedProxyContainerIds] = useState<string[]>([]);
   const [globalUserAgent, setGlobalUserAgent] = useState(false);
   const [userAgentType, setUserAgentType] = useState<'all' | 'desktop' | 'mobile'>('all');
   const [selectedUserAgent, setSelectedUserAgent] = useState("");
@@ -649,6 +649,7 @@ function App() {
         globalProxyParsed: null,
         addContainerColorHeaderEnabled: false,
         promotedProxyContainerId: "",
+        promotedProxyContainerIds: null,
         globalUserAgentEnabled: false,
         globalUserAgentType: 'all',
         globalUserAgent: "",
@@ -686,7 +687,17 @@ function App() {
       setProxyUrl(sanitizedStoredProxyUrl);
 
       setPaintBurp(!!stored.addContainerColorHeaderEnabled);
-      setPromotedProxyContainerId(String(stored.promotedProxyContainerId || ""));
+      if (Array.isArray(stored.promotedProxyContainerIds)) {
+        setPromotedProxyContainerIds(
+          (stored.promotedProxyContainerIds as unknown[]).map((id) => String(id || "")).filter((id) => id)
+        );
+      } else {
+        // Migrate the legacy single promoted container ID into the array key.
+        const legacyId = String(stored.promotedProxyContainerId || "");
+        const migrated = legacyId ? [legacyId] : [];
+        setPromotedProxyContainerIds(migrated);
+        await browser.storage.local.set({ promotedProxyContainerIds: migrated });
+      }
       setGlobalUserAgent(!!stored.globalUserAgentEnabled);
       setUserAgentType(stored.globalUserAgentType as any);
       setSelectedUserAgent(String(stored.globalUserAgent || ""));
@@ -749,8 +760,11 @@ function App() {
         if (changes.addContainerColorHeaderEnabled) {
           setPaintBurp(!!changes.addContainerColorHeaderEnabled.newValue);
         }
-        if (changes.promotedProxyContainerId) {
-          setPromotedProxyContainerId(String(changes.promotedProxyContainerId.newValue || ""));
+        if (changes.promotedProxyContainerIds) {
+          const next = changes.promotedProxyContainerIds.newValue;
+          setPromotedProxyContainerIds(
+            Array.isArray(next) ? next.map((id) => String(id || "")).filter((id) => id) : []
+          );
         }
         if (changes.containerUserAgents) {
           refreshContainers().catch((e) => logError("Failed to refresh container UAs:", e));
@@ -1250,15 +1264,19 @@ function App() {
           const browser = requireWebExt();
           const userContextId = Number(container.cookieStoreId.split("-").pop());
           await browser.runtime.sendMessage({ method: "deleteContainer", message: { userContextId } });
-          const stored = await browser.storage.local.get({ containerDisplayIconOverrides: {}, promotedProxyContainerId: "" });
+          const stored = await browser.storage.local.get({ containerDisplayIconOverrides: {}, promotedProxyContainerIds: null });
           const overrides = (stored.containerDisplayIconOverrides && typeof stored.containerDisplayIconOverrides === "object" ? stored.containerDisplayIconOverrides : {}) || {};
           if (overrides[container.cookieStoreId]) {
             delete overrides[container.cookieStoreId];
             await browser.storage.local.set({ containerDisplayIconOverrides: overrides });
           }
-          if (stored.promotedProxyContainerId === container.cookieStoreId) {
-            await browser.storage.local.set({ promotedProxyContainerId: "" });
-            setPromotedProxyContainerId("");
+          const storedPromotedIds = Array.isArray(stored.promotedProxyContainerIds)
+            ? (stored.promotedProxyContainerIds as unknown[]).map((id) => String(id || "")).filter((id) => id)
+            : [];
+          if (storedPromotedIds.includes(container.cookieStoreId)) {
+            const nextIds = storedPromotedIds.filter((id) => id !== container.cookieStoreId);
+            await browser.storage.local.set({ promotedProxyContainerIds: nextIds });
+            setPromotedProxyContainerIds(nextIds);
           }
           await refreshContainers();
         }}
@@ -1300,12 +1318,15 @@ function App() {
             quickHideBusyRef.current.delete(container.cookieStoreId);
           }
         }}
-        promotedProxyContainerId={promotedProxyContainerId}
+        promotedProxyContainerIds={promotedProxyContainerIds}
         onTogglePromotedProxyContainer={async (container) => {
           const browser = requireWebExt();
-          const nextId = promotedProxyContainerId === container.cookieStoreId ? "" : container.cookieStoreId;
-          setPromotedProxyContainerId(nextId);
-          await browser.storage.local.set({ promotedProxyContainerId: nextId });
+          const isPromoted = promotedProxyContainerIds.includes(container.cookieStoreId);
+          const nextIds = isPromoted
+            ? promotedProxyContainerIds.filter((id) => id !== container.cookieStoreId)
+            : [...promotedProxyContainerIds, container.cookieStoreId];
+          setPromotedProxyContainerIds(nextIds);
+          await browser.storage.local.set({ promotedProxyContainerIds: nextIds });
         }}
         proxyEnabled={globalProxyEnabled}
         onToggleProxy={async (enabled, urlOverride) => {

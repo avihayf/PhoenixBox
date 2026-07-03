@@ -13,12 +13,13 @@ window.assignManager = {
   GLOBAL_PROXY_URL_KEY: "globalProxyUrl",
   GLOBAL_PROXY_PARSED_KEY: "globalProxyParsed",
   PROMOTED_PROXY_CONTAINER_ID_KEY: "promotedProxyContainerId",
+  PROMOTED_PROXY_CONTAINER_IDS_KEY: "promotedProxyContainerIds",
   _sessionGlobalProxyPassword: null,
   globalProxy: {
     enabled: false,
     proxy: null,
   },
-  promotedProxyContainerId: "",
+  promotedProxyContainerIds: [],
 
   _sanitizeGlobalProxyUrl(rawUrl) {
     const raw = String(rawUrl || "").trim();
@@ -297,7 +298,7 @@ window.assignManager = {
     // 2) Global proxy fallback (only when no container-specific proxy exists).
     const globalFallbackAllowed = PhoenixBoxReviewHelpers.shouldAllowGlobalProxyFallback(
       tab.cookieStoreId,
-      this.promotedProxyContainerId
+      this.promotedProxyContainerIds
     );
     if (globalFallbackAllowed && this.globalProxy.enabled && this.globalProxy.proxy) {
       const proxy = { ...this.globalProxy.proxy };
@@ -561,15 +562,49 @@ window.assignManager = {
     this.resetBookmarksMenuItem();
   },
 
+  _sanitizePromotedProxyContainerIds(rawIds) {
+    if (!Array.isArray(rawIds)) {
+      return [];
+    }
+    const seen = new Set();
+    const result = [];
+    for (const id of rawIds) {
+      const value = String(id || "");
+      if (value && !seen.has(value)) {
+        seen.add(value);
+        result.push(value);
+      }
+    }
+    return result;
+  },
+
   async _initGlobalProxy() {
     const stored = await browser.storage.local.get({
       [this.GLOBAL_PROXY_ENABLED_KEY]: false,
       [this.GLOBAL_PROXY_URL_KEY]: "",
       [this.GLOBAL_PROXY_PARSED_KEY]: null,
       [this.PROMOTED_PROXY_CONTAINER_ID_KEY]: "",
+      [this.PROMOTED_PROXY_CONTAINER_IDS_KEY]: null,
     });
     this.globalProxy.enabled = !!stored[this.GLOBAL_PROXY_ENABLED_KEY];
-    this.promotedProxyContainerId = String(stored[this.PROMOTED_PROXY_CONTAINER_ID_KEY] || "");
+
+    // Migrate the legacy single promoted container ID into the array key when
+    // the new key has never been written.
+    const storedIds = stored[this.PROMOTED_PROXY_CONTAINER_IDS_KEY];
+    let needsPromotedMigration = false;
+    if (Array.isArray(storedIds)) {
+      this.promotedProxyContainerIds = this._sanitizePromotedProxyContainerIds(storedIds);
+    } else {
+      const legacyId = String(stored[this.PROMOTED_PROXY_CONTAINER_ID_KEY] || "");
+      this.promotedProxyContainerIds = legacyId ? [legacyId] : [];
+      needsPromotedMigration = true;
+    }
+    if (needsPromotedMigration) {
+      await browser.storage.local.set({
+        [this.PROMOTED_PROXY_CONTAINER_IDS_KEY]: this.promotedProxyContainerIds,
+      });
+    }
+
     const sanitizedProxy = this.setGlobalProxyConfig(stored[this.GLOBAL_PROXY_PARSED_KEY] || null);
     const sanitizedUrl = this._sanitizeGlobalProxyUrl(stored[this.GLOBAL_PROXY_URL_KEY]);
     const needsProxyScrub = JSON.stringify(sanitizedProxy) !== JSON.stringify(stored[this.GLOBAL_PROXY_PARSED_KEY] || null);
@@ -596,8 +631,10 @@ window.assignManager = {
       if (this.GLOBAL_PROXY_PARSED_KEY in changes) {
         this.globalProxy.proxy = this._cacheGlobalProxySecret(changes[this.GLOBAL_PROXY_PARSED_KEY].newValue || null);
       }
-      if (this.PROMOTED_PROXY_CONTAINER_ID_KEY in changes) {
-        this.promotedProxyContainerId = String(changes[this.PROMOTED_PROXY_CONTAINER_ID_KEY].newValue || "");
+      if (this.PROMOTED_PROXY_CONTAINER_IDS_KEY in changes) {
+        this.promotedProxyContainerIds = this._sanitizePromotedProxyContainerIds(
+          changes[this.PROMOTED_PROXY_CONTAINER_IDS_KEY].newValue
+        );
       }
     });
   },

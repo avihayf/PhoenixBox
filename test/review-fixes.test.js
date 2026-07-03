@@ -94,15 +94,30 @@ describe("reviewHelpers", () => {
 
   describe("shouldAllowGlobalProxyFallback", () => {
     it("allows global fallback when no container is promoted", () => {
-      expect(shouldAllowGlobalProxyFallback("firefox-container-1", "")).to.equal(true);
+      expect(shouldAllowGlobalProxyFallback("firefox-container-1", [])).to.equal(true);
       expect(shouldAllowGlobalProxyFallback("firefox-container-2", null)).to.equal(true);
+      expect(shouldAllowGlobalProxyFallback("firefox-container-3", undefined)).to.equal(true);
     });
 
     it("allows global fallback only for the promoted container", () => {
-      const promoted = "firefox-container-2";
+      const promoted = ["firefox-container-2"];
       expect(shouldAllowGlobalProxyFallback("firefox-container-2", promoted)).to.equal(true);
       expect(shouldAllowGlobalProxyFallback("firefox-container-1", promoted)).to.equal(false);
       expect(shouldAllowGlobalProxyFallback("firefox-container-3", promoted)).to.equal(false);
+    });
+
+    it("allows global fallback for every promoted container when multiple are promoted", () => {
+      const promoted = ["firefox-container-2", "firefox-container-4"];
+      expect(shouldAllowGlobalProxyFallback("firefox-container-2", promoted)).to.equal(true);
+      expect(shouldAllowGlobalProxyFallback("firefox-container-4", promoted)).to.equal(true);
+      expect(shouldAllowGlobalProxyFallback("firefox-container-1", promoted)).to.equal(false);
+      expect(shouldAllowGlobalProxyFallback("firefox-container-3", promoted)).to.equal(false);
+    });
+
+    it("tolerates a legacy single promoted container string", () => {
+      expect(shouldAllowGlobalProxyFallback("firefox-container-2", "firefox-container-2")).to.equal(true);
+      expect(shouldAllowGlobalProxyFallback("firefox-container-1", "firefox-container-2")).to.equal(false);
+      expect(shouldAllowGlobalProxyFallback("firefox-container-1", "")).to.equal(true);
     });
   });
 
