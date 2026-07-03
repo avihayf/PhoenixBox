@@ -4,10 +4,16 @@ import { ACCENT_PRESETS, type AccentValue, accentToHue, hueToHex } from '../../l
 interface HueAccentPickerProps {
   value: AccentValue;
   onChange: (value: AccentValue) => void;
+  /** Controls which mono preset is offered: White only in dark mode, Black only in light mode (each is invisible in the other). */
+  isDark?: boolean;
 }
 
-export function HueAccentPicker({ value, onChange }: HueAccentPickerProps) {
+export function HueAccentPicker({ value, onChange, isDark = true }: HueAccentPickerProps) {
   const currentHue = accentToHue(value);
+  // White reads only on dark backgrounds, black only on light — hide the one that would be invisible.
+  const presets = ACCENT_PRESETS.filter((p) =>
+    (p.id !== 'white' || isDark) && (p.id !== 'black' || !isDark)
+  );
   const trackRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -55,12 +61,14 @@ export function HueAccentPicker({ value, onChange }: HueAccentPickerProps) {
 
   const thumbLeft = `${(currentHue / 359) * 100}%`;
   const thumbColor = hueToHex(currentHue);
+  const activePreset = value.type === 'preset' ? ACCENT_PRESETS.find((p) => p.id === value.id) : undefined;
+  const valueText = activePreset ? activePreset.label : `Hue ${currentHue}`;
 
   return (
     <div className="flex flex-col gap-2 w-full">
       {/* Preset dots */}
       <div className="flex gap-1.5 justify-center">
-        {ACCENT_PRESETS.map((preset) => {
+        {presets.map((preset) => {
           const isActive = value.type === 'preset' && value.id === preset.id;
           return (
             <button
@@ -69,7 +77,7 @@ export function HueAccentPicker({ value, onChange }: HueAccentPickerProps) {
               className={`w-5 h-5 rounded-full transition-all hover:scale-110 ${
                 isActive ? 'ring-2 ring-white ring-offset-1 ring-offset-[var(--ext-bg)]' : ''
               }`}
-              style={{ backgroundColor: preset.hex }}
+              style={{ backgroundColor: preset.hex, border: (preset.id === 'white' || preset.id === 'black') ? '1px solid var(--ext-border)' : undefined }}
               aria-label={preset.label}
               title={preset.label}
             />
@@ -86,6 +94,7 @@ export function HueAccentPicker({ value, onChange }: HueAccentPickerProps) {
         aria-valuemin={0}
         aria-valuemax={359}
         aria-valuenow={currentHue}
+        aria-valuetext={valueText}
         className="relative h-3 rounded-full cursor-crosshair select-none touch-none focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-1 focus:ring-offset-[var(--ext-bg)]"
         style={{
           background: 'linear-gradient(to right, hsl(0,85%,60%), hsl(60,85%,60%), hsl(120,85%,60%), hsl(180,85%,60%), hsl(240,85%,60%), hsl(300,85%,60%), hsl(359,85%,60%))',

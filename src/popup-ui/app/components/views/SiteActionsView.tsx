@@ -1,7 +1,6 @@
-import { Plus, RotateCcw, ArrowUpDown, Hourglass, Sun, Moon, Info, Search, ChevronRight, ChevronDown, ChevronUp, Palette, Trash2, Edit2, X, AlertCircle, ArrowUp, Eye, EyeOff } from 'lucide-react';
+import { Plus, RotateCcw, ArrowUpDown, Hourglass, Sun, Moon, Info, Search, ChevronRight, ChevronDown, ChevronUp, Palette, Trash2, Edit2, X, ArrowUp, Eye, EyeOff, Globe, Highlighter, UserCog, Download, type LucideIcon } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { ContainerIcon } from '../ContainerIcon';
-import { Switch } from '../ui/switch';
 import { UserAgentModal } from '../modals/UserAgentModal';
 import { ProxyPresetModal } from '../modals/ProxyPresetModal';
 import type { UserAgentData } from '../../../lib/userAgent';
@@ -9,7 +8,33 @@ import { getContainerColorHex } from '../../../lib/containerColors';
 import { DEFAULT_PROXY_PRESETS, type ProxyPreset } from '../../../data/mockData';
 import { requireWebExt } from '../../../lib/browser';
 import { HueAccentPicker } from '../HueAccentPicker';
-import type { AccentValue } from '../../../lib/accentColors';
+import { LogoAccentPicker } from '../LogoAccentPicker';
+import { accentToHue, type AccentValue, type LogoAccentValue } from '../../../lib/accentColors';
+
+/** Compact on/off toggle tile used for the Proxy / Highlighter / User-Agent controls. */
+function ControlTile({ icon: Icon, label, active, disabled, onClick }: {
+  icon: LucideIcon;
+  label: string;
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  const color = active ? 'var(--ext-accent)' : 'var(--ext-text-muted)';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={active}
+      className="flex-1 flex flex-col items-center gap-2 py-3 px-1.5 rounded-xl border transition-colors disabled:opacity-50"
+      style={{ borderColor: active ? 'var(--ext-accent)' : 'var(--ext-border)', background: active ? 'var(--ext-accent-bg)' : 'transparent' }}
+    >
+      <Icon className="w-5 h-5" style={{ color }} />
+      <span className="text-[11px] font-medium leading-tight text-center" style={{ color }}>{label}</span>
+      <span className="text-[9px] uppercase tracking-wide font-semibold" style={{ color }}>{active ? 'On' : 'Off'}</span>
+    </button>
+  );
+}
 
 type Container = {
   cookieStoreId: string;
@@ -64,6 +89,8 @@ interface SiteActionsViewProps {
   // Accent Color
   accentColor: AccentValue;
   onChangeAccent: (value: AccentValue) => void;
+  logoAccent: LogoAccentValue;
+  onChangeLogoAccent: (value: LogoAccentValue) => void;
 
   // Proxy Presets
   proxyPresets: ProxyPreset[];
@@ -72,7 +99,7 @@ interface SiteActionsViewProps {
   onDeleteProxyPreset: (id: string) => void;
   onQuickDeleteContainer: (container: Container) => void;
   onQuickHideContainer: (container: Container) => void;
-  promotedProxyContainerId: string;
+  promotedProxyContainerIds: string[];
   onTogglePromotedProxyContainer: (container: Container) => void;
 }
 
@@ -108,13 +135,15 @@ export function SiteActionsView({
   onOpenOptions,
   accentColor,
   onChangeAccent,
+  logoAccent,
+  onChangeLogoAccent,
   proxyPresets,
   onSaveProxyPreset,
   onUpdateProxyPreset,
   onDeleteProxyPreset,
   onQuickDeleteContainer,
   onQuickHideContainer,
-  promotedProxyContainerId,
+  promotedProxyContainerIds,
   onTogglePromotedProxyContainer,
 }: SiteActionsViewProps) {
   const [showUserAgentModal, setShowUserAgentModal] = useState(false);
@@ -126,6 +155,7 @@ export function SiteActionsView({
   const [editingPreset, setEditingPreset] = useState<ProxyPreset | null>(null);
   const [showPaintBurpFirstTimeMessage, setShowPaintBurpFirstTimeMessage] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [hoveredContainerId, setHoveredContainerId] = useState<string | null>(null);
   const presetDropdownRef = useRef<HTMLDivElement>(null);
   const accentPickerRef = useRef<HTMLDivElement>(null);
 
@@ -202,14 +232,24 @@ export function SiteActionsView({
 
             {showAccentPicker && (
               <div className="absolute top-full left-0 mt-1 p-3 bg-[var(--ext-bg-secondary)] border border-[var(--ext-border)] rounded-lg shadow-xl z-50 w-[220px]">
-                <HueAccentPicker value={accentColor} onChange={onChangeAccent} />
+                <HueAccentPicker value={accentColor} onChange={onChangeAccent} isDark={isDarkMode} />
+                <LogoAccentPicker
+                  value={logoAccent}
+                  themeHue={accentToHue(accentColor)}
+                  isDark={isDarkMode}
+                  onChange={onChangeLogoAccent}
+                />
               </div>
             )}
           </div>
         </div>
 
-        <h1 className="brand-main-title text-[32px] text-[var(--ext-accent)]">
-          PhoenixBox
+        <h1 className="brand-main-title text-[32px]">
+          {"PhoenixBox".split("").map((ch, i) => (
+            <span key={i} style={{ color: i >= 7 ? 'var(--ext-logo-accent)' : 'var(--ext-accent)' }}>
+              {ch}
+            </span>
+          ))}
         </h1>
 
         <button
@@ -282,13 +322,37 @@ export function SiteActionsView({
           </h2>
 
           <div className="space-y-2.5">
-            {/* Proxy Toggle */}
-            <div className="flex items-center justify-between">
-            <span className="text-[calc(0.875rem+0.5px)] leading-[1.25rem] text-[var(--ext-text)]">Proxy all tabs</span>
-              <Switch
-                checked={proxyEnabled}
-                onCheckedChange={onToggleProxy}
+            {/* Burp / Proxy control tiles */}
+            <div className="flex gap-2">
+              <ControlTile
+                icon={Globe}
+                label="Proxy"
+                active={proxyEnabled}
                 disabled={!!proxyToggleDisabled}
+                onClick={() => onToggleProxy(!proxyEnabled)}
+              />
+              <ControlTile
+                icon={Highlighter}
+                label="Highlighter"
+                active={paintBurp}
+                onClick={async () => {
+                  const enabled = !paintBurp;
+                  await onTogglePaintBurp(enabled);
+                  if (enabled) {
+                    const browser = requireWebExt();
+                    const stored = await browser.storage.local.get({ paintBurpFirstTimeMessageShown: false });
+                    if (!stored.paintBurpFirstTimeMessageShown) {
+                      await browser.storage.local.set({ paintBurpFirstTimeMessageShown: true });
+                      setShowPaintBurpFirstTimeMessage(true);
+                    }
+                  }
+                }}
+              />
+              <ControlTile
+                icon={UserCog}
+                label="User-Agent"
+                active={userAgentEnabled}
+                onClick={() => handleToggleUserAgent(!userAgentEnabled)}
               />
             </div>
 
@@ -417,35 +481,6 @@ export function SiteActionsView({
               initialData={editingPreset || undefined}
             />
 
-            {/* Paint the Burp */}
-            <div className="flex items-center justify-between">
-            <span className="text-[calc(0.875rem+0.5px)] leading-[1.25rem] text-[var(--ext-text)]">Paint the Burp</span>
-              <Switch
-                checked={paintBurp}
-                onCheckedChange={async (enabled) => {
-                  await onTogglePaintBurp(enabled);
-                  // Check if this is the first time enabling
-                  if (enabled) {
-                    const browser = requireWebExt();
-                    const stored = await browser.storage.local.get({ paintBurpFirstTimeMessageShown: false });
-                    if (!stored.paintBurpFirstTimeMessageShown) {
-                      await browser.storage.local.set({ paintBurpFirstTimeMessageShown: true });
-                      setShowPaintBurpFirstTimeMessage(true);
-                    }
-                  }
-                }}
-              />
-            </div>
-
-            {/* User Agent Toggle */}
-            <div className="flex items-center justify-between">
-            <span className="text-[calc(0.875rem+0.5px)] leading-[1.25rem] text-[var(--ext-text)]">Set User-Agent</span>
-              <Switch
-                checked={userAgentEnabled}
-                onCheckedChange={handleToggleUserAgent}
-              />
-            </div>
-
             {/* User Agent Configure Button (when enabled) */}
             {userAgentEnabled && (
               <button
@@ -488,15 +523,38 @@ export function SiteActionsView({
                 {filteredContainers.map(container => {
                   const cHex = getContainerColorHex(container.color);
                   const isConfirming = confirmDeleteId === container.cookieStoreId;
-                  const isPromoted = promotedProxyContainerId === container.cookieStoreId;
+                  const isPromoted = promotedProxyContainerIds.includes(container.cookieStoreId);
                   const hasVisibleTabs = container.visibleTabCount > 0;
                   const hasHiddenTabs = container.hiddenTabCount > 0;
                   const hideActionLabel = hasVisibleTabs ? "Hide" : "Show";
                   return (
                     <div
                       key={container.cookieStoreId}
-                      className="relative group container-item"
+                      className="relative group container-item rounded-lg overflow-hidden transition-colors"
+                      style={{
+                        border: `1px solid ${
+                          hoveredContainerId === container.cookieStoreId
+                            ? `${cHex}99`
+                            : isPromoted
+                              ? `${cHex}40`
+                              : 'transparent'
+                        }`,
+                        background:
+                          hoveredContainerId === container.cookieStoreId
+                            ? `${cHex}1a`
+                            : isPromoted
+                              ? `${cHex}0d`
+                              : 'transparent',
+                      }}
+                      onMouseEnter={() => setHoveredContainerId(container.cookieStoreId)}
+                      onMouseLeave={() => setHoveredContainerId(null)}
                     >
+                      {isPromoted && !isConfirming && (
+                        <div
+                          className="absolute left-[3px] top-2 bottom-2 w-[3px] rounded z-10"
+                          style={{ background: cHex }}
+                        />
+                      )}
                       {isConfirming ? (
                         <div
                           className="flex items-center gap-2 p-2 rounded border"
@@ -526,15 +584,7 @@ export function SiteActionsView({
                           <button
                             type="button"
                             onClick={() => onSelectContainer(container)}
-                            className="w-full flex items-center gap-2.5 p-2 pr-[10rem] border border-transparent rounded transition-colors text-left"
-                            onMouseEnter={e => {
-                              e.currentTarget.style.borderColor = `${cHex}66`;
-                              e.currentTarget.style.background = `${cHex}0d`;
-                            }}
-                            onMouseLeave={e => {
-                              e.currentTarget.style.borderColor = 'transparent';
-                              e.currentTarget.style.background = 'transparent';
-                            }}
+                            className="w-full flex items-center gap-2.5 p-2 pr-[10rem] rounded text-left"
                           >
                             <ContainerIcon iconKey={container.displayIcon || container.icon} colorHex={cHex} />
                             <span className="text-sm text-[var(--ext-text)] flex-1 truncate">{container.name}</span>
@@ -552,9 +602,16 @@ export function SiteActionsView({
                             >
                               {container.tabCount}
                             </span>
+                            <div
+                              className={`flex items-center gap-1 transition-opacity duration-150 ${
+                                isPromoted
+                                  ? 'opacity-100'
+                                  : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto'
+                              }`}
+                            >
                             <button
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); onTogglePromotedProxyContainer(container); }}
+                              onClick={(e) => { e.stopPropagation(); e.currentTarget.blur(); onTogglePromotedProxyContainer(container); }}
                               className={`p-1 rounded transition-colors ${
                                 isPromoted
                                   ? 'text-[var(--ext-accent)] bg-[var(--ext-accent-bg)]'
@@ -567,7 +624,7 @@ export function SiteActionsView({
                             </button>
                             <button
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); onQuickHideContainer(container); }}
+                              onClick={(e) => { e.stopPropagation(); e.currentTarget.blur(); onQuickHideContainer(container); }}
                               className="p-1 rounded transition-colors text-[var(--ext-purple)] hover:bg-[var(--ext-purple)]/10 focus-visible:bg-[var(--ext-purple)]/10"
                               aria-label={`${hideActionLabel} ${container.name}`}
                               title={hasVisibleTabs ? "Hide open tabs" : hasHiddenTabs ? "Show hidden tabs" : "No tabs to hide"}
@@ -582,6 +639,7 @@ export function SiteActionsView({
                             >
                               <X className="w-3 h-3" />
                             </button>
+                            </div>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); onContainerDetails(container); }}
@@ -629,40 +687,77 @@ export function SiteActionsView({
           
           {/* Modal */}
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-            <div 
-              className="bg-[var(--ext-bg-secondary)] border-2 border-[var(--ext-accent)] rounded-xl shadow-2xl w-full max-w-[320px] pointer-events-auto animate-in scale-in-95 duration-200"
+            <div
+              className="relative bg-[var(--ext-bg-secondary)] border border-[var(--ext-accent)]/40 rounded-2xl overflow-hidden w-full max-w-[340px] pointer-events-auto animate-in scale-in-95 duration-200"
+              style={{ boxShadow: '0 24px 60px rgba(0,0,0,0.6), 0 0 32px var(--ext-glow-accent)' }}
               onClick={(e) => e.stopPropagation()}
             >
+              {/* Accent top line */}
+              <div
+                className="h-0.5 w-full"
+                style={{ background: 'linear-gradient(90deg, transparent, var(--ext-accent) 30%, var(--ext-accent-light) 50%, var(--ext-accent) 70%, transparent)' }}
+              />
+
               {/* Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--ext-border)]">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-[var(--ext-accent)]" />
-                  <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--ext-accent)] brand-title">
-                    Paint the Burp Setup
+              <div className="flex items-start gap-3 px-5 pt-5 pb-4 border-b border-[var(--ext-accent)]/15">
+                <div
+                  className="w-10 h-10 flex-none rounded-xl flex items-center justify-center border border-[var(--ext-accent)]/40"
+                  style={{ background: 'var(--ext-accent-bg)', boxShadow: 'inset 0 0 18px var(--ext-glow-accent)' }}
+                >
+                  <Highlighter className="w-5 h-5 text-[var(--ext-accent)]" />
+                </div>
+                <div className="flex-1 min-w-0 pt-0.5">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--ext-text-muted)] mb-1.5">
+                    Burp Integration
+                  </div>
+                  <h2 className="font-medium uppercase tracking-wider text-[var(--ext-text)] brand-title" style={{ fontSize: '15px', lineHeight: 1.2 }}>
+                    Phoenix Highlighter Setup
                   </h2>
                 </div>
                 <button
                   onClick={() => setShowPaintBurpFirstTimeMessage(false)}
-                  className="p-1.5 hover:bg-[var(--ext-bg-tertiary)] rounded transition-all duration-200"
+                  className="w-8 h-8 flex-none flex items-center justify-center rounded-lg text-[var(--ext-text-muted)] hover:bg-[var(--ext-accent-bg)] hover:text-[var(--ext-accent)] transition-all duration-200"
                 >
-                  <X className="w-4 h-4 text-[var(--ext-text-muted)]" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
               {/* Content */}
-              <div className="p-4">
-                <p className="text-xs text-[var(--ext-text)] leading-relaxed">
-                  For this feature to work, make sure you load the <strong className="text-[var(--ext-accent)]">Phoenix JAR</strong> in your Burp extension.
+              <div className="px-5 pt-5 pb-6 space-y-3.5">
+                <p className="text-sm text-[var(--ext-text)] leading-relaxed">
+                  Color-codes your Burp requests by container, so you can see at a glance which container each request came from.
                 </p>
+                <div
+                  className="flex items-start gap-3 p-3.5 rounded-xl border border-[var(--ext-accent)]/25"
+                  style={{ background: 'var(--ext-accent-bg)' }}
+                >
+                  <Info className="w-4 h-4 flex-none mt-0.5 text-[var(--ext-accent)]" />
+                  <p className="text-sm text-[var(--ext-text)] leading-relaxed">
+                    Make sure the <strong className="text-[var(--ext-accent)] font-semibold">Phoenix Highlighter</strong> extension (JAR) is loaded in Burp Suite.
+                  </p>
+                </div>
               </div>
 
               {/* Actions */}
-              <div className="px-4 pb-4">
-                <button
+              <div className="px-5 pb-5">
+                <a
+                  href="https://github.com/avihayf/PhoenixBox-Highlighter/releases/download/v1.1.0/PhoenixBoxHighlighter.jar"
+                  download
+                  target="_blank"
+                  rel="noreferrer"
                   onClick={() => setShowPaintBurpFirstTimeMessage(false)}
-                  className="w-full px-3 py-2 text-xs bg-[var(--ext-accent)] text-black rounded-lg hover:bg-[var(--ext-accent-light)] transition-all duration-200 font-medium"
+                  className="w-full flex items-center justify-center gap-2 px-3 py-3 text-sm text-black rounded-xl font-semibold transition-all duration-200"
+                  style={{ background: 'linear-gradient(180deg, var(--ext-accent-light), var(--ext-accent))', boxShadow: '0 0 22px var(--ext-glow-accent)' }}
                 >
-                  Got it
+                  <Download className="w-4 h-4" />
+                  Download Phoenix JAR
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setShowPaintBurpFirstTimeMessage(false)}
+                  className="w-full mt-2 px-3 py-2 text-xs text-[var(--ext-text-muted)] hover:text-[var(--ext-accent)] transition-colors font-medium"
+                >
+                  I already have it
                 </button>
               </div>
             </div>

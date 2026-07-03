@@ -1,7 +1,7 @@
 # PhoenixBox
 
 [![License](https://img.shields.io/badge/License-MPL%202.0-blue.svg)](https://opensource.org/licenses/MPL-2.0)
-[![Version](https://img.shields.io/badge/version-2.0.0-green.svg)](https://github.com/avihayf/PhoenixBox/releases)
+[![Version](https://img.shields.io/badge/version-3.0.0-green.svg)](https://github.com/avihayf/PhoenixBox/releases)
 
 **Run different sessions side by side in Firefox, create any custom containers you want, route the right traffic through Burp and Highlight your traffic, and test faster without session collisions.**
 
@@ -41,7 +41,7 @@ Works on any Firefox (release, ESR, Developer Edition, or Nightly).
 Search for "PhoenixBox" on [addons.mozilla.org](https://addons.mozilla.org) and click **Add to Firefox**.
 
 **Option B — Manual install from GitHub Releases:**
-1. Download `PhoenixBox.xpi` from [GitHub Releases](https://github.com/avihayf/PhoenixBox/releases) and `PhoenixBoxHighlighter.jar` from the [PhoenixBox-Highlighter releases page](https://github.com/avihayf/PhoenixBox-Highlighter/releases/tag/v1.0.0).
+1. Download `PhoenixBox.xpi` from [GitHub Releases](https://github.com/avihayf/PhoenixBox/releases) and `PhoenixBoxHighlighter.jar` from the [PhoenixBox-Highlighter releases page](https://github.com/avihayf/PhoenixBox-Highlighter/releases/tag/v1.1.0).
 2. Drag `PhoenixBox.xpi` into Firefox and confirm the installation prompt.
 3. Pin the PhoenixBox toolbar icon if needed.
 
@@ -96,7 +96,7 @@ PhoenixBox can add an `X-MAC-Container-Color` header to requests so Burp can vis
 
 Basic setup:
 
-1. Download and install `PhoenixBoxHighlighter.jar` from the [PhoenixBox-Highlighter releases page](https://github.com/avihayf/PhoenixBox-Highlighter/releases/tag/v1.0.0) into Burp Suite via **Extender → Extensions → Add**.
+1. Download and install `PhoenixBoxHighlighter.jar` from the [PhoenixBox-Highlighter releases page](https://github.com/avihayf/PhoenixBox-Highlighter/releases/tag/v1.1.0) into Burp Suite via **Extender → Extensions → Add**.
 2. Configure Firefox to send traffic through Burp.
 3. Enable **Add container color header** in PhoenixBox.
 4. Browse in different containers and check Burp HTTP history.

@@ -154,9 +154,8 @@ const messageHandler = {
           try {
             const reply = await browser.tabs.sendMessage(tabId, { method: "scanEndpoints" });
             endpoints = Array.isArray(reply) ? reply : [];
-            console.log("[PhoenixBox] extractEndpoints: found", endpoints.length, "on", pageUrl);
           } catch (scanErr) {
-            console.error("[PhoenixBox] extractEndpoints: scan failed:", scanErr);
+            LOG.error("[PhoenixBox] extractEndpoints: scan failed:", scanErr);
           }
           await browser.storage.local.set({
             endpointScanResults: {

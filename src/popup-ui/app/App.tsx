@@ -12,7 +12,7 @@ import { parseGlobalProxyUrl, sanitizeProxyUrlForStorage, stripSensitiveProxyFie
 import { getUserAgents, type UserAgentData } from "../lib/userAgent";
 import { DEFAULT_PROXY_PRESETS, type ProxyPreset } from "../data/mockData";
 import { logError } from "../lib/logger";
-import { type AccentValue, ACCENT_PRESETS, applyCustomHue, clearCustomHue, serializeAccent, deserializeAccent } from "../lib/accentColors";
+import { type AccentValue, ACCENT_PRESETS, applyCustomHue, clearCustomHue, serializeAccent, deserializeAccent, type LogoAccentValue, applyLogoAccentToDOM, serializeLogoAccent, deserializeLogoAccent } from "../lib/accentColors";
 
 type View = "main" | "detail" | "edit" | "picker" | "manage" | "assignedSites" | "advancedProxy" | "onboarding";
 
@@ -130,7 +130,7 @@ function App() {
   const proxyToggleBusyRef = useRef(false);
   const quickHideBusyRef = useRef(new Set<string>());
   const [paintBurp, setPaintBurp] = useState(false);
-  const [promotedProxyContainerId, setPromotedProxyContainerId] = useState("");
+  const [promotedProxyContainerIds, setPromotedProxyContainerIds] = useState<string[]>([]);
   const [globalUserAgent, setGlobalUserAgent] = useState(false);
   const [userAgentType, setUserAgentType] = useState<'all' | 'desktop' | 'mobile'>('all');
   const [selectedUserAgent, setSelectedUserAgent] = useState("");
@@ -142,6 +142,7 @@ function App() {
   const [containers, setContainers] = useState<Container[]>([]);
   const [isDark, setIsDark] = useState(true);
   const [accentColor, setAccentColor] = useState<AccentValue>({ type: 'preset', id: 'cyan' });
+  const [logoAccent, setLogoAccent] = useState<LogoAccentValue>({ linked: true });
   const [tabsByContainer, setTabsByContainer] = useState<Record<string, Tab[]>>({});
   const [windowId, setWindowId] = useState<number | null>(null);
   const [pickerTitle, setPickerTitle] = useState<string>("");
@@ -621,6 +622,11 @@ function App() {
     setAccentColor(accent);
     applyAccentToDOM(accent, document.documentElement.classList.contains('dark'));
 
+    // Load saved logo highlight (P, i, B) color
+    const savedLogo = deserializeLogoAccent(localStorage.getItem("logoAccent"));
+    setLogoAccent(savedLogo);
+    applyLogoAccentToDOM(savedLogo, document.documentElement.classList.contains('dark'));
+
     const run = async () => {
       const browser = requireWebExt();
 
@@ -643,6 +649,7 @@ function App() {
         globalProxyParsed: null,
         addContainerColorHeaderEnabled: false,
         promotedProxyContainerId: "",
+        promotedProxyContainerIds: null,
         globalUserAgentEnabled: false,
         globalUserAgentType: 'all',
         globalUserAgent: "",
@@ -680,7 +687,17 @@ function App() {
       setProxyUrl(sanitizedStoredProxyUrl);
 
       setPaintBurp(!!stored.addContainerColorHeaderEnabled);
-      setPromotedProxyContainerId(String(stored.promotedProxyContainerId || ""));
+      if (Array.isArray(stored.promotedProxyContainerIds)) {
+        setPromotedProxyContainerIds(
+          (stored.promotedProxyContainerIds as unknown[]).map((id) => String(id || "")).filter((id) => id)
+        );
+      } else {
+        // Migrate the legacy single promoted container ID into the array key.
+        const legacyId = String(stored.promotedProxyContainerId || "");
+        const migrated = legacyId ? [legacyId] : [];
+        setPromotedProxyContainerIds(migrated);
+        await browser.storage.local.set({ promotedProxyContainerIds: migrated });
+      }
       setGlobalUserAgent(!!stored.globalUserAgentEnabled);
       setUserAgentType(stored.globalUserAgentType as any);
       setSelectedUserAgent(String(stored.globalUserAgent || ""));
@@ -743,8 +760,11 @@ function App() {
         if (changes.addContainerColorHeaderEnabled) {
           setPaintBurp(!!changes.addContainerColorHeaderEnabled.newValue);
         }
-        if (changes.promotedProxyContainerId) {
-          setPromotedProxyContainerId(String(changes.promotedProxyContainerId.newValue || ""));
+        if (changes.promotedProxyContainerIds) {
+          const next = changes.promotedProxyContainerIds.newValue;
+          setPromotedProxyContainerIds(
+            Array.isArray(next) ? next.map((id) => String(id || "")).filter((id) => id) : []
+          );
         }
         if (changes.containerUserAgents) {
           refreshContainers().catch((e) => logError("Failed to refresh container UAs:", e));
@@ -1197,7 +1217,31 @@ function App() {
           setIsDark(nextDark);
           document.documentElement.classList.toggle("dark", nextDark);
           localStorage.setItem("theme", nextDark ? "dark" : "light");
-          applyAccentToDOM(accentColor, nextDark);
+
+          // White only reads on a dark background and black only on a light one,
+          // so swap the mono choice when the mode flips to keep it visible.
+          let nextAccent = accentColor;
+          if (accentColor.type === 'preset') {
+            if (!nextDark && accentColor.id === 'white') nextAccent = { type: 'preset', id: 'black' };
+            else if (nextDark && accentColor.id === 'black') nextAccent = { type: 'preset', id: 'white' };
+          }
+          if (nextAccent !== accentColor) {
+            setAccentColor(nextAccent);
+            localStorage.setItem("accentColor", serializeAccent(nextAccent));
+          }
+
+          let nextLogo = logoAccent;
+          if (!logoAccent.linked) {
+            if (!nextDark && 'white' in logoAccent && logoAccent.white) nextLogo = { linked: false, black: true };
+            else if (nextDark && 'black' in logoAccent && logoAccent.black) nextLogo = { linked: false, white: true };
+          }
+          if (nextLogo !== logoAccent) {
+            setLogoAccent(nextLogo);
+            localStorage.setItem("logoAccent", serializeLogoAccent(nextLogo));
+          }
+
+          applyAccentToDOM(nextAccent, nextDark);
+          applyLogoAccentToDOM(nextLogo, nextDark);
         }}
         accentColor={accentColor}
         onChangeAccent={(value) => {
@@ -1206,6 +1250,13 @@ function App() {
           setAccentColor(value);
           localStorage.setItem("accentColor", serializeAccent(value));
         }}
+        logoAccent={logoAccent}
+        onChangeLogoAccent={(value) => {
+          const currentDark = document.documentElement.classList.contains('dark');
+          applyLogoAccentToDOM(value, currentDark);
+          setLogoAccent(value);
+          localStorage.setItem("logoAccent", serializeLogoAccent(value));
+        }}
         onManageContainers={() => setCurrentView("manage")}
         onSelectContainer={handleContainerClick}
         onContainerDetails={handleContainerDetails}
@@ -1213,15 +1264,19 @@ function App() {
           const browser = requireWebExt();
           const userContextId = Number(container.cookieStoreId.split("-").pop());
           await browser.runtime.sendMessage({ method: "deleteContainer", message: { userContextId } });
-          const stored = await browser.storage.local.get({ containerDisplayIconOverrides: {}, promotedProxyContainerId: "" });
+          const stored = await browser.storage.local.get({ containerDisplayIconOverrides: {}, promotedProxyContainerIds: null });
           const overrides = (stored.containerDisplayIconOverrides && typeof stored.containerDisplayIconOverrides === "object" ? stored.containerDisplayIconOverrides : {}) || {};
           if (overrides[container.cookieStoreId]) {
             delete overrides[container.cookieStoreId];
             await browser.storage.local.set({ containerDisplayIconOverrides: overrides });
           }
-          if (stored.promotedProxyContainerId === container.cookieStoreId) {
-            await browser.storage.local.set({ promotedProxyContainerId: "" });
-            setPromotedProxyContainerId("");
+          const storedPromotedIds = Array.isArray(stored.promotedProxyContainerIds)
+            ? (stored.promotedProxyContainerIds as unknown[]).map((id) => String(id || "")).filter((id) => id)
+            : [];
+          if (storedPromotedIds.includes(container.cookieStoreId)) {
+            const nextIds = storedPromotedIds.filter((id) => id !== container.cookieStoreId);
+            await browser.storage.local.set({ promotedProxyContainerIds: nextIds });
+            setPromotedProxyContainerIds(nextIds);
           }
           await refreshContainers();
         }}
@@ -1263,12 +1318,15 @@ function App() {
             quickHideBusyRef.current.delete(container.cookieStoreId);
           }
         }}
-        promotedProxyContainerId={promotedProxyContainerId}
+        promotedProxyContainerIds={promotedProxyContainerIds}
         onTogglePromotedProxyContainer={async (container) => {
           const browser = requireWebExt();
-          const nextId = promotedProxyContainerId === container.cookieStoreId ? "" : container.cookieStoreId;
-          setPromotedProxyContainerId(nextId);
-          await browser.storage.local.set({ promotedProxyContainerId: nextId });
+          const isPromoted = promotedProxyContainerIds.includes(container.cookieStoreId);
+          const nextIds = isPromoted
+            ? promotedProxyContainerIds.filter((id) => id !== container.cookieStoreId)
+            : [...promotedProxyContainerIds, container.cookieStoreId];
+          setPromotedProxyContainerIds(nextIds);
+          await browser.storage.local.set({ promotedProxyContainerIds: nextIds });
         }}
         proxyEnabled={globalProxyEnabled}
         onToggleProxy={async (enabled, urlOverride) => {

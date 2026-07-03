@@ -1,4 +1,4 @@
-import { ChevronRight, ArrowRight } from 'lucide-react';
+import { ArrowRight, ArrowLeft } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { requireWebExt } from '../../../lib/browser';
 
@@ -7,31 +7,41 @@ interface OnboardingViewProps {
   initialStep?: number;
 }
 
+// Titles are split into three parts so a single keyword can be accent-colored
+// (titleHi) while the rest stays in the primary text color.
 const STEPS = [
   {
     id: 1,
-    header: "Your Security Testing Workspace",
-    description: "Preconfigured profiles like Attacker, Victim, Admin, and Member are ready to go — each isolated with its own cookies, storage, and proxy.\n\nNeed something custom? Create containers with any name, color, and icon to fit your workflow.",
+    titlePre: "Your ",
+    titleHi: "Security Testing",
+    titlePost: " Workspace",
+    description: "Attacker, Victim, Admin & Member profiles come ready — each fully isolated with its own cookies, storage, and proxy. Spin up your own with any name, color, or icon.",
     image: "/img/onboarding-1.png",
     buttonText: "Get Started"
   },
   {
     id: 2,
-    header: "Burp Suite, Built In",
-    description: "Route any container through Burp with per-container proxy settings. Every request is color-highlighted by its container — instantly see which role sent it.\n\nNo more guessing which session a request belongs to. Clear visibility, faster hunting.",
+    titlePre: "",
+    titleHi: "Burp Suite",
+    titlePost: ", Built In",
+    description: "Route any container through Burp with per-container proxy settings. Every request is color-highlighted by its container — so you always know which role sent it.",
     image: "/img/onboarding-4.png",
     buttonText: "Next"
   },
   {
     id: 3,
-    header: "Spoof User-Agents on the Fly",
-    description: "Switch between desktop and mobile User-Agents per container — live, no restart. Test mobile-only endpoints, check browser-specific behavior, and explore how targets respond to different fingerprints.",
+    titlePre: "Spoof ",
+    titleHi: "User-Agents",
+    titlePost: " on the Fly",
+    description: "Switch desktop and mobile User-Agents per container — live, no restart. Test mobile-only endpoints and browser-specific behavior instantly.",
     image: "/img/onboarding-2.png",
     buttonText: "Next"
   },
   {
     id: 4,
-    header: "Sync Your Setup Across Machines",
+    titlePre: "",
+    titleHi: "Sync",
+    titlePost: " Across Machines",
     description: "",
     image: "/img/Sync.svg",
     dualButtons: true,
@@ -41,9 +51,11 @@ const STEPS = [
   },
   {
     id: 5,
-    header: "You're All Set",
-    description: "Your containers are isolated and ready.\n\nOpen a target, pick a role, and start testing.",
-    image: "/img/moz-vpn-onboarding.svg",
+    titlePre: "You're ",
+    titleHi: "All Set",
+    titlePost: "",
+    description: "Your containers are isolated and ready. Open a target, pick a role, and start testing.",
+    image: "/img/onboarding-3.png",
     buttonText: "Launch PhoenixBox"
   }
 ];
@@ -57,10 +69,11 @@ export function OnboardingView({ onComplete, initialStep = 0 }: OnboardingViewPr
   const [syncDetected, setSyncDetected] = useState<boolean | null>(null);
   const step = STEPS[currentStepIndex];
   const isSyncStep = "isSyncStep" in step && step.isSyncStep;
+  const isLastStep = currentStepIndex === STEPS.length - 1;
   const syncDescription = syncDetected
     ? "Your Mozilla account is connected. Keep your roles, targets, and container setup consistent across machines."
-    : "Sign in with your Mozilla account to sync your containers, site assignments, and proxy configs across devices.";
-  const syncActionText = syncDetected ? "Enable Sync" : "Sign In & Enable Sync";
+    : "Sign in with your Mozilla account to sync your containers, site assignments, and proxy configs across every device.";
+  const syncActionText = syncDetected ? "Enable Sync" : "Sign In & Sync";
 
   useEffect(() => {
     if (!isSyncStep) return;
@@ -132,6 +145,18 @@ export function OnboardingView({ onComplete, initialStep = 0 }: OnboardingViewPr
     }
   };
 
+  const handleBack = async () => {
+    if (busy || currentStepIndex === 0) return;
+    const prevIndex = currentStepIndex - 1;
+    setCurrentStepIndex(prevIndex);
+    try {
+      const browser = requireWebExt();
+      await browser.storage.local.set({ "onboarding-stage": prevIndex });
+    } catch {
+      // Navigation shouldn't fail if storage is briefly unavailable.
+    }
+  };
+
   const handleEnableSyncDirect = async () => {
     if (busy) return;
     setBusy(true);
@@ -181,82 +206,107 @@ export function OnboardingView({ onComplete, initialStep = 0 }: OnboardingViewPr
   };
 
   return (
-    <div className="w-full h-full flex flex-col items-center p-6 text-center animate-in fade-in duration-500">
-      <div className="flex-1 flex flex-col items-center justify-center gap-6">
-        <div className="relative group">
-          <div className="absolute -inset-1 bg-gradient-to-r from-[var(--ext-accent)] to-[var(--ext-purple)] rounded-full blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
-          <img 
-            src={step.image} 
-            alt="" 
-            className="relative w-32 h-32 object-contain"
+    <div className="w-full h-full flex flex-col animate-in fade-in duration-500">
+      {/* Header: back + step counter (fixed) */}
+      <div className="flex-none flex items-center justify-between h-[52px] px-5 pt-3">
+        <button
+          onClick={handleBack}
+          aria-label="Back"
+          className={`w-9 h-9 flex items-center justify-center rounded-lg text-[var(--ext-text-muted)] hover:bg-[var(--ext-bg-secondary)] hover:text-[var(--ext-text)] transition-colors ${currentStepIndex === 0 ? "invisible" : "visible"}`}
+        >
+          <ArrowLeft className="w-[18px] h-[18px]" />
+        </button>
+        <span className="text-sm font-semibold tracking-wider text-[var(--ext-text-muted)] tabular-nums">
+          {currentStepIndex + 1} / {STEPS.length}
+        </span>
+      </div>
+
+      {/* Body */}
+      <div key={step.id} className="flex-1 min-h-0 flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-500">
+        {/* Media zone (fixed height keeps art from jumping between steps) */}
+        <div className="flex-none h-[186px] flex items-center justify-center relative">
+          <div
+            className="absolute w-[180px] h-[180px] rounded-full"
+            style={{ background: "radial-gradient(closest-side, var(--ext-glow-accent), rgba(168,85,247,0.14) 55%, transparent 75%)", filter: "blur(10px)" }}
           />
+          <img src={step.image} alt="" className="relative w-32 h-32 object-contain" />
         </div>
 
-        <div className="space-y-3">
-          <h2 className="text-2xl font-bold text-[var(--ext-accent)] leading-tight tracking-tight">
-            {step.header}
-          </h2>
-          <p className="text-base text-[var(--ext-text-muted)] leading-relaxed max-w-[260px] whitespace-pre-line">
+        {/* Copy zone */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-8 pb-2 text-center flex flex-col">
+          <div className="min-h-[60px] flex items-end justify-center">
+            <h2 className="text-[22px] font-extrabold leading-tight tracking-tight text-[var(--ext-text)]">
+              {step.titlePre}
+              <span className="text-[var(--ext-accent)]">{step.titleHi}</span>
+              {step.titlePost}
+            </h2>
+          </div>
+          <p className="mt-3 text-[15px] leading-relaxed text-[var(--ext-text-muted)]">
             {isSyncStep ? syncDescription : step.description}
           </p>
         </div>
       </div>
 
-      <div className="w-full space-y-4 mt-8">
-        {step.dualButtons ? (
-          <div className="flex gap-3 w-full">
-            <button
-              onClick={handleNotNow}
-              className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium border border-[var(--ext-border)] text-[var(--ext-text)] hover:bg-[var(--ext-bg-secondary)] transition-all"
-            >
-              {step.notNowText}
-            </button>
-            <button
-              onClick={handleNext}
-              className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-[var(--ext-accent)] text-black hover:bg-[var(--ext-accent-light)] shadow-lg shadow-[var(--ext-glow-accent)]/20 transition-all flex items-center justify-center gap-2"
-            >
-              {isSyncStep ? syncActionText : step.actionText}
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={handleNext}
-            className="w-full px-6 py-3 rounded-xl text-sm font-bold bg-[var(--ext-accent)] text-black hover:bg-[var(--ext-accent-light)] shadow-lg shadow-[var(--ext-glow-accent)]/20 transition-all flex items-center justify-center gap-2 group"
-          >
-            {step.buttonText}
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-          </button>
-        )}
-
-        <div className="flex items-center justify-center gap-1.5 py-2">
+      {/* Footer: dots + CTA + skip (anchored, always visible) */}
+      <div className="flex-none px-6 pt-3 pb-5">
+        <div className="flex items-center justify-center gap-1.5 pb-4">
           {STEPS.map((_, i) => (
-            <div 
+            <div
               key={i}
               className={`h-1.5 rounded-full transition-all duration-300 ${
-                i === currentStepIndex 
-                  ? "w-6 bg-[var(--ext-accent)] shadow-[0_0_8px_var(--ext-glow-accent)]" 
+                i === currentStepIndex
+                  ? "w-6 bg-[var(--ext-accent)] shadow-[0_0_8px_var(--ext-glow-accent)]"
                   : "w-1.5 bg-[var(--ext-border)]"
               }`}
             />
           ))}
         </div>
 
+        {step.dualButtons ? (
+          <div className="flex gap-3 w-full">
+            <button
+              onClick={handleNotNow}
+              className="flex-1 h-11 rounded-xl text-sm font-semibold border border-[var(--ext-border)] text-[var(--ext-text)] hover:bg-[var(--ext-bg-secondary)] transition-all flex items-center justify-center"
+            >
+              {step.notNowText}
+            </button>
+            <button
+              onClick={handleNext}
+              className="flex-[1.4] h-11 rounded-xl text-sm font-bold bg-[var(--ext-accent)] text-black hover:bg-[var(--ext-accent-light)] shadow-lg shadow-[var(--ext-glow-accent)]/20 transition-all flex items-center justify-center gap-2"
+            >
+              {isSyncStep ? syncActionText : step.actionText}
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleNext}
+            className="w-full h-12 rounded-xl text-[15px] font-bold bg-[var(--ext-accent)] text-black hover:bg-[var(--ext-accent-light)] shadow-lg shadow-[var(--ext-glow-accent)]/20 transition-all flex items-center justify-center gap-2 group"
+          >
+            {step.buttonText}
+            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          </button>
+        )}
+
         {isSyncStep && syncDetected === false && (
           <button
             onClick={handleEnableSyncDirect}
-            className="w-full text-xs text-[var(--ext-text-muted)] hover:text-[var(--ext-accent)] transition-colors"
+            className="w-full mt-3 text-xs text-[var(--ext-text-muted)] hover:text-[var(--ext-accent)] transition-colors"
           >
             Already signed in? Enable sync directly
           </button>
         )}
 
-        <button 
-          onClick={handleSkip}
-          className="text-xs text-[var(--ext-text-muted)] hover:text-[var(--ext-accent)] transition-colors uppercase tracking-widest font-semibold"
-        >
-          Skip Introduction
-        </button>
+        {/* Skip is hidden on the final step where it has no meaning */}
+        <div className="h-9 flex items-center justify-center mt-1.5">
+          {!isLastStep && (
+            <button
+              onClick={handleSkip}
+              className="text-xs text-[var(--ext-text-muted)] hover:text-[var(--ext-accent)] transition-colors uppercase tracking-widest font-semibold"
+            >
+              Skip Introduction
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

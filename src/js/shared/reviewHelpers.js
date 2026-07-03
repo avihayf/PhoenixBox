@@ -52,12 +52,27 @@
     return !!autoEnablePaintBurp && !!proxyEnabled;
   }
 
-  function shouldAllowGlobalProxyFallback(cookieStoreId, promotedProxyContainerId) {
-    const promoted = String(promotedProxyContainerId || "");
-    if (!promoted) {
+  function shouldAllowGlobalProxyFallback(cookieStoreId, promotedProxyContainerIds) {
+    // Accept an array of promoted container IDs. Tolerate a legacy single
+    // string value for backward compatibility with older stored state.
+    let promoted;
+    if (Array.isArray(promotedProxyContainerIds)) {
+      promoted = promotedProxyContainerIds;
+    } else if (promotedProxyContainerIds) {
+      promoted = [promotedProxyContainerIds];
+    } else {
+      promoted = [];
+    }
+
+    const promotedIds = promoted
+      .map((id) => String(id || ""))
+      .filter((id) => id);
+
+    if (promotedIds.length === 0) {
       return true;
     }
-    return String(cookieStoreId || "") === promoted;
+
+    return promotedIds.includes(String(cookieStoreId || ""));
   }
 
   function countVisibleAndHiddenTabs(visibleTabs, hiddenTabs) {

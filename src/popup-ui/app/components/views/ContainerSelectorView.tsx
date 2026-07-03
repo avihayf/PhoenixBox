@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { ContainerIcon } from '../ContainerIcon';
 import { getContainerColorHex } from '../../../lib/containerColors';
@@ -26,6 +27,8 @@ export function ContainerSelectorView({
   onSelectContainer,
   children,
 }: ContainerSelectorViewProps) {
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
   return (
     <div className="w-full h-auto max-h-[720px] flex flex-col bg-[var(--ext-bg)] border border-[var(--ext-border)] rounded-xl shadow-xl overflow-hidden">
       {/* Header */}
@@ -41,24 +44,43 @@ export function ContainerSelectorView({
       </div>
 
       {/* Container List */}
-      <div className="flex-1 min-h-0 p-2.5 space-y-1 overflow-y-auto custom-scrollbar">
-        {containers.map(container => (
-          <button
-            key={container.cookieStoreId}
-            onClick={() => onSelectContainer(container)}
-            className="w-full flex items-center gap-2.5 p-2 bg-[var(--ext-bg-secondary)] hover:bg-[var(--ext-bg-tertiary)] border border-[var(--ext-border)]/50 rounded transition-colors group"
-          >
-            <ContainerIcon iconKey={container.displayIcon || container.icon} colorHex={getContainerColorHex(container.color)} />
-            <span className="text-sm text-[var(--ext-text)] flex-1 text-left font-medium leading-none">{container.name}</span>
-            <span className="text-xs text-[var(--ext-accent)] bg-[var(--ext-cyan-bg)] px-1.5 py-0.5 rounded-full min-w-[1.5rem] text-center font-medium">
-              {container.tabCount}
-            </span>
-            <ChevronRight className="w-4 h-4 text-[var(--ext-text-muted)] group-hover:text-[var(--ext-accent)] transition-colors" />
-          </button>
-        ))}
+      <div className="flex-1 min-h-0 p-2 space-y-1 overflow-y-auto custom-scrollbar">
+        {containers.map(container => {
+          const cHex = getContainerColorHex(container.color);
+          const hovered = hoveredId === container.cookieStoreId;
+          return (
+            <button
+              key={container.cookieStoreId}
+              onClick={() => onSelectContainer(container)}
+              onMouseEnter={() => setHoveredId(container.cookieStoreId)}
+              onMouseLeave={() => setHoveredId(null)}
+              className="group w-full flex items-center gap-3 p-2 rounded-lg text-left transition-colors"
+              style={{
+                border: `1px solid ${hovered ? `${cHex}99` : 'transparent'}`,
+                background: hovered ? `${cHex}1a` : 'transparent',
+              }}
+            >
+              <ContainerIcon iconKey={container.displayIcon || container.icon} colorHex={cHex} />
+              <span className="text-sm text-[var(--ext-text)] flex-1 truncate">{container.name}</span>
+              {container.tabCount > 0 && (
+                <span
+                  className="text-xs min-w-[1.5rem] text-center shrink-0"
+                  style={{ color: cHex }}
+                  title={`${container.tabCount} open`}
+                >
+                  {container.tabCount}
+                </span>
+              )}
+              <ChevronRight
+                className="w-4 h-4 shrink-0 transition-colors"
+                style={{ color: hovered ? cHex : 'var(--ext-text-muted)' }}
+              />
+            </button>
+          );
+        })}
       </div>
 
-      {/* Additional content (like "Add Container" button) */}
+      {/* Additional content (like "Extract Endpoints" / "Add Container" button) */}
       {children}
     </div>
   );
