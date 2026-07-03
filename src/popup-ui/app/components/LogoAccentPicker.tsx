@@ -11,23 +11,32 @@ interface LogoAccentPickerProps {
 /**
  * Controls the color of the "Box" half of the PhoenixBox wordmark.
  * - Linked  : "Box" follows the theme accent (the hue bar). Controls hidden.
- * - Unlinked: a white swatch + hue slider give "Box" its own fixed color.
- * ("Phoenix" always follows the hue bar via --ext-accent.)
+ * - Unlinked: a single track — black → rainbow → white — gives "Box" its own
+ *   fixed color. Black and white are the two ends of the same scale (no
+ *   separate swatch). ("Phoenix" always follows the hue bar via --ext-accent.)
  */
 export function LogoAccentPicker({ value, themeHue, onChange }: LogoAccentPickerProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
 
+  // The track has three zones: a black end, the rainbow hue span, and a white end.
+  const BLACK_MAX = 0.085;
+  const WHITE_MIN = 0.915;
+  const HUE_SPAN = WHITE_MIN - BLACK_MAX;
+
   const isWhite = !value.linked && 'white' in value && value.white === true;
-  const currentHue = !value.linked && !isWhite ? value.hue : themeHue;
+  const isBlack = !value.linked && 'black' in value && value.black === true;
+  const currentHue = !value.linked && 'hue' in value ? value.hue : themeHue;
   const clampHue = (h: number) => Math.max(0, Math.min(359, h));
 
-  const hueFromPointer = useCallback((clientX: number) => {
+  const valueFromPointer = useCallback((clientX: number): LogoAccentValue => {
     const track = trackRef.current;
-    if (!track) return currentHue;
+    if (!track) return { linked: false, hue: currentHue };
     const rect = track.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    return clampHue(Math.round(ratio * 359));
+    if (ratio <= BLACK_MAX) return { linked: false, black: true };
+    if (ratio >= WHITE_MIN) return { linked: false, white: true };
+    return { linked: false, hue: clampHue(Math.round(((ratio - BLACK_MAX) / HUE_SPAN) * 359)) };
   }, [currentHue]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
@@ -35,22 +44,54 @@ export function LogoAccentPicker({ value, themeHue, onChange }: LogoAccentPicker
     e.preventDefault();
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     setDragging(true);
-    onChange({ linked: false, hue: hueFromPointer(e.clientX) });
-  }, [value.linked, hueFromPointer, onChange]);
+    onChange(valueFromPointer(e.clientX));
+  }, [value.linked, valueFromPointer, onChange]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragging || value.linked) return;
-    onChange({ linked: false, hue: hueFromPointer(e.clientX) });
-  }, [dragging, value.linked, hueFromPointer, onChange]);
+    onChange(valueFromPointer(e.clientX));
+  }, [dragging, value.linked, valueFromPointer, onChange]);
 
   const handlePointerUp = useCallback(() => setDragging(false), []);
+
+  // Keyboard model: a single linear position across the whole track.
+  // 0 = black, 1..360 = hue (0..359), 361 = white.
+  const currentPos = isBlack ? 0 : isWhite ? 361 : currentHue + 1;
+  const posToValue = (pos: number): LogoAccentValue => {
+    const p = Math.max(0, Math.min(361, Math.round(pos)));
+    if (p === 0) return { linked: false, black: true };
+    if (p === 361) return { linked: false, white: true };
+    return { linked: false, hue: p - 1 };
+  };
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (value.linked) return;
+    let delta = 0;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') delta = 1;
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') delta = -1;
+    else if (e.key === 'PageUp') delta = 15;
+    else if (e.key === 'PageDown') delta = -15;
+    else if (e.key === 'Home') { onChange(posToValue(0)); e.preventDefault(); return; }
+    else if (e.key === 'End') { onChange(posToValue(361)); e.preventDefault(); return; }
+    else return;
+
+    e.preventDefault();
+    onChange(posToValue(currentPos + delta));
+  }, [value.linked, currentPos, onChange]);
+
+  const valueText = isBlack ? 'Black' : isWhite ? 'White' : `Hue ${currentHue}`;
 
   const toggleLink = () => {
     onChange(value.linked ? { linked: false, hue: themeHue } : { linked: true });
   };
 
-  const thumbLeft = `${(currentHue / 359) * 100}%`;
-  const thumbColor = hueToHex(currentHue);
+  const thumbLeft = isBlack
+    ? `${(BLACK_MAX / 2) * 100}%`
+    : isWhite
+      ? `${(WHITE_MIN + (1 - WHITE_MIN) / 2) * 100}%`
+      : `${(BLACK_MAX + (currentHue / 359) * HUE_SPAN) * 100}%`;
+  const thumbColor = isBlack ? '#000000' : isWhite ? '#ffffff' : hueToHex(currentHue);
+  const thumbBorder = isWhite ? 'var(--ext-border)' : '#ffffff';
 
   return (
     <div className="flex flex-col gap-2 w-full pt-2.5 mt-2.5 border-t border-[var(--ext-border)]">
@@ -80,49 +121,33 @@ export function LogoAccentPicker({ value, themeHue, onChange }: LogoAccentPicker
           "Box" follows the theme accent. Unlink to give it its own color.
         </p>
       ) : (
-        <div className="flex items-center gap-2">
-          {/* White swatch */}
-          <button
-            type="button"
-            onClick={() => onChange({ linked: false, white: true })}
-            className="w-5 h-5 rounded-full flex-shrink-0 transition-all hover:scale-110"
-            style={{
-              backgroundColor: '#ffffff',
-              border: '1px solid var(--ext-border)',
-              boxShadow: isWhite ? '0 0 0 2px var(--ext-accent)' : 'none',
-            }}
-            aria-label="White"
-            title="White"
-          />
-          {/* Hue slider */}
+        <div
+          ref={trackRef}
+          role="slider"
+          tabIndex={0}
+          aria-label="Logo Box color"
+          aria-valuemin={0}
+          aria-valuemax={361}
+          aria-valuenow={currentPos}
+          aria-valuetext={valueText}
+          className="relative h-3 w-full rounded-full cursor-crosshair select-none touch-none focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-1 focus:ring-offset-[var(--ext-bg)]"
+          style={{
+            background: 'linear-gradient(to right, #000 0%, #000 7%, hsl(0,85%,60%) 10%, hsl(45,85%,60%), hsl(90,85%,60%), hsl(140,85%,60%), hsl(190,85%,60%), hsl(240,85%,60%), hsl(290,85%,60%), hsl(340,85%,60%), hsl(359,85%,60%) 90%, #fff 93%, #fff 100%)',
+          }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onKeyDown={handleKeyDown}
+        >
           <div
-            ref={trackRef}
-            role="slider"
-            tabIndex={0}
-            aria-label="Logo Box hue"
-            aria-valuemin={0}
-            aria-valuemax={359}
-            aria-valuenow={currentHue}
-            className="relative h-3 flex-1 rounded-full cursor-crosshair select-none touch-none focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-1 focus:ring-offset-[var(--ext-bg)]"
+            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full border-2 shadow-md pointer-events-none"
             style={{
-              background: 'linear-gradient(to right, hsl(0,85%,60%), hsl(60,85%,60%), hsl(120,85%,60%), hsl(180,85%,60%), hsl(240,85%,60%), hsl(300,85%,60%), hsl(359,85%,60%))',
-              opacity: isWhite ? 0.5 : 1,
+              left: thumbLeft,
+              backgroundColor: thumbColor,
+              borderColor: thumbBorder,
+              boxShadow: dragging ? `0 0 8px rgba(255,255,255,0.4)` : `0 1px 3px rgba(0,0,0,0.4)`,
             }}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-          >
-            {!isWhite && (
-              <div
-                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full border-2 border-white shadow-md pointer-events-none"
-                style={{
-                  left: thumbLeft,
-                  backgroundColor: thumbColor,
-                  boxShadow: dragging ? `0 0 8px ${thumbColor}88` : `0 1px 3px rgba(0,0,0,0.4)`,
-                }}
-              />
-            )}
-          </div>
+          />
         </div>
       )}
     </div>

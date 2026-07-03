@@ -14,6 +14,7 @@ export const ACCENT_PRESETS = [
   { id: 'yellow', hue: 48,  hex: '#EAB308', label: 'Yellow' },
   { id: 'indigo', hue: 235, hex: '#6366F1', label: 'Indigo' },
   { id: 'white',  hue: 0,   hex: '#FFFFFF', label: 'White' },
+  { id: 'black',  hue: 0,   hex: '#000000', label: 'Black' },
 ] as const;
 
 export type AccentPresetId = typeof ACCENT_PRESETS[number]['id'];
@@ -90,14 +91,16 @@ export function clearCustomHue(): void {
 }
 
 /* ---------------------------------------------------------------------------
-   Logo highlight accent — colors the P, i, B letters of the PhoenixBox wordmark.
-   `linked` = follow the theme accent (the hue bar). Unlinked = a fixed hue set
-   by the logo picker. The rest of the wordmark always uses --ext-text.
+   Logo accent — colors the "Box" half of the PhoenixBox wordmark via
+   --ext-logo-accent. `linked` = follow the theme accent (the hue bar).
+   Unlinked = a fixed color: black, white, or a specific hue set by the logo
+   picker. The "Phoenix" half always follows the theme accent (--ext-accent).
 --------------------------------------------------------------------------- */
 export type LogoAccentValue =
   | { linked: true }
   | { linked: false; white: true }
-  | { linked: false; hue: number; white?: false };
+  | { linked: false; black: true }
+  | { linked: false; hue: number; white?: false; black?: false };
 
 export function applyLogoAccentToDOM(logo: LogoAccentValue, isDark: boolean): void {
   const root = document.documentElement;
@@ -111,6 +114,10 @@ export function applyLogoAccentToDOM(logo: LogoAccentValue, isDark: boolean): vo
     root.style.setProperty('--ext-logo-accent', '#ffffff');
     return;
   }
+  if ('black' in logo && logo.black) {
+    root.style.setProperty('--ext-logo-accent', '#000000');
+    return;
+  }
   const h = ((Math.round(logo.hue) % 360) + 360) % 360;
   // Match the lightness/saturation of applyCustomHue so it reads correctly in each mode.
   root.style.setProperty('--ext-logo-accent', isDark ? `hsl(${h}, 85%, 60%)` : `hsl(${h}, 70%, 40%)`);
@@ -119,12 +126,14 @@ export function applyLogoAccentToDOM(logo: LogoAccentValue, isDark: boolean): vo
 export function serializeLogoAccent(logo: LogoAccentValue): string {
   if (logo.linked) return 'linked';
   if ('white' in logo && logo.white) return 'white';
+  if ('black' in logo && logo.black) return 'black';
   return `hue:${logo.hue}`;
 }
 
 export function deserializeLogoAccent(raw: string | null): LogoAccentValue {
   if (!raw || raw === 'linked') return { linked: true };
   if (raw === 'white') return { linked: false, white: true };
+  if (raw === 'black') return { linked: false, black: true };
   if (raw.startsWith('hue:')) {
     const hue = Math.max(0, Math.min(359, Number(raw.slice(4)) || 0));
     return { linked: false, hue };

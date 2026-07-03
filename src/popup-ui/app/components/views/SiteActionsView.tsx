@@ -1,4 +1,4 @@
-import { Plus, RotateCcw, ArrowUpDown, Hourglass, Sun, Moon, Info, Search, ChevronRight, ChevronDown, ChevronUp, Palette, Trash2, Edit2, X, ArrowUp, Eye, EyeOff, Globe, Highlighter, UserCog, Download } from 'lucide-react';
+import { Plus, RotateCcw, ArrowUpDown, Hourglass, Sun, Moon, Info, Search, ChevronRight, ChevronDown, ChevronUp, Palette, Trash2, Edit2, X, ArrowUp, Eye, EyeOff, Globe, Highlighter, UserCog, Download, type LucideIcon } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { ContainerIcon } from '../ContainerIcon';
 import { UserAgentModal } from '../modals/UserAgentModal';
@@ -10,6 +10,31 @@ import { requireWebExt } from '../../../lib/browser';
 import { HueAccentPicker } from '../HueAccentPicker';
 import { LogoAccentPicker } from '../LogoAccentPicker';
 import { accentToHue, type AccentValue, type LogoAccentValue } from '../../../lib/accentColors';
+
+/** Compact on/off toggle tile used for the Proxy / Highlighter / User-Agent controls. */
+function ControlTile({ icon: Icon, label, active, disabled, onClick }: {
+  icon: LucideIcon;
+  label: string;
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  const color = active ? 'var(--ext-accent)' : 'var(--ext-text-muted)';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={active}
+      className="flex-1 flex flex-col items-center gap-2 py-3 px-1.5 rounded-xl border transition-colors disabled:opacity-50"
+      style={{ borderColor: active ? 'var(--ext-accent)' : 'var(--ext-border)', background: active ? 'var(--ext-accent-bg)' : 'transparent' }}
+    >
+      <Icon className="w-5 h-5" style={{ color }} />
+      <span className="text-[11px] font-medium leading-tight text-center" style={{ color }}>{label}</span>
+      <span className="text-[9px] uppercase tracking-wide font-semibold" style={{ color }}>{active ? 'On' : 'Off'}</span>
+    </button>
+  );
+}
 
 type Container = {
   cookieStoreId: string;
@@ -207,7 +232,7 @@ export function SiteActionsView({
 
             {showAccentPicker && (
               <div className="absolute top-full left-0 mt-1 p-3 bg-[var(--ext-bg-secondary)] border border-[var(--ext-border)] rounded-lg shadow-xl z-50 w-[220px]">
-                <HueAccentPicker value={accentColor} onChange={onChangeAccent} />
+                <HueAccentPicker value={accentColor} onChange={onChangeAccent} isDark={isDarkMode} />
                 <LogoAccentPicker
                   value={logoAccent}
                   themeHue={accentToHue(accentColor)}
@@ -298,19 +323,17 @@ export function SiteActionsView({
           <div className="space-y-2.5">
             {/* Burp / Proxy control tiles */}
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => onToggleProxy(!proxyEnabled)}
+              <ControlTile
+                icon={Globe}
+                label="Proxy"
+                active={proxyEnabled}
                 disabled={!!proxyToggleDisabled}
-                className="flex-1 flex flex-col items-center gap-2 py-3 px-1.5 rounded-xl border transition-colors disabled:opacity-50"
-                style={{ borderColor: proxyEnabled ? 'var(--ext-accent)' : 'var(--ext-border)', background: proxyEnabled ? 'var(--ext-accent-bg)' : 'transparent' }}
-              >
-                <Globe className="w-5 h-5" style={{ color: proxyEnabled ? 'var(--ext-accent)' : 'var(--ext-text-muted)' }} />
-                <span className="text-[11px] font-medium leading-tight text-center" style={{ color: proxyEnabled ? 'var(--ext-accent)' : 'var(--ext-text-muted)' }}>Proxy</span>
-                <span className="text-[9px] uppercase tracking-wide font-semibold" style={{ color: proxyEnabled ? 'var(--ext-accent)' : '#64748b' }}>{proxyEnabled ? 'On' : 'Off'}</span>
-              </button>
-              <button
-                type="button"
+                onClick={() => onToggleProxy(!proxyEnabled)}
+              />
+              <ControlTile
+                icon={Highlighter}
+                label="Highlighter"
+                active={paintBurp}
                 onClick={async () => {
                   const enabled = !paintBurp;
                   await onTogglePaintBurp(enabled);
@@ -323,23 +346,13 @@ export function SiteActionsView({
                     }
                   }
                 }}
-                className="flex-1 flex flex-col items-center gap-2 py-3 px-1.5 rounded-xl border transition-colors"
-                style={{ borderColor: paintBurp ? 'var(--ext-accent)' : 'var(--ext-border)', background: paintBurp ? 'var(--ext-accent-bg)' : 'transparent' }}
-              >
-                <Highlighter className="w-5 h-5" style={{ color: paintBurp ? 'var(--ext-accent)' : 'var(--ext-text-muted)' }} />
-                <span className="text-[11px] font-medium leading-tight text-center" style={{ color: paintBurp ? 'var(--ext-accent)' : 'var(--ext-text-muted)' }}>Highlighter</span>
-                <span className="text-[9px] uppercase tracking-wide font-semibold" style={{ color: paintBurp ? 'var(--ext-accent)' : '#64748b' }}>{paintBurp ? 'On' : 'Off'}</span>
-              </button>
-              <button
-                type="button"
+              />
+              <ControlTile
+                icon={UserCog}
+                label="User-Agent"
+                active={userAgentEnabled}
                 onClick={() => handleToggleUserAgent(!userAgentEnabled)}
-                className="flex-1 flex flex-col items-center gap-2 py-3 px-1.5 rounded-xl border transition-colors"
-                style={{ borderColor: userAgentEnabled ? 'var(--ext-accent)' : 'var(--ext-border)', background: userAgentEnabled ? 'var(--ext-accent-bg)' : 'transparent' }}
-              >
-                <UserCog className="w-5 h-5" style={{ color: userAgentEnabled ? 'var(--ext-accent)' : 'var(--ext-text-muted)' }} />
-                <span className="text-[11px] font-medium leading-tight text-center" style={{ color: userAgentEnabled ? 'var(--ext-accent)' : 'var(--ext-text-muted)' }}>User-Agent</span>
-                <span className="text-[9px] uppercase tracking-wide font-semibold" style={{ color: userAgentEnabled ? 'var(--ext-accent)' : '#64748b' }}>{userAgentEnabled ? 'On' : 'Off'}</span>
-              </button>
+              />
             </div>
 
             {/* Proxy URL Input with Presets */}
@@ -723,12 +736,20 @@ export function SiteActionsView({
                   download
                   target="_blank"
                   rel="noreferrer"
+                  onClick={() => setShowPaintBurpFirstTimeMessage(false)}
                   className="w-full flex items-center justify-center gap-2 px-3 py-3 text-sm text-black rounded-xl font-semibold transition-all duration-200"
                   style={{ background: 'linear-gradient(180deg, var(--ext-accent-light), var(--ext-accent))', boxShadow: '0 0 22px var(--ext-glow-accent)' }}
                 >
                   <Download className="w-4 h-4" />
                   Download Phoenix JAR
                 </a>
+                <button
+                  type="button"
+                  onClick={() => setShowPaintBurpFirstTimeMessage(false)}
+                  className="w-full mt-2 px-3 py-2 text-xs text-[var(--ext-text-muted)] hover:text-[var(--ext-accent)] transition-colors font-medium"
+                >
+                  I already have it
+                </button>
               </div>
             </div>
           </div>

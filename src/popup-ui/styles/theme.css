@@ -190,10 +190,10 @@
   --ext-accent-light: var(--ext-cyan-light);
   --ext-accent-bg: var(--ext-cyan-bg);
   --ext-glow-accent: var(--ext-glow-cyan);
-  /* Logo highlight (P, B). Defaults to the bar accent so those letters follow
-     the hue bar. The logo picker overrides this with its own fixed color (or
-     white); "Link" resets it back to var(--ext-accent). The rest of the
-     wordmark uses --ext-accent too, so the bar drives every letter except P, B. */
+  /* Logo accent — colors the "Box" half of the wordmark. Defaults to the theme
+     accent so "Box" follows the hue bar. The logo picker overrides this with its
+     own fixed color (black, white, or a hue); "Link" resets it back to
+     var(--ext-accent). "Phoenix" always uses var(--ext-accent). */
   --ext-logo-accent: var(--ext-accent);
 }
 
@@ -227,6 +227,22 @@
   --ext-accent-light: #ffffff;
   --ext-accent-bg: rgba(255, 255, 255, 0.1);
   --ext-glow-accent: rgba(255, 255, 255, 0.5);
+}
+
+/* Accent: Black — high-contrast mono accent; pairs with light UI text on dark. */
+.accent-black {
+  --ext-accent: #111827;
+  --ext-accent-dark: #030712;
+  --ext-accent-light: #374151;
+  --ext-accent-bg: rgba(17, 24, 39, 0.12);
+  --ext-glow-accent: rgba(17, 24, 39, 0.4);
+}
+.dark.accent-black, .dark .accent-black {
+  --ext-accent: #e5e7eb;
+  --ext-accent-dark: #9ca3af;
+  --ext-accent-light: #f9fafb;
+  --ext-accent-bg: rgba(17, 24, 39, 0.55);
+  --ext-glow-accent: rgba(0, 0, 0, 0.6);
 }
 
 /* Accent: Green (Matrix/Hacker) */
