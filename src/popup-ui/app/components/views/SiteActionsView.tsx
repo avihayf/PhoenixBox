@@ -1,4 +1,4 @@
-import { Plus, RotateCcw, ArrowUpDown, Hourglass, Sun, Moon, Info, Search, ChevronRight, ChevronDown, ChevronUp, Palette, Trash2, Edit2, X, AlertCircle, ArrowUp, Eye, EyeOff, Globe, Droplet, UserCog, Download } from 'lucide-react';
+import { Plus, RotateCcw, ArrowUpDown, Hourglass, Sun, Moon, Info, Search, ChevronRight, ChevronDown, ChevronUp, Palette, Trash2, Edit2, X, AlertCircle, ArrowUp, Eye, EyeOff, Globe, Highlighter, UserCog, Download } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { ContainerIcon } from '../ContainerIcon';
 import { UserAgentModal } from '../modals/UserAgentModal';
@@ -326,8 +326,8 @@ export function SiteActionsView({
                 className="flex-1 flex flex-col items-center gap-2 py-3 px-1.5 rounded-xl border transition-colors"
                 style={{ borderColor: paintBurp ? 'var(--ext-accent)' : 'var(--ext-border)', background: paintBurp ? 'var(--ext-accent-bg)' : 'transparent' }}
               >
-                <Droplet className="w-5 h-5" style={{ color: paintBurp ? 'var(--ext-accent)' : 'var(--ext-text-muted)' }} />
-                <span className="text-[11px] font-medium leading-tight text-center" style={{ color: paintBurp ? 'var(--ext-accent)' : 'var(--ext-text-muted)' }}>Paint</span>
+                <Highlighter className="w-5 h-5" style={{ color: paintBurp ? 'var(--ext-accent)' : 'var(--ext-text-muted)' }} />
+                <span className="text-[11px] font-medium leading-tight text-center" style={{ color: paintBurp ? 'var(--ext-accent)' : 'var(--ext-text-muted)' }}>Highlighter</span>
                 <span className="text-[9px] uppercase tracking-wide font-semibold" style={{ color: paintBurp ? 'var(--ext-accent)' : '#64748b' }}>{paintBurp ? 'On' : 'Off'}</span>
               </button>
               <button
@@ -674,7 +674,7 @@ export function SiteActionsView({
                 <div className="flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-[var(--ext-accent)]" />
                   <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--ext-accent)] brand-title">
-                    Paint the Burp Setup
+                    Phoenix Highlighter Setup
                   </h2>
                 </div>
                 <button
@@ -688,7 +688,7 @@ export function SiteActionsView({
               {/* Content */}
               <div className="p-4 space-y-3">
                 <p className="text-xs text-[var(--ext-text)] leading-relaxed">
-                  For this feature to work, make sure you load the <strong className="text-[var(--ext-accent)]">Phoenix JAR</strong> in your Burp extension.
+                  This color-codes your Burp requests by container so you can see which container each request came from. Make sure the <strong className="text-[var(--ext-accent)]">Phoenix Highlighter</strong> extension (JAR) is loaded in Burp Suite.
                 </p>
                 <a
                   href="https://github.com/avihayf/PhoenixBox-Highlighter/releases/download/v1.1.0/PhoenixBoxHighlighter.jar"
