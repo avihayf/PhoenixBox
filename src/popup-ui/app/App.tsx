@@ -1203,8 +1203,31 @@ function App() {
           setIsDark(nextDark);
           document.documentElement.classList.toggle("dark", nextDark);
           localStorage.setItem("theme", nextDark ? "dark" : "light");
-          applyAccentToDOM(accentColor, nextDark);
-          applyLogoAccentToDOM(logoAccent, nextDark);
+
+          // White only reads on a dark background and black only on a light one,
+          // so swap the mono choice when the mode flips to keep it visible.
+          let nextAccent = accentColor;
+          if (accentColor.type === 'preset') {
+            if (!nextDark && accentColor.id === 'white') nextAccent = { type: 'preset', id: 'black' };
+            else if (nextDark && accentColor.id === 'black') nextAccent = { type: 'preset', id: 'white' };
+          }
+          if (nextAccent !== accentColor) {
+            setAccentColor(nextAccent);
+            localStorage.setItem("accentColor", serializeAccent(nextAccent));
+          }
+
+          let nextLogo = logoAccent;
+          if (!logoAccent.linked) {
+            if (!nextDark && 'white' in logoAccent && logoAccent.white) nextLogo = { linked: false, black: true };
+            else if (nextDark && 'black' in logoAccent && logoAccent.black) nextLogo = { linked: false, white: true };
+          }
+          if (nextLogo !== logoAccent) {
+            setLogoAccent(nextLogo);
+            localStorage.setItem("logoAccent", serializeLogoAccent(nextLogo));
+          }
+
+          applyAccentToDOM(nextAccent, nextDark);
+          applyLogoAccentToDOM(nextLogo, nextDark);
         }}
         accentColor={accentColor}
         onChangeAccent={(value) => {

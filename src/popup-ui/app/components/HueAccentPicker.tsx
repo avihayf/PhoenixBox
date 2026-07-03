@@ -4,13 +4,16 @@ import { ACCENT_PRESETS, type AccentValue, accentToHue, hueToHex } from '../../l
 interface HueAccentPickerProps {
   value: AccentValue;
   onChange: (value: AccentValue) => void;
-  /** When false (light mode), the White preset is hidden since it renders invisible on a light background. */
+  /** Controls which mono preset is offered: White only in dark mode, Black only in light mode (each is invisible in the other). */
   isDark?: boolean;
 }
 
 export function HueAccentPicker({ value, onChange, isDark = true }: HueAccentPickerProps) {
   const currentHue = accentToHue(value);
-  const presets = ACCENT_PRESETS.filter((p) => isDark || p.id !== 'white');
+  // White reads only on dark backgrounds, black only on light — hide the one that would be invisible.
+  const presets = ACCENT_PRESETS.filter((p) =>
+    (p.id !== 'white' || isDark) && (p.id !== 'black' || !isDark)
+  );
   const trackRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
 

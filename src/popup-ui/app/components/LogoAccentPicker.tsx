@@ -5,6 +5,8 @@ interface LogoAccentPickerProps {
   value: LogoAccentValue;
   /** Current theme accent hue — used to seed the slider when unlinking. */
   themeHue: number;
+  /** Current theme mode. White is only offered on dark, black only on light (each is invisible in the other). */
+  isDark?: boolean;
   onChange: (value: LogoAccentValue) => void;
 }
 
@@ -13,9 +15,11 @@ interface LogoAccentPickerProps {
  * - Linked  : "Box" follows the theme accent (the hue bar). Controls hidden.
  * - Unlinked: a single track — black → rainbow → white — gives "Box" its own
  *   fixed color. Black and white are the two ends of the same scale (no
- *   separate swatch). ("Phoenix" always follows the hue bar via --ext-accent.)
+ *   separate swatch). The end that would be invisible in the current mode
+ *   (white on light, black on dark) is disabled. ("Phoenix" always follows the
+ *   hue bar via --ext-accent.)
  */
-export function LogoAccentPicker({ value, themeHue, onChange }: LogoAccentPickerProps) {
+export function LogoAccentPicker({ value, themeHue, isDark = true, onChange }: LogoAccentPickerProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -23,6 +27,10 @@ export function LogoAccentPicker({ value, themeHue, onChange }: LogoAccentPicker
   const BLACK_MAX = 0.085;
   const WHITE_MIN = 0.915;
   const HUE_SPAN = WHITE_MIN - BLACK_MAX;
+
+  // White reads only on dark, black only on light — disable the invisible end.
+  const whiteAllowed = isDark;
+  const blackAllowed = !isDark;
 
   const isWhite = !value.linked && 'white' in value && value.white === true;
   const isBlack = !value.linked && 'black' in value && value.black === true;
@@ -34,10 +42,11 @@ export function LogoAccentPicker({ value, themeHue, onChange }: LogoAccentPicker
     if (!track) return { linked: false, hue: currentHue };
     const rect = track.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    if (ratio <= BLACK_MAX) return { linked: false, black: true };
-    if (ratio >= WHITE_MIN) return { linked: false, white: true };
+    // A disabled end falls back to the nearest allowed hue (0 or 359).
+    if (ratio <= BLACK_MAX) return blackAllowed ? { linked: false, black: true } : { linked: false, hue: 0 };
+    if (ratio >= WHITE_MIN) return whiteAllowed ? { linked: false, white: true } : { linked: false, hue: 359 };
     return { linked: false, hue: clampHue(Math.round(((ratio - BLACK_MAX) / HUE_SPAN) * 359)) };
-  }, [currentHue]);
+  }, [currentHue, blackAllowed, whiteAllowed]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (value.linked) return;
@@ -55,10 +64,12 @@ export function LogoAccentPicker({ value, themeHue, onChange }: LogoAccentPicker
   const handlePointerUp = useCallback(() => setDragging(false), []);
 
   // Keyboard model: a single linear position across the whole track.
-  // 0 = black, 1..360 = hue (0..359), 361 = white.
+  // 0 = black, 1..360 = hue (0..359), 361 = white. Disabled ends are clamped out.
+  const minPos = blackAllowed ? 0 : 1;
+  const maxPos = whiteAllowed ? 361 : 360;
   const currentPos = isBlack ? 0 : isWhite ? 361 : currentHue + 1;
   const posToValue = (pos: number): LogoAccentValue => {
-    const p = Math.max(0, Math.min(361, Math.round(pos)));
+    const p = Math.max(minPos, Math.min(maxPos, Math.round(pos)));
     if (p === 0) return { linked: false, black: true };
     if (p === 361) return { linked: false, white: true };
     return { linked: false, hue: p - 1 };
@@ -71,13 +82,13 @@ export function LogoAccentPicker({ value, themeHue, onChange }: LogoAccentPicker
     else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') delta = -1;
     else if (e.key === 'PageUp') delta = 15;
     else if (e.key === 'PageDown') delta = -15;
-    else if (e.key === 'Home') { onChange(posToValue(0)); e.preventDefault(); return; }
-    else if (e.key === 'End') { onChange(posToValue(361)); e.preventDefault(); return; }
+    else if (e.key === 'Home') { onChange(posToValue(minPos)); e.preventDefault(); return; }
+    else if (e.key === 'End') { onChange(posToValue(maxPos)); e.preventDefault(); return; }
     else return;
 
     e.preventDefault();
     onChange(posToValue(currentPos + delta));
-  }, [value.linked, currentPos, onChange]);
+  }, [value.linked, currentPos, minPos, maxPos, onChange]);
 
   const valueText = isBlack ? 'Black' : isWhite ? 'White' : `Hue ${currentHue}`;
 
@@ -126,8 +137,8 @@ export function LogoAccentPicker({ value, themeHue, onChange }: LogoAccentPicker
           role="slider"
           tabIndex={0}
           aria-label="Logo Box color"
-          aria-valuemin={0}
-          aria-valuemax={361}
+          aria-valuemin={minPos}
+          aria-valuemax={maxPos}
           aria-valuenow={currentPos}
           aria-valuetext={valueText}
           className="relative h-3 w-full rounded-full cursor-crosshair select-none touch-none focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-1 focus:ring-offset-[var(--ext-bg)]"
@@ -139,6 +150,21 @@ export function LogoAccentPicker({ value, themeHue, onChange }: LogoAccentPicker
           onPointerUp={handlePointerUp}
           onKeyDown={handleKeyDown}
         >
+          {/* Grey out whichever end can't be used in the current mode */}
+          {!blackAllowed && (
+            <div
+              className="absolute inset-y-0 left-0 rounded-l-full pointer-events-none"
+              style={{ width: `${BLACK_MAX * 100}%`, background: 'var(--ext-bg-secondary)', opacity: 0.6 }}
+              title="Black is only available in light mode"
+            />
+          )}
+          {!whiteAllowed && (
+            <div
+              className="absolute inset-y-0 right-0 rounded-r-full pointer-events-none"
+              style={{ width: `${(1 - WHITE_MIN) * 100}%`, background: 'var(--ext-bg-secondary)', opacity: 0.6 }}
+              title="White is only available in dark mode"
+            />
+          )}
           <div
             className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full border-2 shadow-md pointer-events-none"
             style={{

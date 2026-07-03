@@ -236,6 +236,7 @@ export function SiteActionsView({
                 <LogoAccentPicker
                   value={logoAccent}
                   themeHue={accentToHue(accentColor)}
+                  isDark={isDarkMode}
                   onChange={onChangeLogoAccent}
                 />
               </div>
