@@ -1,4 +1,4 @@
-import { Plus, RotateCcw, ArrowUpDown, Hourglass, Sun, Moon, Info, Search, ChevronRight, ChevronDown, ChevronUp, Palette, Trash2, Edit2, X, AlertCircle, ArrowUp, Eye, EyeOff, Globe, Highlighter, UserCog, Download } from 'lucide-react';
+import { Plus, RotateCcw, ArrowUpDown, Hourglass, Sun, Moon, Info, Search, ChevronRight, ChevronDown, ChevronUp, Palette, Trash2, Edit2, X, ArrowUp, Eye, EyeOff, Globe, Highlighter, UserCog, Download } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { ContainerIcon } from '../ContainerIcon';
 import { UserAgentModal } from '../modals/UserAgentModal';
@@ -665,51 +665,70 @@ export function SiteActionsView({
           
           {/* Modal */}
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-            <div 
-              className="bg-[var(--ext-bg-secondary)] border-2 border-[var(--ext-accent)] rounded-xl shadow-2xl w-full max-w-[320px] pointer-events-auto animate-in scale-in-95 duration-200"
+            <div
+              className="relative bg-[var(--ext-bg-secondary)] border border-[var(--ext-accent)]/40 rounded-2xl overflow-hidden w-full max-w-[340px] pointer-events-auto animate-in scale-in-95 duration-200"
+              style={{ boxShadow: '0 24px 60px rgba(0,0,0,0.6), 0 0 32px var(--ext-glow-accent)' }}
               onClick={(e) => e.stopPropagation()}
             >
+              {/* Accent top line */}
+              <div
+                className="h-0.5 w-full"
+                style={{ background: 'linear-gradient(90deg, transparent, var(--ext-accent) 30%, var(--ext-accent-light) 50%, var(--ext-accent) 70%, transparent)' }}
+              />
+
               {/* Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--ext-border)]">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-[var(--ext-accent)]" />
-                  <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--ext-accent)] brand-title">
+              <div className="flex items-start gap-3 px-5 pt-5 pb-4 border-b border-[var(--ext-accent)]/15">
+                <div
+                  className="w-10 h-10 flex-none rounded-xl flex items-center justify-center border border-[var(--ext-accent)]/40"
+                  style={{ background: 'var(--ext-accent-bg)', boxShadow: 'inset 0 0 18px var(--ext-glow-accent)' }}
+                >
+                  <Highlighter className="w-5 h-5 text-[var(--ext-accent)]" />
+                </div>
+                <div className="flex-1 min-w-0 pt-0.5">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--ext-text-muted)] mb-1.5">
+                    Burp Integration
+                  </div>
+                  <h2 className="font-medium uppercase tracking-wider text-[var(--ext-text)] brand-title" style={{ fontSize: '15px', lineHeight: 1.2 }}>
                     Phoenix Highlighter Setup
                   </h2>
                 </div>
                 <button
                   onClick={() => setShowPaintBurpFirstTimeMessage(false)}
-                  className="p-1.5 hover:bg-[var(--ext-bg-tertiary)] rounded transition-all duration-200"
+                  className="w-8 h-8 flex-none flex items-center justify-center rounded-lg text-[var(--ext-text-muted)] hover:bg-[var(--ext-accent-bg)] hover:text-[var(--ext-accent)] transition-all duration-200"
                 >
-                  <X className="w-4 h-4 text-[var(--ext-text-muted)]" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
               {/* Content */}
-              <div className="p-4 space-y-3">
-                <p className="text-xs text-[var(--ext-text)] leading-relaxed">
-                  This color-codes your Burp requests by container so you can see which container each request came from. Make sure the <strong className="text-[var(--ext-accent)]">Phoenix Highlighter</strong> extension (JAR) is loaded in Burp Suite.
+              <div className="px-5 pt-5 pb-6 space-y-3.5">
+                <p className="text-sm text-[var(--ext-text)] leading-relaxed">
+                  Color-codes your Burp requests by container, so you can see at a glance which container each request came from.
                 </p>
+                <div
+                  className="flex items-start gap-3 p-3.5 rounded-xl border border-[var(--ext-accent)]/25"
+                  style={{ background: 'var(--ext-accent-bg)' }}
+                >
+                  <Info className="w-4 h-4 flex-none mt-0.5 text-[var(--ext-accent)]" />
+                  <p className="text-sm text-[var(--ext-text)] leading-relaxed">
+                    Make sure the <strong className="text-[var(--ext-accent)] font-semibold">Phoenix Highlighter</strong> extension (JAR) is loaded in Burp Suite.
+                  </p>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="px-5 pb-5">
                 <a
                   href="https://github.com/avihayf/PhoenixBox-Highlighter/releases/download/v1.1.0/PhoenixBoxHighlighter.jar"
                   download
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs border border-[var(--ext-accent)] text-[var(--ext-accent)] rounded-lg hover:bg-[var(--ext-accent-bg)] transition-all duration-200 font-medium"
+                  className="w-full flex items-center justify-center gap-2 px-3 py-3 text-sm text-black rounded-xl font-semibold transition-all duration-200"
+                  style={{ background: 'linear-gradient(180deg, var(--ext-accent-light), var(--ext-accent))', boxShadow: '0 0 22px var(--ext-glow-accent)' }}
                 >
-                  <Download className="w-3.5 h-3.5" />
+                  <Download className="w-4 h-4" />
                   Download Phoenix JAR
                 </a>
-              </div>
-
-              {/* Actions */}
-              <div className="px-4 pb-4">
-                <button
-                  onClick={() => setShowPaintBurpFirstTimeMessage(false)}
-                  className="w-full px-3 py-2 text-xs bg-[var(--ext-accent)] text-black rounded-lg hover:bg-[var(--ext-accent-light)] transition-all duration-200 font-medium"
-                >
-                  Got it
-                </button>
               </div>
             </div>
           </div>
