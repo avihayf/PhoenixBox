@@ -48,22 +48,27 @@ h3.title {
   padding-block-end: 0 !important;
 }
 
+/* Extract Endpoints — match the "Manage Containers" button language:
+   accent outline, uppercase + letter-spaced label, centered, no icon. */
 .extract-endpoints-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 0;
   width: calc(100% - 20px);
   margin: 4px 10px;
-  padding: 3px 12px;
+  padding: 8px 12px;
   background: transparent;
   border: 2px solid var(--ext-accent, #00c8ff);
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
+  font-family: var(--fontInter, -apple-system, sans-serif);
   font-size: 12px;
   font-weight: 500;
   color: var(--ext-accent, #00c8ff);
-  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-align: center;
   transition: background 0.15s;
 }
 
@@ -76,4 +81,92 @@ h3.title {
   height: 16px;
   opacity: 0.8;
   filter: invert(70%) sepia(80%) saturate(400%) hue-rotate(var(--icon-hue-rotate, 160deg));
+}
+
+/* ============================================================
+   New-design row styling — bring the picker in line with the
+   redesigned React container list (sans names, rounded rows,
+   accent hover, icon tile, right chevron). All scoped to the
+   page-action picker so the shared popup menu is untouched.
+   ============================================================ */
+
+/* Names: sans instead of the terminal mono */
+.page-action-container-picker .menu-text,
+.dark .page-action-container-picker .menu-text {
+  font-family: var(--fontInter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif) !important;
+  font-size: 14px !important;
+  letter-spacing: 0 !important;
+  align-items: center !important;
+  color: var(--text-color-primary, #f0f9ff) !important;
+}
+
+/* Rows: roomier + rounded, spacing between them */
+.page-action-container-picker .menu-item {
+  block-size: auto !important;
+  border-radius: 10px !important;
+  margin-block: 3px !important;
+  margin-inline: 6px !important;
+  transition: background-color 0.12s ease, box-shadow 0.12s ease !important;
+}
+
+.page-action-container-picker .menu-item td {
+  padding-block: 9px !important;
+  padding-inline: 10px !important;
+  gap: 12px !important;
+  border-radius: 10px;
+}
+
+/* Remove the permanent left "neon rail" */
+.page-action-container-picker .menu-item td::before {
+  display: none !important;
+}
+
+/* Hover / active: accent-tinted fill + hairline border, rounded */
+.page-action-container-picker .hover-highlight:hover,
+.page-action-container-picker .menu-item:hover {
+  background-color: var(--ext-accent-bg, rgb(0 224 255 / 0.12)) !important;
+  box-shadow: inset 0 0 0 1px var(--ext-accent, var(--accent-cyan, #00e0ff)) !important;
+}
+
+/* Icon sits in a subtle rounded tile, like the React rows */
+.page-action-container-picker .menu-icon {
+  inline-size: 30px !important;
+  block-size: 30px !important;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 0.05);
+  margin-inline-end: 0 !important;
+  flex: none;
+}
+
+/* The glyph is a background-image sized off its box — let it fill the tile
+   so it stays centered (a flex tile would collapse its width to 0). */
+.page-action-container-picker .menu-icon .usercontext-icon {
+  inline-size: 100% !important;
+  block-size: 100% !important;
+  background-size: 16px !important;
+  background-position: center center !important;
+}
+
+/* Right chevron (the picker template has none) */
+.page-action-container-picker .menu-item td::after {
+  content: "";
+  flex: none;
+  inline-size: 16px;
+  block-size: 16px;
+  margin-inline-start: auto;
+  background-color: var(--text-color-secondary, #7c8aa0);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E") center / 16px no-repeat;
+  transition: background-color 0.12s ease;
+}
+
+.page-action-container-picker .menu-item:hover td::after {
+  background-color: var(--ext-accent, var(--accent-cyan, #00e0ff));
+}
+
+/* No leading icon */
+.page-action-container-picker .extract-endpoints-btn .extract-endpoints-icon {
+  display: none !important;
+}
+.page-action-container-picker .extract-endpoints-btn::before {
+  content: none !important;
 }

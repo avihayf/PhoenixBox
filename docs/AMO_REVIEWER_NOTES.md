@@ -1,4 +1,4 @@
-# Notes to AMO Reviewer — PhoenixBox v2.0.0
+# Notes to AMO Reviewer — PhoenixBox v3.0.0
 
 ## What This Extension Does
 
@@ -23,7 +23,7 @@ These three permissions work together and are essential for two core features:
 
 1. **Proxy routing** — The extension uses `browser.proxy.onRequest` (optional `proxy` permission) and `browser.webRequest.onBeforeRequest` to intercept navigation requests and re-open them in the correct container. This must work on any URL the user visits during a security test.
 
-2. **HTTP header modification** — When the user enables "Paint the Burp" or a User-Agent override, the extension adds/replaces headers via `webRequest.onBeforeSendHeaders`. This must apply to all URLs because the user may be testing any target site.
+2. **HTTP header modification** — When the user enables "Highlighter" or a User-Agent override, the extension adds/replaces headers via `webRequest.onBeforeSendHeaders`. This must apply to all URLs because the user may be testing any target site.
 
 The content script injected on `<all_urls>` at `document_start` is minimal (55 lines) and only listens for `runtime.onMessage` from the extension's own background script to display a brief notification toast. It does not read or modify page content.
 
@@ -141,7 +141,7 @@ yarn build
 yarn test
 ```
 
-The built extension will be in `dist/` and the packaged zip in `web-ext-artifacts/phoenix_box-2.0.0.zip`.
+The built extension will be in `dist/` and the packaged zip in `web-ext-artifacts/phoenix_box-3.0.0.zip`.
 
 ### What the build does
 
