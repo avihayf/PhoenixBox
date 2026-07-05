@@ -38,9 +38,9 @@ Complete installation instructions for PhoenixBox.
 
 ## For End Users
 
-PhoenixBox is signed and published on Firefox Add-ons, so it installs on **any** Firefox 142.0 or later. You do **not** need Firefox Developer Edition or Nightly, and you do **not** need to change any `about:config` settings.
+Install the signed build from **Firefox Add-ons (AMO)**, where Mozilla signs the extension. That signed version installs on **any** Firefox 142.0 or later — standard release, ESR, Developer Edition, or Nightly — with no `about:config` changes.
 
-### Option 1: Firefox Add-ons (recommended)
+### Firefox Add-ons (recommended)
 
 1. **Open the listing**
    - Go to [PhoenixBox on addons.mozilla.org](https://addons.mozilla.org/firefox/addon/phoenix-box/), or search "PhoenixBox" on [addons.mozilla.org](https://addons.mozilla.org).
@@ -51,14 +51,7 @@ PhoenixBox is signed and published on Firefox Add-ons, so it installs on **any**
 
 Firefox keeps the extension updated automatically as new versions are published.
 
-### Option 2: Signed .xpi from GitHub Releases
-
-1. **Download**
-   - Grab `PhoenixBox.xpi` from the [Releases page](https://github.com/avihayf/PhoenixBox/releases).
-2. **Install**
-   - Drag the `.xpi` into any Firefox window (or **File → Open File** and select the `.xpi`), then click **Add** when prompted.
-
-The release build is signed, so it installs on standard Firefox without disabling signature enforcement.
+> **Note:** The `.xpi` attached to [GitHub Releases](https://github.com/avihayf/PhoenixBox/releases) is an **unsigned** developer build. Standard Firefox won't install it permanently — use it with Firefox Developer Edition or Nightly (see [For Developers](#for-developers)).
 
 ---
 
@@ -89,6 +82,17 @@ The release build is signed, so it installs on standard Firefox without disablin
    - Go to `about:debugging#/runtime/this-firefox`
    - Click "Load Temporary Add-on..."
    - Select `dist/manifest.json`
+
+### Installing the release .xpi (unsigned)
+
+The `.xpi` attached to GitHub Releases is unsigned, so it only installs permanently on Firefox Developer Edition or Nightly:
+
+1. Open Firefox Developer Edition (or Nightly).
+2. Go to `about:config` and set `xpinstall.signatures.required` to `false`.
+3. Download the `.xpi` from the [Releases page](https://github.com/avihayf/PhoenixBox/releases).
+4. Drag the `.xpi` into the browser (or **File → Open File**), then click **Add**.
+
+On standard Firefox, use the signed [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/phoenix-box/) build instead.
 
 ### Development Mode with Auto-reload
 
