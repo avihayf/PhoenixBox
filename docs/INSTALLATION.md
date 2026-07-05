@@ -19,9 +19,12 @@ Complete installation instructions for PhoenixBox.
 
 ### Required
 
-- **Firefox Developer Edition** (recommended) or Firefox Nightly
-  - Download: [Firefox Developer Edition](https://www.mozilla.org/en-US/firefox/developer/)
-- **Node.js 18+** (for building from source)
+- **Firefox 142.0 or later** — any edition works (standard release, ESR, Developer Edition, or Nightly). Developer Edition is **not** required.
+  - Download: [Firefox](https://www.mozilla.org/firefox/)
+
+### For building from source (developers only)
+
+- **Node.js 22+**
   - Download: [Node.js](https://nodejs.org/)
 
 ### Optional
@@ -35,50 +38,20 @@ Complete installation instructions for PhoenixBox.
 
 ## For End Users
 
-### Option 1: Pre-built Release (Easiest)
+Install the signed build from **Firefox Add-ons (AMO)**, where Mozilla signs the extension. That signed version installs on **any** Firefox 142.0 or later — standard release, ESR, Developer Edition, or Nightly — with no `about:config` changes.
 
-1. **Download the Extension**
-   ```
-   Go to: https://github.com/avihayf/PhoenixBox/releases
-   Download: phoenix_proxy-1.0.0.xpi
-   ```
+### Firefox Add-ons (recommended)
 
-2. **Allow Unsigned Extensions**
-   - Open Firefox Developer Edition
-   - Navigate to `about:config`
-   - Search for `xpinstall.signatures.required`
-   - Set value to `false` (double-click to toggle)
+1. **Open the listing**
+   - Go to [PhoenixBox on addons.mozilla.org](https://addons.mozilla.org/firefox/addon/phoenix-box/), or search "PhoenixBox" on [addons.mozilla.org](https://addons.mozilla.org).
+2. **Install**
+   - Click **Add to Firefox**, then **Add** when prompted.
+3. **Verify**
+   - Look for the PhoenixBox icon in the toolbar (pin it if needed) and click it — you'll see the pre-configured Attacker, Victim, Admin, and Member containers.
 
-3. **Install the Extension**
-   - Drag and drop the `.xpi` file into Firefox
-   - OR: File → Open File → Select `.xpi` file
-   - Click "Add" when prompted
+Firefox keeps the extension updated automatically as new versions are published.
 
-4. **Verify Installation**
-   - Look for PhoenixBox icon in toolbar
-   - Click icon to open popup
-   - You should see pre-configured containers
-
-### Option 2: Temporary Installation (For Testing)
-
-1. **Download and Extract**
-   ```
-   Download: phoenix_proxy-1.0.0.xpi
-   Rename to: phoenix_proxy-1.0.0.zip
-   Extract the zip file
-   ```
-
-2. **Load Temporary Add-on**
-   - Open Firefox Developer Edition
-   - Go to `about:debugging#/runtime/this-firefox`
-   - Click "Load Temporary Add-on..."
-   - Navigate to extracted folder
-   - Select `manifest.json`
-
-3. **Note About Temporary**
-   - Extension unloads when Firefox closes
-   - Need to reload each time you restart Firefox
-   - Good for testing without permanently installing
+> **Note:** The `.xpi` attached to [GitHub Releases](https://github.com/avihayf/PhoenixBox/releases) is an **unsigned** developer build. Standard Firefox won't install it permanently — use it with Firefox Developer Edition or Nightly (see [For Developers](#for-developers)).
 
 ---
 
@@ -109,6 +82,17 @@ Complete installation instructions for PhoenixBox.
    - Go to `about:debugging#/runtime/this-firefox`
    - Click "Load Temporary Add-on..."
    - Select `dist/manifest.json`
+
+### Installing the release .xpi (unsigned)
+
+The `.xpi` attached to GitHub Releases is unsigned, so it only installs permanently on Firefox Developer Edition or Nightly:
+
+1. Open Firefox Developer Edition (or Nightly).
+2. Go to `about:config` and set `xpinstall.signatures.required` to `false`.
+3. Download the `.xpi` from the [Releases page](https://github.com/avihayf/PhoenixBox/releases).
+4. Drag the `.xpi` into the browser (or **File → Open File**), then click **Add**.
+
+On standard Firefox, use the signed [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/phoenix-box/) build instead.
 
 ### Development Mode with Auto-reload
 
@@ -238,9 +222,9 @@ See [BURP_SUITE_SETUP.md](BURP_SUITE_SETUP.md) for detailed setup.
 **Problem**: "This add-on could not be installed because it appears to be corrupt"
 
 **Solutions**:
-1. Ensure `xpinstall.signatures.required` is set to `false`
-2. Try renaming `.xpi` to `.zip`, extracting, and loading as temporary add-on
-3. Download the file again (may have been corrupted during download)
+1. Make sure you're on Firefox 142.0 or later (`about:support` shows your version)
+2. Install from [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/phoenix-box/) or use the signed `PhoenixBox.xpi` from [Releases](https://github.com/avihayf/PhoenixBox/releases) — don't sideload an unsigned `dist/` build
+3. Download the file again (it may have been corrupted during download)
 
 ---
 
