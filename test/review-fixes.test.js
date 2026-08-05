@@ -8,6 +8,8 @@ const {
   shouldAllowGlobalProxyFallback,
   countVisibleAndHiddenTabs,
   buildHiddenTabCreateProperties,
+  compareContainerOrder,
+  sanitizeHostnameForStoreKey,
   resolveUserAgentSelection,
 } = require("../src/js/shared/reviewHelpers");
 
@@ -177,6 +179,55 @@ describe("reviewHelpers", () => {
       // makes tabs.create reject.
       expect(props).to.not.have.property("title");
       expect(props.pinned).to.equal(true);
+    });
+  });
+
+  describe("compareContainerOrder", () => {
+    it("orders container ids numerically rather than as strings", () => {
+      expect(["10", "9", "1"].sort(compareContainerOrder)).to.deep.equal(["1", "9", "10"]);
+    });
+
+    it("returns a negative, zero, or positive number as sort requires", () => {
+      expect(compareContainerOrder(1, 2)).to.be.below(0);
+      expect(compareContainerOrder(2, 1)).to.be.above(0);
+      expect(compareContainerOrder(2, 2)).to.equal(0);
+    });
+
+    it("mixes stored numeric ordering with container id strings", () => {
+      expect(["3", -1, "2"].sort(compareContainerOrder)).to.deep.equal([-1, "2", "3"]);
+    });
+
+    it("sorts the default container (reported as false) first", () => {
+      expect(compareContainerOrder(false, "2")).to.be.below(0);
+      expect(compareContainerOrder("2", false)).to.be.above(0);
+      expect(["2", false, "1"].sort(compareContainerOrder)).to.deep.equal([false, "1", "2"]);
+    });
+
+    it("sorts unreadable positions after readable ones", () => {
+      expect(compareContainerOrder("2", undefined)).to.be.below(0);
+      expect(compareContainerOrder(undefined, "2")).to.be.above(0);
+    });
+  });
+
+  describe("sanitizeHostnameForStoreKey", () => {
+    it("leaves ordinary hostnames byte-identical so existing keys still match", () => {
+      expect(sanitizeHostnameForStoreKey("sub.example.com")).to.equal("sub.example.com");
+      expect(sanitizeHostnameForStoreKey("xn--bcher-kva.example")).to.equal("xn--bcher-kva.example");
+    });
+
+    it("escapes disallowed characters instead of dropping them", () => {
+      expect(sanitizeHostnameForStoreKey("a_b.com")).to.equal("a~5fb.com");
+    });
+
+    it("keeps hostnames distinct that the old sanitizer collapsed together", () => {
+      expect(sanitizeHostnameForStoreKey("a_b.com"))
+        .to.not.equal(sanitizeHostnameForStoreKey("ab.com"));
+    });
+
+    it("handles empty and nullish input", () => {
+      expect(sanitizeHostnameForStoreKey("")).to.equal("");
+      expect(sanitizeHostnameForStoreKey(null)).to.equal("");
+      expect(sanitizeHostnameForStoreKey(undefined)).to.equal("");
     });
   });
 

@@ -103,6 +103,50 @@
     return createProperties;
   }
 
+  // Build the hostname portion of a site-assignment storage key.
+  //
+  // Characters outside the allowed set used to be deleted, which let two
+  // different hostnames collapse onto one key — and site assignments decide
+  // which container a site opens in, so a collision opens a site in the wrong
+  // container. Escaping instead of dropping keeps distinct hosts distinct.
+  // Hostnames that need no escaping produce byte-identical keys to before, so
+  // existing assignments keep working.
+  function sanitizeHostnameForStoreKey(hostname) {
+    return String(hostname || "").replace(
+      /[^a-z0-9.-]/gi,
+      (char) => `~${char.charCodeAt(0).toString(16)}`
+    );
+  }
+
+  // Comparator for the container ordering used by "sort tabs by container".
+  // Values arrive either as container id strings ("1", "10") or as numbers
+  // from the stored `container-order` map, so numeric ordering wins when both
+  // sides look numeric and a locale compare handles the rest. Returning a
+  // number (rather than a boolean) is what makes Array#sort well-defined.
+  function compareContainerOrder(a, b) {
+    const numA = toContainerOrderNumber(a);
+    const numB = toContainerOrderNumber(b);
+
+    if (numA !== null && numB !== null) {
+      return numA - numB;
+    }
+    // Anything we can't read as a position sorts after the ones we can.
+    if (numA !== null) return -1;
+    if (numB !== null) return 1;
+
+    return String(a).localeCompare(String(b));
+  }
+
+  function toContainerOrderNumber(value) {
+    // getUserContextIdFromCookieStoreId reports `false` for the default
+    // container, which is user context 0 and belongs at the front.
+    if (value === false) return 0;
+    if (value === null || value === undefined || value === "") return null;
+
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+  }
+
   function resolveUserAgentSelection(savedUserAgent, availableUserAgents) {
     const saved = String(savedUserAgent || "");
     const list = Array.isArray(availableUserAgents) ? availableUserAgents : [];
@@ -138,6 +182,8 @@
     shouldAllowGlobalProxyFallback,
     countVisibleAndHiddenTabs,
     buildHiddenTabCreateProperties,
+    compareContainerOrder,
+    sanitizeHostnameForStoreKey,
     resolveUserAgentSelection,
   };
 });

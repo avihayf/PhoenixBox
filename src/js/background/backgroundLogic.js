@@ -339,7 +339,9 @@ const backgroundLogic = {
   async openNewTab(options) {
     let url = options.url || undefined;
     const userContextId = ("userContextId" in options) ? options.userContextId : 0;
-    const active = ("nofocus" in options) ? options.nofocus : true;
+    // `active` defaults to true so a plain openNewTab() call focuses the tab.
+    // Un-hide passes active:false so restoring a container never steals focus.
+    const active = ("active" in options) ? !!options.active : true;
     const discarded = ("noload" in options) ? options.noload : false;
 
     const cookieStoreId = backgroundLogic.cookieStoreId(userContextId);
@@ -442,7 +444,10 @@ const backgroundLogic = {
       windowId
     });
 
-    const containerState = await identityState.storageArea.get(cookieStoreId);
+    // A container that has never had state stored returns null here, so fall
+    // back to an empty state rather than dereferencing null below.
+    const containerState =
+      await identityState.storageArea.get(cookieStoreId) || { hiddenTabs: [] };
 
     // Nothing to do
     if (list.length === 0 &&
@@ -601,8 +606,14 @@ const backgroundLogic = {
       });
     }
 
-    // Let's sort the map.
-    const sortMap = new Map([...map.entries()].sort((a, b) => a[1].order > b[1].order));
+    // Let's sort the map. `order` can be a container id string or a stored
+    // ordering number, so compare numerically and fall back to a string
+    // compare for anything non-numeric.
+    const sortMap = new Map(
+      [...map.entries()].sort(
+        (a, b) => PhoenixBoxReviewHelpers.compareContainerOrder(a[1].order, b[1].order)
+      )
+    );
 
     // Let's move tabs.
     for (const { tabs } of sortMap.values()) {
@@ -660,7 +671,7 @@ const backgroundLogic = {
           userContextId: userContextId,
           url: object.url,
           title: object.title,
-          nofocus: options.nofocus || false,
+          active: false,
           noload: noload,
           pinned: object.pinned,
         }));
