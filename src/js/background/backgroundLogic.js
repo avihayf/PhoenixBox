@@ -379,7 +379,10 @@ const backgroundLogic = {
 
   checkArgs(requiredArguments, options, methodName) {
     for (const argument of requiredArguments) {
-      if (!(argument in options)) {
+      // Reject null/undefined, not just a missing key. A null windowId used to
+      // pass this check and then reach tabs.query, where it matches nothing —
+      // so the action silently did nothing instead of failing loudly.
+      if (!(argument in options) || options[argument] === null || options[argument] === undefined) {
         throw new Error(`${methodName} must be called with ${argument} argument.`);
       }
     }
@@ -434,15 +437,18 @@ const backgroundLogic = {
     }
   },
 
+  /**
+   * Give a container its own window: gather its tabs — including hidden ones —
+   * into a freshly created window.
+   *
+   * Container-scoped like hideTabs, so a container whose tabs are spread over
+   * several windows ends up consolidated rather than partially moved.
+   */
   async moveTabsToWindow(options) {
-    const requiredArguments = ["cookieStoreId", "windowId"];
-    this.checkArgs(requiredArguments, options, "moveTabsToWindow");
-    const { cookieStoreId, windowId } = options;
+    this.checkArgs(["cookieStoreId"], options, "moveTabsToWindow");
+    const { cookieStoreId } = options;
 
-    const list = await browser.tabs.query({
-      cookieStoreId,
-      windowId
-    });
+    const list = await browser.tabs.query({ cookieStoreId });
 
     // A container that has never had state stored returns null here, so fall
     // back to an empty state rather than dereferencing null below.

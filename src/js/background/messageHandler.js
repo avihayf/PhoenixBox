@@ -77,8 +77,7 @@ const messageHandler = {
           break;
         case "moveTabsToWindow":
           response = backgroundLogic.moveTabsToWindow({
-            cookieStoreId: m.cookieStoreId,
-            windowId: m.windowId
+            cookieStoreId: m.cookieStoreId
           });
           break;
         case "getTabs":

@@ -71,12 +71,9 @@ export function hideTabs(cookieStoreId: string) {
   return send({ method: "hideTabs", cookieStoreId });
 }
 
-export function moveTabsToWindow(cookieStoreId: string, windowId: number | null) {
-  return send({ method: "moveTabsToWindow", cookieStoreId, windowId });
-}
-
-export function getTabs<T = unknown[]>(cookieStoreId: string, windowId: number) {
-  return send<T>({ method: "getTabs", cookieStoreId, windowId });
+/** Consolidates the container's tabs from every window; no windowId needed. */
+export function moveTabsToWindow(cookieStoreId: string) {
+  return send({ method: "moveTabsToWindow", cookieStoreId });
 }
 
 export function sortTabs() {

@@ -1061,7 +1061,7 @@ function App() {
           }}
           onMoveToWindow={async () => {
             const browser = requireWebExt();
-            await msg.moveTabsToWindow(selectedContainer.cookieStoreId, windowId);
+            await msg.moveTabsToWindow(selectedContainer.cookieStoreId);
           }}
           onManageSites={() => {
             if (!selectedContainer?.cookieStoreId) return;

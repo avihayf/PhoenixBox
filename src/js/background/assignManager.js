@@ -753,9 +753,9 @@ window.assignManager = {
         );
         break;
       case this.MENU_MOVE_ID:
+        // Container-scoped: gathers this container's tabs from every window.
         backgroundLogic.moveTabsToWindow({
           cookieStoreId: tab.cookieStoreId,
-          windowId: tab.windowId,
         });
         break;
       case this.MENU_HIDE_ID:
