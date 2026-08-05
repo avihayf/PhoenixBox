@@ -401,7 +401,10 @@ function App() {
         }
       }
     }
-    const tabQuery = await browser.tabs.query(winId ? { windowId: winId } : {});
+    // Every window, not just the current one. These counts drive the hide/show
+    // toggle, and hiding is container-scoped — a per-window count would offer
+    // "show" for a container whose tabs are simply in another window.
+    const tabQuery = await browser.tabs.query({});
     const { containerUserAgents = {} } = await browser.storage.local.get({
       containerUserAgents: {},
     });
@@ -1054,7 +1057,7 @@ function App() {
           }}
           onHideContainer={async () => {
             const browser = requireWebExt();
-            await msg.hideTabs(selectedContainer.cookieStoreId, windowId);
+            await msg.hideTabs(selectedContainer.cookieStoreId);
           }}
           onMoveToWindow={async () => {
             const browser = requireWebExt();
@@ -1210,7 +1213,7 @@ function App() {
             }
 
             if (hasOpenTabs) {
-              await msg.hideTabs(container.cookieStoreId, windowId);
+              await msg.hideTabs(container.cookieStoreId);
             } else if (hasHiddenTabs) {
               await msg.showTabs(container.cookieStoreId);
             }

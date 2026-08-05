@@ -70,8 +70,7 @@ const messageHandler = {
           break;
         case "hideTabs":
           response = backgroundLogic.hideTabs({
-            cookieStoreId: m.cookieStoreId,
-            windowId: m.windowId
+            cookieStoreId: m.cookieStoreId
           });
           break;
         case "checkIncompatibleAddons":

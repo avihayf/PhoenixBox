@@ -759,9 +759,9 @@ window.assignManager = {
         });
         break;
       case this.MENU_HIDE_ID:
+        // Container-scoped: hides this container's tabs in every window.
         backgroundLogic.hideTabs({
           cookieStoreId: tab.cookieStoreId,
-          windowId: tab.windowId,
         });
         break;
       }

@@ -186,6 +186,43 @@
     return result;
   }
 
+  /**
+   * Decide what hiding a container should do with each of its tabs.
+   *
+   * Hiding must round-trip: whatever gets closed has to come back on un-hide.
+   * Only http(s) tabs can be reopened by the extension, so anything else is
+   * left alone rather than closed and lost — except blank new-tab pages, which
+   * are safe to close because there is nothing in them to restore.
+   *
+   * @param {Array<{id: number, url: string}>} tabs
+   * @param {Set<string>|Array<string>} newTabPages URLs treated as blank.
+   * @returns {{toStore: object[], toClose: object[], toLeaveOpen: object[]}}
+   */
+  function partitionTabsForHide(tabs, newTabPages) {
+    const list = Array.isArray(tabs) ? tabs : [];
+    const blanks = newTabPages instanceof Set
+      ? newTabPages
+      : new Set(Array.isArray(newTabPages) ? newTabPages : []);
+
+    const toStore = [];
+    const toClose = [];
+    const toLeaveOpen = [];
+
+    for (const tab of list) {
+      const url = String((tab && tab.url) || "");
+      if (url.startsWith("http://") || url.startsWith("https://")) {
+        toStore.push(tab);
+        toClose.push(tab);
+      } else if (blanks.has(url)) {
+        toClose.push(tab);
+      } else {
+        toLeaveOpen.push(tab);
+      }
+    }
+
+    return { toStore, toClose, toLeaveOpen };
+  }
+
   // Build the hostname portion of a site-assignment storage key.
   //
   // Characters outside the allowed set used to be deleted, which let two
@@ -267,6 +304,7 @@
     buildHiddenTabCreateProperties,
     compareContainerOrder,
     sanitizeHostnameForStoreKey,
+    partitionTabsForHide,
     isSiteStoreKey,
     buildSiteStoreKey,
     getHostnameFromSiteStoreKey,

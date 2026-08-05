@@ -528,16 +528,22 @@ const backgroundLogic = {
     return browser.tabs.remove(tabIds);
   },
 
-  async queryIdentitiesState(windowId) {
+  /**
+   * Open/hidden tab state per container.
+   *
+   * Counted across every window, to match hideTabs: these numbers drive the
+   * popup's hide/show toggle, so a per-window count would offer "show" for a
+   * container whose tabs are merely in another window.
+   *
+   * @param {number} [windowId] accepted for backwards compatibility; unused.
+   */
+  async queryIdentitiesState(windowId) { // eslint-disable-line no-unused-vars
     const identities = await browser.contextualIdentities.query({});
     const identitiesOutput = {};
     const identitiesPromise = identities.map(async (identity) => {
       const { cookieStoreId } = identity;
       const containerState = await identityState.storageArea.get(cookieStoreId) || { hiddenTabs: [] };
-      const openTabs = await browser.tabs.query({
-        cookieStoreId,
-        windowId
-      });
+      const openTabs = await browser.tabs.query({ cookieStoreId });
       identitiesOutput[cookieStoreId] = {
         hasHiddenTabs: !!(containerState.hiddenTabs || []).length,
         hasOpenTabs: !!openTabs.length,
@@ -641,15 +647,31 @@ const backgroundLogic = {
     }
   },
 
+  /**
+   * Hide a container: stash its tabs and close them, so the user is left with
+   * only the other containers' tabs on screen.
+   *
+   * Scoped to the container, not to a window. Hiding is a container-level
+   * action, so leaving that container's tabs open in a second window defeats
+   * the point. Note that un-hide restores them into the focused window, since
+   * the tabs API gives no way to reopen a tab in the window it came from.
+   */
   async hideTabs(options) {
-    const requiredArguments = ["cookieStoreId", "windowId"];
-    this.checkArgs(requiredArguments, options, "hideTabs");
-    const { cookieStoreId, windowId } = options;
+    this.checkArgs(["cookieStoreId"], options, "hideTabs");
+    const { cookieStoreId } = options;
 
-    const userContextId = backgroundLogic.getUserContextIdFromCookieStoreId(cookieStoreId);
+    // One query feeds both the stash and the close, so a tab opened midway
+    // through can't be closed without having been recorded.
+    const tabs = await browser.tabs.query({ cookieStoreId });
+    const { toStore, toClose } =
+      PhoenixBoxReviewHelpers.partitionTabsForHide(tabs, this.NEW_TAB_PAGES);
 
-    const containerState = await identityState.storeHidden(cookieStoreId, windowId);
-    await this._closeTabs(userContextId, windowId);
+    const containerState = await identityState.storeHidden(cookieStoreId, toStore);
+
+    const tabIds = toClose.map((tab) => tab.id);
+    if (tabIds.length) {
+      await browser.tabs.remove(tabIds);
+    }
     return containerState;
   },
 

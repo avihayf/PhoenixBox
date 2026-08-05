@@ -66,8 +66,9 @@ export function showTabs(cookieStoreId: string) {
   return send({ method: "showTabs", cookieStoreId });
 }
 
-export function hideTabs(cookieStoreId: string, windowId: number | null) {
-  return send({ method: "hideTabs", cookieStoreId, windowId });
+/** Hides the container's tabs in every window; no windowId to get wrong. */
+export function hideTabs(cookieStoreId: string) {
+  return send({ method: "hideTabs", cookieStoreId });
 }
 
 export function moveTabsToWindow(cookieStoreId: string, windowId: number | null) {

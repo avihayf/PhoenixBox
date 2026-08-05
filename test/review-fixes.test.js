@@ -10,6 +10,7 @@ const {
   buildHiddenTabCreateProperties,
   compareContainerOrder,
   sanitizeHostnameForStoreKey,
+  partitionTabsForHide,
   isSiteStoreKey,
   buildSiteStoreKey,
   getHostnameFromSiteStoreKey,
@@ -234,6 +235,76 @@ describe("reviewHelpers", () => {
       expect(sanitizeHostnameForStoreKey("")).to.equal("");
       expect(sanitizeHostnameForStoreKey(null)).to.equal("");
       expect(sanitizeHostnameForStoreKey(undefined)).to.equal("");
+    });
+  });
+
+  describe("partitionTabsForHide", () => {
+    const NEW_TAB_PAGES = new Set([
+      "about:startpage", "about:newtab", "about:home", "about:blank",
+    ]);
+    const part = (tabs) => partitionTabsForHide(tabs, NEW_TAB_PAGES);
+
+    it("hides and remembers ordinary web tabs", () => {
+      const tabs = [
+        { id: 1, url: "https://a.test/" },
+        { id: 2, url: "http://b.test/x" },
+      ];
+      const { toStore, toClose, toLeaveOpen } = part(tabs);
+      expect(toStore.map((t) => t.id)).to.deep.equal([1, 2]);
+      expect(toClose.map((t) => t.id)).to.deep.equal([1, 2]);
+      expect(toLeaveOpen).to.deep.equal([]);
+    });
+
+    // The invariant the whole feature rests on: un-hide must restore
+    // everything hide closed, so nothing may be closed without being stored.
+    it("never closes a tab it has not remembered, except blank pages", () => {
+      const tabs = [
+        { id: 1, url: "https://a.test/" },
+        { id: 2, url: "file:///home/user/report.html" },
+        { id: 3, url: "about:newtab" },
+        { id: 4, url: "view-source:https://c.test/" },
+        { id: 5, url: "about:reader?url=https%3A%2F%2Fd.test%2F" },
+      ];
+      const { toStore, toClose } = part(tabs);
+      const storedIds = new Set(toStore.map((t) => t.id));
+      for (const tab of toClose) {
+        if (NEW_TAB_PAGES.has(tab.url)) continue;
+        expect(storedIds.has(tab.id), `tab ${tab.id} closed but not stored`).to.equal(true);
+      }
+    });
+
+    it("leaves tabs it cannot reopen alone rather than destroying them", () => {
+      const tabs = [
+        { id: 1, url: "https://a.test/" },
+        { id: 2, url: "file:///home/user/report.html" },
+        { id: 3, url: "view-source:https://c.test/" },
+      ];
+      const { toClose, toLeaveOpen } = part(tabs);
+      expect(toClose.map((t) => t.id)).to.deep.equal([1]);
+      expect(toLeaveOpen.map((t) => t.id)).to.deep.equal([2, 3]);
+    });
+
+    it("closes blank new-tab pages without storing them", () => {
+      const tabs = [
+        { id: 1, url: "about:newtab" },
+        { id: 2, url: "about:blank" },
+        { id: 3, url: "about:home" },
+      ];
+      const { toStore, toClose, toLeaveOpen } = part(tabs);
+      expect(toStore).to.deep.equal([]);
+      expect(toClose.map((t) => t.id)).to.deep.equal([1, 2, 3]);
+      expect(toLeaveOpen).to.deep.equal([]);
+    });
+
+    it("accepts the new-tab pages as an array as well as a Set", () => {
+      const tabs = [{ id: 1, url: "about:blank" }];
+      expect(partitionTabsForHide(tabs, ["about:blank"]).toClose).to.have.lengthOf(1);
+    });
+
+    it("handles empty and malformed input", () => {
+      expect(part([])).to.deep.equal({ toStore: [], toClose: [], toLeaveOpen: [] });
+      expect(partitionTabsForHide(null, NEW_TAB_PAGES).toClose).to.deep.equal([]);
+      expect(part([{ id: 1 }]).toLeaveOpen).to.have.lengthOf(1);
     });
   });
 

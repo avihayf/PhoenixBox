@@ -118,18 +118,31 @@ window.identityState = {
     return containers;
   },
 
-  async storeHidden(cookieStoreId, windowId) {
+  /**
+   * Record tabs so un-hide can bring them back.
+   *
+   * Takes the tabs explicitly rather than querying for them: the caller has
+   * already decided which ones it is going to close, and a second query here
+   * could see a different set, closing a tab that was never recorded.
+   *
+   * @param {string} cookieStoreId
+   * @param {object[]} tabs tabs the caller is about to close.
+   */
+  async storeHidden(cookieStoreId, tabs) {
     const containerState = await this.storageArea.get(cookieStoreId);
-    const tabsByContainer = await browser.tabs.query({cookieStoreId, windowId});
-    tabsByContainer.forEach((tab) => {
-      const tabObject = PhoenixBoxReviewHelpers.sanitizeHiddenTab(tab);
-      if (!backgroundLogic.isPermissibleURL(tab.url)) {
-        return;
-      }
-      containerState.hiddenTabs.push(tabObject);
-    });
+    if (!containerState) {
+      return false;
+    }
+    if (!Array.isArray(containerState.hiddenTabs)) {
+      containerState.hiddenTabs = [];
+    }
 
-    return this.storageArea.set(cookieStoreId, containerState);
+    for (const tab of (tabs || [])) {
+      containerState.hiddenTabs.push(PhoenixBoxReviewHelpers.sanitizeHiddenTab(tab));
+    }
+
+    await this.storageArea.set(cookieStoreId, containerState);
+    return containerState;
   },
 
   async updateUUID(cookieStoreId, uuid) {
