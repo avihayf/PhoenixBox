@@ -157,14 +157,20 @@ const messageHandler = {
           } catch (scanErr) {
             LOG.error("[PhoenixBox] extractEndpoints: scan failed:", scanErr);
           }
+          // Key each scan separately so two scans in flight can't overwrite
+          // each other, and so reloading a results tab still finds its data.
+          const scanId = `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
           await browser.storage.local.set({
-            endpointScanResults: {
+            [`endpointScanResults@@_${scanId}`]: {
               endpoints,
               pageUrl,
               scannedAt: Date.now(),
             }
           });
-          await browser.tabs.create({ url: browser.runtime.getURL("endpoint-results.html") });
+          await this.pruneEndpointScanResults();
+          await browser.tabs.create({
+            url: browser.runtime.getURL(`endpoint-results.html?scan=${encodeURIComponent(scanId)}`)
+          });
           break;
         }
         }
@@ -174,6 +180,11 @@ const messageHandler = {
         LOG.error("Background onMessage failed:", e, m && m.method);
         return undefined;
       }
+    });
+
+    // Scan results only need to outlive a tab reload, not the browser session.
+    browser.runtime.onStartup.addListener(() => {
+      this.pruneEndpointScanResults(0).catch(() => {});
     });
 
     if (browser.contextualIdentities.onRemoved) {
@@ -265,6 +276,25 @@ const messageHandler = {
     });
   },
 
+  // Scan results are kept so their tab survives a reload, so they need a cap.
+  // Keep the newest few and drop the legacy single-key entry on the way past.
+  async pruneEndpointScanResults(keep = 5) {
+    try {
+      const all = await browser.storage.local.get();
+      const staleKeys = ["endpointScanResults"].filter((key) => key in all);
+      const scanKeys = Object.keys(all)
+        .filter((key) => key.startsWith("endpointScanResults@@_"))
+        .sort((a, b) => (all[b].scannedAt || 0) - (all[a].scannedAt || 0));
+
+      const removable = staleKeys.concat(scanKeys.slice(keep));
+      if (removable.length) {
+        await browser.storage.local.remove(removable);
+      }
+    } catch (e) {
+      LOG.error("Failed to prune endpoint scan results:", e);
+    }
+  },
+
   async incrementCountOfContainerTabsOpened() {
     const key = "containerTabsOpened";
     const count = await browser.storage.local.get({[key]: 0});
@@ -280,7 +310,10 @@ const messageHandler = {
         assignManager.calculateContextMenu(tabs[0]);
       }
     }).catch((e) => {
-      throw e;
+      // Focus can land on a window with no queryable active tab (devtools,
+      // a closing window). Log it rather than re-throwing into an unhandled
+      // rejection on the background page.
+      LOG.error("Failed to update context menu onFocusChanged:", e);
     });
   },
 };

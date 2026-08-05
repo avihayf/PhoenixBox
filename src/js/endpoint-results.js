@@ -1,6 +1,13 @@
 "use strict";
 
-const STORAGE_KEY = "endpointScanResults";
+const STORAGE_PREFIX = "endpointScanResults@@_";
+// Pre-scan-id builds wrote a single shared key; still read it as a fallback.
+const LEGACY_STORAGE_KEY = "endpointScanResults";
+
+function getStorageKey() {
+  const scanId = new URLSearchParams(window.location.search).get("scan");
+  return scanId ? `${STORAGE_PREFIX}${scanId}` : LEGACY_STORAGE_KEY;
+}
 
 // Sort modes: "alpha" = A→Z, "depth" = fewest segments first
 let sortMode = "alpha";
@@ -106,11 +113,12 @@ function renderEndpoints(endpoints) {
 }
 
 async function init() {
-  const stored = await browser.storage.local.get(STORAGE_KEY);
-  const data = stored[STORAGE_KEY];
+  const storageKey = getStorageKey();
+  const stored = await browser.storage.local.get(storageKey);
+  const data = stored[storageKey];
 
-  // Clear results from storage immediately after reading
-  await browser.storage.local.remove(STORAGE_KEY);
+  // Results are intentionally left in storage so reloading this tab still
+  // works; the background page caps how many scans are retained.
 
   if (!data || !data.endpoints) {
     document.getElementById("count").textContent = "0 endpoints";
