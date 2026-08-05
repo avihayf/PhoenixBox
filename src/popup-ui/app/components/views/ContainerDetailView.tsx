@@ -1,14 +1,9 @@
 import { ArrowLeft, Plus, Eye, ArrowLeftRight, Hourglass, Trash2, X } from 'lucide-react';
 import { ContainerIcon } from '../ContainerIcon';
 import { getContainerColorHex } from '../../../lib/containerColors';
-import type { ProxyPreset } from '../../../data/mockData';
+import type { ProxyPreset } from '../../../lib/proxyPresets';
 
-interface Tab {
-  id: number;
-  title: string;
-  url: string;
-  favicon?: string;
-}
+import type { Tab } from '../../../lib/types';
 
 interface ContainerDetailViewProps {
   containerName: string;

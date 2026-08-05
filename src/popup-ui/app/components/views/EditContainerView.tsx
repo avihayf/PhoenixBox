@@ -7,18 +7,7 @@ import { Switch } from '../ui/switch';
 import { CONTAINER_COLORS, getContainerColorHex } from '../../../lib/containerColors';
 import type { UserAgentData } from '../../../lib/userAgent';
 
-type Container = {
-  cookieStoreId: string;
-  name: string;
-  color: string;
-  icon: string;
-  displayIcon: string;
-  tabCount: number;
-  proxyUrl?: string;
-  proxySource?: string;
-  isIsolated?: boolean;
-  userAgent?: string;
-};
+import type { Container } from '../../../lib/types';
 
 interface EditContainerViewProps {
   container?: Container;

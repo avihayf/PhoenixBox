@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Save } from 'lucide-react';
-import { ProxyPreset } from '../../data/mockData';
+import { type ProxyPreset } from '../../../lib/proxyPresets';
 import { parseGlobalProxyUrl } from '../../../lib/proxy';
 import { Switch } from '../ui/switch';
 

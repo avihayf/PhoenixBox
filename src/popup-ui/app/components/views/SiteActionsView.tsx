@@ -5,7 +5,7 @@ import { UserAgentModal } from '../modals/UserAgentModal';
 import { ProxyPresetModal } from '../modals/ProxyPresetModal';
 import type { UserAgentData } from '../../../lib/userAgent';
 import { getContainerColorHex } from '../../../lib/containerColors';
-import { DEFAULT_PROXY_PRESETS, type ProxyPreset } from '../../../data/mockData';
+import { DEFAULT_PROXY_PRESETS, type ProxyPreset } from '../../../lib/proxyPresets';
 import { requireWebExt } from '../../../lib/browser';
 import { HueAccentPicker } from '../HueAccentPicker';
 import { LogoAccentPicker } from '../LogoAccentPicker';
@@ -36,16 +36,7 @@ function ControlTile({ icon: Icon, label, active, disabled, onClick }: {
   );
 }
 
-type Container = {
-  cookieStoreId: string;
-  name: string;
-  color: string;
-  icon: string;
-  displayIcon: string;
-  tabCount: number;
-  visibleTabCount: number;
-  hiddenTabCount: number;
-};
+import type { Container } from '../../../lib/types';
 
 interface SiteActionsViewProps {
   containers: Container[];

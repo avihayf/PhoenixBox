@@ -10,38 +10,12 @@ import { OnboardingView } from "./components/views/OnboardingView";
 import { requireWebExt } from "../lib/browser";
 import { parseGlobalProxyUrl, sanitizeProxyUrlForStorage, stripSensitiveProxyFields } from "../lib/proxy";
 import { getUserAgents, type UserAgentData } from "../lib/userAgent";
-import { DEFAULT_PROXY_PRESETS, type ProxyPreset } from "../data/mockData";
+import { DEFAULT_PROXY_PRESETS, type ProxyPreset } from "../lib/proxyPresets";
 import { logError } from "../lib/logger";
 import { type AccentValue, ACCENT_PRESETS, applyCustomHue, clearCustomHue, serializeAccent, deserializeAccent, type LogoAccentValue, applyLogoAccentToDOM, serializeLogoAccent, deserializeLogoAccent } from "../lib/accentColors";
+import type { Container, Tab, AssignedSite } from "../lib/types";
 
 type View = "main" | "detail" | "edit" | "picker" | "manage" | "assignedSites" | "advancedProxy" | "onboarding";
-
-type Container = {
-  cookieStoreId: string;
-  name: string;
-  color: string;
-  icon: string;
-  displayIcon: string;
-  tabCount: number;
-  visibleTabCount: number;
-  hiddenTabCount: number;
-  proxyUrl?: string;
-  proxySource?: string;
-  isIsolated?: boolean;
-  userAgent?: string;
-};
-
-type Tab = {
-  id: number;
-  title: string;
-  url: string;
-  favicon?: string;
-};
-
-type AssignedSite = {
-  key: string;
-  hostname: string;
-};
 
 function countVisibleAndHiddenTabs(visibleTabs: unknown[], hiddenTabs: unknown) {
   const visibleCount = Array.isArray(visibleTabs) ? visibleTabs.length : 0;

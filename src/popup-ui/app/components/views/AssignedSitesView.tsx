@@ -1,9 +1,6 @@
 import { ArrowLeft, Globe, RotateCcw, Trash2 } from "lucide-react";
 
-type AssignedSite = {
-  key: string;
-  hostname: string;
-};
+import type { AssignedSite } from "../../../lib/types";
 
 interface AssignedSitesViewProps {
   containerName: string;
