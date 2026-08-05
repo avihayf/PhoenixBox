@@ -138,6 +138,15 @@ Choose from five distinct accent color themes:
 
 PhoenixBox includes advanced user-agent spoofing capabilities with real-world data.
 
+### Scope: request headers only
+
+Spoofing rewrites the `User-Agent` **HTTP request header**, so the server (and
+your proxy) sees the identity you picked. It does not change what JavaScript on
+the page sees — `navigator.userAgent`, `navigator.userAgentData`, and client
+hints still report the real Firefox build. A site that fingerprints in JS can
+therefore tell the difference. If you need the page-side values changed too,
+use a dedicated fingerprinting tool alongside PhoenixBox.
+
 ### Data Source
 
 - **Source**: [microlinkhq/top-user-agents](https://github.com/microlinkhq/top-user-agents)

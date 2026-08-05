@@ -50,8 +50,6 @@ PhoenixBox requires certain browser permissions to function:
 
 - **`activeTab`**: Required to determine the current tab's container for page-specific actions.
 
-- **`history`**: Required only to remove internal confirmation-page URLs from your browsing history so they don't clutter the address bar. PhoenixBox does not read or query your browsing history.
-
 ### Optional Permissions
 
 - **`bookmarks`**: Only if you enable bookmark menu features
@@ -63,7 +61,7 @@ PhoenixBox requires certain browser permissions to function:
 
 The extension may make the following external connections:
 
-1. **User-Agent List Updates**: The extension fetches a pinned, public list of top user agents from `https://cdn.jsdelivr.net` (the microlinkhq/top-user-agents CDN) only when you use the User-Agent override feature. This request is lazy, cached locally for 7 days, and does not transmit browsing history, container configuration, or user identifiers.
+1. **User-Agent List Updates**: The extension fetches a pinned, public list of top user agents from `https://cdn.jsdelivr.net` (the microlinkhq/top-user-agents CDN) only when you use the User-Agent override feature. This request is lazy, cached locally for 7 days, and does not transmit browsing history, container configuration, or user identifiers. As with any network request, the CDN operator can see the IP address it comes from and the time it was made; the request is pinned to a fixed revision and is repeated at most once every 7 days.
 
 This is the only external network connection PhoenixBox makes. It is explicitly allowed in the Content Security Policy and can be avoided by not using the User-Agent override feature.
 

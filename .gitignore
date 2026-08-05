@@ -25,6 +25,7 @@ coverage/
 .vscode/
 .cursor/
 .claude/
+.mcp.json
 CLAUDE.md
 *.code-workspace
 
