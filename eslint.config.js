@@ -81,7 +81,6 @@ module.exports = [
         messageHandler: true,
         sync: true,
         userAgentFetcher: true,
-        userAgentHandler: true,
       },
     },
   },
