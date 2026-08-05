@@ -5,7 +5,10 @@ const js = require("@eslint/js");
 
 module.exports = [
   {
-    ignores: ["**/coverage", "dist/**", "**/dist/**"],
+    // `.claude/` holds agent scratch space, including git worktrees with their
+    // own full checkout. Linting those reports errors against a copy of the
+    // tree that this config's `files` globs don't apply to.
+    ignores: ["**/coverage", "dist/**", "**/dist/**", ".claude/**"],
   },
   js.configs.recommended,
   {
@@ -23,6 +26,7 @@ module.exports = [
         MozillaVPN_Background: true,
         PhoenixBoxReviewHelpers: true,
         PhoenixBoxPageActionHelpers: true,
+        PhoenixBoxRequestHeaderHelpers: true,
       },
     },
     plugins: {

@@ -13,31 +13,18 @@
  * blocking listener delays every request. Container identity is served from
  * caches kept in sync with the tabs and contextualIdentities events, so the
  * common path resolves synchronously with no API round-trip per request.
+ *
+ * This file owns the browser I/O and the caches; every decision it makes is
+ * delegated to the pure helpers in shared/requestHeaderHelpers.js, which are
+ * unit-tested.
  */
+
+const H = PhoenixBoxRequestHeaderHelpers;
 
 const GLOBAL_UA_ENABLED_KEY = "globalUserAgentEnabled";
 const GLOBAL_UA_KEY = "globalUserAgent";
 const CONTAINER_UAS_KEY = "containerUserAgents";
 const COLOR_HEADER_STORAGE_KEY = "addContainerColorHeaderEnabled";
-const COLOR_HEADER_NAME = "X-MAC-Container-Color";
-
-// Map Firefox container colors to standard color names for Burp Suite
-// highlighting. These are common color names that most tools can recognize.
-const COLOR_MAP = {
-  blue: "blue",
-  turquoise: "cyan",
-  green: "green",
-  yellow: "yellow",
-  orange: "orange",
-  red: "red",
-  pink: "pink",
-  purple: "magenta",
-};
-
-const NON_CONTAINER_COOKIE_STORES = new Set([
-  "firefox-default",
-  "firefox-private",
-]);
 
 const requestHeaders = {
   colorHeaderEnabled: false,
@@ -74,9 +61,14 @@ const requestHeaders = {
     // lookup for that request, whereas waiting would let requests made during
     // startup slip through unmodified.
     this._applyListener();
+    this._watchSettings();
 
     await Promise.all([this._primeTabCache(), this._primeContainerColors()]);
+  },
 
+  // Registered before the caches are primed so a settings change made during
+  // startup isn't dropped. Only mutates plain fields, so it is safe this early.
+  _watchSettings() {
     browser.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== "local") return;
 
@@ -99,14 +91,11 @@ const requestHeaders = {
 
   // Any container-scoped UA counts, even when the global toggle is off.
   _hasContainerUserAgents() {
-    return Object.keys(this.containerUserAgents || {}).length > 0;
+    return H.hasContainerUserAgents(this.containerUserAgents);
   },
 
   _shouldListen() {
-    const uaActive =
-      (this.userAgentEnabled && !!this.globalUserAgent) ||
-      this._hasContainerUserAgents();
-    return this.colorHeaderEnabled || uaActive;
+    return H.shouldListen(this);
   },
 
   _applyListener() {
@@ -198,24 +187,11 @@ const requestHeaders = {
   },
 
   _isSupportedScheme(url) {
-    return (
-      url.startsWith("http://") ||
-      url.startsWith("https://") ||
-      url.startsWith("ws://") ||
-      url.startsWith("wss://")
-    );
+    return H.isSupportedScheme(url);
   },
 
   _userAgentFor(cookieStoreId) {
-    if (cookieStoreId && this.containerUserAgents[cookieStoreId]) {
-      return this.containerUserAgents[cookieStoreId];
-    }
-    // Only fall back to the global UA while the global toggle is on, so a
-    // leftover stored value can't keep spoofing after the user turns it off.
-    if (this.userAgentEnabled && this.globalUserAgent) {
-      return this.globalUserAgent;
-    }
-    return null;
+    return H.resolveUserAgent(cookieStoreId, this);
   },
 
   /**
@@ -223,31 +199,19 @@ const requestHeaders = {
    *   should not be labelled, or `undefined` when the color is not cached yet.
    */
   _colorFor(cookieStoreId) {
-    if (!this.colorHeaderEnabled) return null;
-    if (!cookieStoreId || NON_CONTAINER_COOKIE_STORES.has(cookieStoreId)) {
-      return null;
-    }
-
-    const rawColor = this._containerColors.get(cookieStoreId);
-    if (rawColor === undefined) return undefined;
-    return COLOR_MAP[rawColor] || null;
+    return H.resolveContainerColor(
+      cookieStoreId,
+      this.colorHeaderEnabled,
+      this._containerColors
+    );
   },
 
   _buildHeaders(details, userAgent, color) {
-    if (!userAgent && !color) return {};
-
-    const lowerColorHeader = COLOR_HEADER_NAME.toLowerCase();
-    const headers = (details.requestHeaders || []).filter((header) => {
-      const name = (header.name || "").toLowerCase();
-      if (userAgent && name === "user-agent") return false;
-      if (color && name === lowerColorHeader) return false;
-      return true;
-    });
-
-    if (userAgent) headers.push({ name: "User-Agent", value: userAgent });
-    if (color) headers.push({ name: COLOR_HEADER_NAME, value: color });
-
-    return { requestHeaders: headers };
+    return H.buildRequestHeaders(
+      details && details.requestHeaders,
+      userAgent,
+      color
+    );
   },
 
   _handleRequest(details) {
@@ -294,11 +258,15 @@ const requestHeaders = {
     if (color === undefined) {
       try {
         const identity = await browser.contextualIdentities.get(cookieStoreId);
+        // Always populate the cache, even with an absent color: resolveContainerColor
+        // tests for presence, so this is what stops the container falling down
+        // this async path on every subsequent request.
         this._containerColors.set(cookieStoreId, identity && identity.color);
-        color = this._colorFor(cookieStoreId);
       } catch {
-        color = null;
+        // Container is gone or unreadable; cache that so we don't retry per request.
+        this._containerColors.set(cookieStoreId, undefined);
       }
+      color = this._colorFor(cookieStoreId);
       if (color === undefined) color = null;
     }
 
@@ -306,4 +274,4 @@ const requestHeaders = {
   },
 };
 
-requestHeaders.init();
+requestHeaders.init().catch((e) => LOG.error("requestHeaders: init failed", e));
