@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { requireWebExt } from "../../lib/browser";
 import { Switch } from "./ui/switch";
+import * as msg from "../../lib/messages";
 
 type VpnServerCity = {
   name: string;
@@ -48,22 +49,22 @@ export function MozillaVpnSection({ cookieStoreId, expanded, onToggle }: Mozilla
 
     const load = async () => {
       try {
-        await browser.runtime.sendMessage({ method: "MozillaVPN_attemptPort" });
+        await msg.vpnAttemptPort();
       } catch {}
 
       try {
-        await browser.runtime.sendMessage({ method: "MozillaVPN_queryStatus" });
+        await msg.vpnQueryStatus();
       } catch {}
 
       if (isExpanded) {
         try {
-          await browser.runtime.sendMessage({ method: "MozillaVPN_queryServers" });
+          await msg.vpnQueryServers();
         } catch {}
       }
 
       const [isInstalled, isConnected, permOk, stored] = await Promise.all([
-        browser.runtime.sendMessage({ method: "MozillaVPN_getInstallationStatus" }),
-        browser.runtime.sendMessage({ method: "MozillaVPN_getConnectionStatus" }),
+        msg.vpnGetInstallationStatus<any>(),
+        msg.vpnGetConnectionStatus<any>(),
         browser.permissions.contains({ permissions: ["proxy", "nativeMessaging"] }),
         browser.storage.local.get({
           mozillaVpnServers: [],

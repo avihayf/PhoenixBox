@@ -5,7 +5,7 @@ import { UserAgentModal } from '../modals/UserAgentModal';
 import { ProxyPresetModal } from '../modals/ProxyPresetModal';
 import type { UserAgentData } from '../../../lib/userAgent';
 import { getContainerColorHex } from '../../../lib/containerColors';
-import { DEFAULT_PROXY_PRESETS, type ProxyPreset } from '../../../lib/proxyPresets';
+import { type ProxyPreset } from '../../../lib/proxyPresets';
 import { requireWebExt } from '../../../lib/browser';
 import { HueAccentPicker } from '../HueAccentPicker';
 import { LogoAccentPicker } from '../LogoAccentPicker';

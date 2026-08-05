@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { SiteActionsView } from "./components/views/SiteActionsView";
 import { ContainerSelectorView } from "./components/views/ContainerSelectorView";
 import { ManageContainersView } from "./components/views/ManageContainersView";
@@ -14,6 +14,7 @@ import { DEFAULT_PROXY_PRESETS, type ProxyPreset } from "../lib/proxyPresets";
 import { logError } from "../lib/logger";
 import { type AccentValue, ACCENT_PRESETS, applyCustomHue, clearCustomHue, serializeAccent, deserializeAccent, type LogoAccentValue, applyLogoAccentToDOM, serializeLogoAccent, deserializeLogoAccent } from "../lib/accentColors";
 import type { Container, Tab, AssignedSite } from "../lib/types";
+import * as msg from "../lib/messages";
 
 type View = "main" | "detail" | "edit" | "picker" | "manage" | "assignedSites" | "advancedProxy" | "onboarding";
 
@@ -96,7 +97,6 @@ function applyAccentToDOM(accent: AccentValue, isDark: boolean) {
 function App() {
   const [currentView, setCurrentView] = useState<View>("main");
   const [selectedContainer, setSelectedContainer] = useState<Container | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
   const [globalProxyEnabled, setGlobalProxyEnabled] = useState(false);
   const [proxyUrl, setProxyUrl] = useState("");
   const [globalProxyError, setGlobalProxyError] = useState<string>("");
@@ -177,12 +177,6 @@ function App() {
     setCustomProxyPresets(updated);
     await browser.storage.local.set({ customProxyPresets: updated });
   };
-
-  const filteredContainers = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
-    if (!q) return containers;
-    return containers.filter((c) => c.name.toLowerCase().includes(q));
-  }, [containers, searchTerm]);
 
   const loadUserAgents = async (forceRefresh = false) => {
     try {
@@ -305,8 +299,7 @@ function App() {
     const currentUserContextId = cookieStoreIdToUserContextId(tab.cookieStoreId);
 
     if (pickerAction === "reopenSiteIn") {
-      await browser.runtime.sendMessage({
-        method: "reloadInContainer",
+      await msg.reloadInContainer({
         url: tab.url,
         currentUserContextId,
         newUserContextId,
@@ -320,8 +313,7 @@ function App() {
 
     if (pickerAction === "alwaysOpenIn") {
       if (tab.cookieStoreId !== c.cookieStoreId) {
-        await browser.runtime.sendMessage({
-          method: "assignAndReloadInContainer",
+        await msg.assignAndReloadInContainer({
           url: tab.url,
           currentUserContextId: false,
           newUserContextId,
@@ -330,13 +322,7 @@ function App() {
           groupId: tab.groupId,
         });
       } else {
-        await browser.runtime.sendMessage({
-          method: "setOrRemoveAssignment",
-          tabId: tab.id,
-          url: tab.url,
-          userContextId: newUserContextId,
-          value: false,
-        });
+        await msg.setOrRemoveAssignment(tab.id, tab.url, newUserContextId, false);
       }
       window.close();
       return;
@@ -499,10 +485,7 @@ function App() {
     if (!userContextId) return;
     setAssignedSitesLoading(true);
     try {
-      const response = await browser.runtime.sendMessage({
-        method: "getAssignmentObjectByContainer",
-        message: { userContextId },
-      });
+      const response = await msg.getAssignmentObjectByContainer<Record<string, any>>(userContextId);
       const assignments = response || {};
       const sites = Object.keys(assignments).map((key) => {
         const site = assignments[key] || {};
@@ -577,7 +560,12 @@ function App() {
 
   // Initial load: containers, current window, tab counts, and global toggles.
   useEffect(() => {
+    // Held in the effect's closure, not inside run(), so the cleanup React
+    // actually receives can reach them: run() is async, so anything it returns
+    // is a promise React discards.
     let intervalId: number | null = null;
+    let storageListener: ((changes: any, areaName: string) => void) | null = null;
+    let cancelled = false;
 
     // Default to dark mode if no theme is set
     const savedTheme = localStorage.getItem("theme");
@@ -606,7 +594,7 @@ function App() {
 
       // Kick VPN status refresh (safe, uses existing background port if available)
       try {
-        await browser.runtime.sendMessage({ method: "MozillaVPN_queryStatus" });
+        await msg.vpnQueryStatus();
       } catch {
         // ignore
       }
@@ -696,15 +684,15 @@ function App() {
       // Mozilla VPN status + permissions warning
       const refreshVpn = async () => {
         try {
-          await browser.runtime.sendMessage({ method: "MozillaVPN_queryStatus" });
+          await msg.vpnQueryStatus();
         } catch {
           // ignore
         }
 
         try {
           await Promise.all([
-            browser.runtime.sendMessage({ method: "MozillaVPN_getInstallationStatus" }),
-            browser.runtime.sendMessage({ method: "MozillaVPN_getConnectionStatus" }),
+            msg.vpnGetInstallationStatus<any>(),
+            msg.vpnGetConnectionStatus<any>(),
           ]);
         } catch {
           // VPN may not be installed
@@ -724,6 +712,10 @@ function App() {
       };
 
       await refreshVpn();
+      // The popup can be dismissed while the awaits above are still in flight,
+      // in which case cleanup has already run and there is nothing to register.
+      if (cancelled) return;
+
       intervalId = window.setInterval(() => {
         refreshVpn().catch(() => {});
       }, 3000);
@@ -756,21 +748,26 @@ function App() {
           refreshContainers().catch((e) => logError("Failed to refresh container UAs:", e));
         }
       };
+      storageListener = handleStorageChange;
       browser.storage.onChanged.addListener(handleStorageChange);
-      return () => {
-        if (intervalId) window.clearInterval(intervalId);
-        browser.storage.onChanged.removeListener(handleStorageChange);
-      };
     };
 
     run().catch((e) => logError("Failed to load popup data:", e));
+
+    return () => {
+      cancelled = true;
+      if (intervalId) window.clearInterval(intervalId);
+      if (storageListener) {
+        try {
+          requireWebExt().storage.onChanged.removeListener(storageListener);
+        } catch {
+          // Extension context already gone; nothing to detach from.
+        }
+        storageListener = null;
+      }
+    };
   }, []);
 
-  // Shared wrapper style for all views - RESTORED h-fit for auto-adjusting
-  // Main view uses fixed height to keep footer visible; other views auto-fit.
-  // Main view: fixed height within Firefox popup limit (~600px max)
-  const mainWrapperClass = "w-[352px] h-[580px] flex flex-col bg-[var(--phoenix-bg)] text-[var(--phoenix-text)] dark:text-[var(--phoenix-text)] border border-[var(--phoenix-border)] shadow-xl font-['JetBrains_Mono',monospace]";
-  const subWrapperClass = "w-[352px] h-fit max-h-[620px] flex flex-col bg-[var(--phoenix-bg)] text-[var(--phoenix-text)] dark:text-[var(--phoenix-text)] border border-[var(--phoenix-border)] overflow-hidden shadow-xl font-['JetBrains_Mono',monospace]";
 
   // Onboarding View
   if (currentView === "onboarding") {
@@ -816,24 +813,14 @@ function App() {
             const browser = requireWebExt();
             const userContextId = cookieStoreIdToUserContextId(selectedContainer.cookieStoreId);
             if (!userContextId) return;
-            await browser.runtime.sendMessage({
-              method: "setOrRemoveAssignment",
-              tabId: null,
-              url: siteKey,
-              userContextId,
-              value: true,
-            });
+            await msg.setOrRemoveAssignment(null, siteKey, userContextId, true);
             setAssignedSites((prev) => prev.filter((s) => s.key !== siteKey));
           }}
           onResetCookies={async (hostname) => {
             const browser = requireWebExt();
             const granted = await browser.permissions.request({ permissions: ["browsingData"] });
             if (!granted) return;
-            await browser.runtime.sendMessage({
-              method: "resetCookiesForSite",
-              hostname,
-              cookieStoreId: selectedContainer.cookieStoreId,
-            });
+            await msg.resetCookiesForSite(hostname, selectedContainer.cookieStoreId);
           }}
         />
       </PopupWrapper>
@@ -933,17 +920,14 @@ function App() {
 
             const nativeIcon = icon === "skull" ? "circle" : icon;
 
-            const response = await browser.runtime.sendMessage({
-              method: "createOrUpdateContainer",
-              message: {
-                userContextId,
-                params: {
-                  name: name || (isNew ? "New Container" : selectedContainer.name),
-                  color: normalizeContainerColor(color),
-                  icon: nativeIcon,
-                },
-              },
-            });
+            const response = await msg.createOrUpdateContainer<{ cookieStoreId?: string }>(
+              userContextId,
+              {
+                name: name || (isNew ? "New Container" : selectedContainer.name),
+                color: normalizeContainerColor(color),
+                icon: nativeIcon,
+              }
+            );
             const targetId = isNew ? response?.cookieStoreId : selectedContainer.cookieStoreId;
 
             // Persist the user's chosen display icon (supports security icons) so UI matches choice.
@@ -969,11 +953,7 @@ function App() {
             }
 
             if (!isNew && siteIsolation !== !!selectedContainer.isIsolated) {
-              await browser.runtime.sendMessage({
-                method: "addRemoveSiteIsolation",
-                cookieStoreId: selectedContainer.cookieStoreId,
-                remove: !siteIsolation,
-              });
+              await msg.addRemoveSiteIsolation(selectedContainer.cookieStoreId, !siteIsolation);
             }
 
             if (proxyUrl) {
@@ -1076,10 +1056,7 @@ function App() {
           onDelete={async () => {
           const browser = requireWebExt();
           const userContextId = Number(selectedContainer.cookieStoreId.split("-").pop());
-          await browser.runtime.sendMessage({
-            method: "deleteContainer",
-            message: { userContextId },
-          });
+          await msg.deleteContainer(userContextId);
           // Remove any display icon override for this container
           const stored = await browser.storage.local.get({
             containerDisplayIconOverrides: {},
@@ -1118,19 +1095,11 @@ function App() {
           }}
           onHideContainer={async () => {
             const browser = requireWebExt();
-            await browser.runtime.sendMessage({
-              method: "hideTabs",
-              cookieStoreId: selectedContainer.cookieStoreId,
-              windowId,
-            });
+            await msg.hideTabs(selectedContainer.cookieStoreId, windowId);
           }}
           onMoveToWindow={async () => {
             const browser = requireWebExt();
-            await browser.runtime.sendMessage({
-              method: "moveTabsToWindow",
-              cookieStoreId: selectedContainer.cookieStoreId,
-              windowId,
-            });
+            await msg.moveTabsToWindow(selectedContainer.cookieStoreId, windowId);
           }}
           onManageSites={() => {
             if (!selectedContainer?.cookieStoreId) return;
@@ -1141,10 +1110,7 @@ function App() {
           onClearStorage={async () => {
             const browser = requireWebExt();
             const userContextId = Number(selectedContainer.cookieStoreId.split("-").pop());
-            await browser.runtime.sendMessage({
-              method: "deleteContainerDataOnly",
-              message: { userContextId },
-            });
+            await msg.deleteContainerDataOnly(userContextId);
           }}
           onManageContainer={handleManageContainer}
           onCloseTab={async (tabId) => {
@@ -1249,7 +1215,7 @@ function App() {
         onQuickDeleteContainer={async (container) => {
           const browser = requireWebExt();
           const userContextId = Number(container.cookieStoreId.split("-").pop());
-          await browser.runtime.sendMessage({ method: "deleteContainer", message: { userContextId } });
+          await msg.deleteContainer(userContextId);
           const stored = await browser.storage.local.get({ containerDisplayIconOverrides: {}, promotedProxyContainerIds: null });
           const overrides = (stored.containerDisplayIconOverrides && typeof stored.containerDisplayIconOverrides === "object" ? stored.containerDisplayIconOverrides : {}) || {};
           if (overrides[container.cookieStoreId]) {
@@ -1274,10 +1240,7 @@ function App() {
             let hasOpenTabs = container.visibleTabCount > 0;
             let hasHiddenTabs = container.hiddenTabCount > 0;
             try {
-              const stateByContainer = await browser.runtime.sendMessage({
-                method: "queryIdentitiesState",
-                message: { windowId },
-              });
+              const stateByContainer = await msg.queryIdentitiesState<Record<string, any>>(windowId);
               const state = stateByContainer?.[container.cookieStoreId];
               if (state) {
                 hasOpenTabs = !!state.hasOpenTabs;
@@ -1288,16 +1251,9 @@ function App() {
             }
 
             if (hasOpenTabs) {
-              await browser.runtime.sendMessage({
-                method: "hideTabs",
-                cookieStoreId: container.cookieStoreId,
-                windowId,
-              });
+              await msg.hideTabs(container.cookieStoreId, windowId);
             } else if (hasHiddenTabs) {
-              await browser.runtime.sendMessage({
-                method: "showTabs",
-                cookieStoreId: container.cookieStoreId,
-              });
+              await msg.showTabs(container.cookieStoreId);
             }
             await refreshContainers();
           } finally {
@@ -1347,7 +1303,7 @@ function App() {
                 return false;
               }
 
-              await browser.runtime.sendMessage({ method: "setGlobalProxyConfig", proxy: parsed });
+              await msg.setGlobalProxyConfig(parsed as unknown as Record<string, unknown>);
 
               setGlobalProxyEnabled(true);
               await browser.storage.local.set({
@@ -1360,7 +1316,7 @@ function App() {
             }
 
             setGlobalProxyEnabled(false);
-            await browser.runtime.sendMessage({ method: "clearGlobalProxyConfig" });
+            await msg.clearGlobalProxyConfig();
             await browser.storage.local.set({
               globalProxyEnabled: false,
               globalProxyUserDisabled: true,
@@ -1380,7 +1336,7 @@ function App() {
           const updates: Record<string, any> = { globalProxyUrl: sanitizeProxyUrlForStorage(url) };
           const parsed = parseGlobalProxyUrl(url);
           if (parsed) {
-            await browser.runtime.sendMessage({ method: "setGlobalProxyConfig", proxy: parsed });
+            await msg.setGlobalProxyConfig(parsed as unknown as Record<string, unknown>);
             updates.globalProxyParsed = stripSensitiveProxyFields(parsed);
           }
           await browser.storage.local.set(updates);
@@ -1427,7 +1383,7 @@ function App() {
         onReopenSiteIn={() => openPicker("Reopen this site in…", "reopenSiteIn")}
         onSortTabs={async () => {
           const browser = requireWebExt();
-          await browser.runtime.sendMessage({ method: "sortTabs" });
+          await msg.sortTabs();
         }}
         onAlwaysOpenIn={() => openPicker("Always open this site in…", "alwaysOpenIn")}
         vpnWarnDot={vpnWarnDot}
