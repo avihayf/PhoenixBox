@@ -32,3 +32,16 @@ export type AssignedSite = {
   key: string;
   hostname: string;
 };
+
+export const PROXY_TYPES = ["http", "https", "socks", "socks4"] as const;
+
+export type ProxyType = (typeof PROXY_TYPES)[number];
+
+/**
+ * Storage can hold any string here (it is also written by the background page
+ * and by older versions), so narrow it before it reaches the form, defaulting
+ * to http the way the form's own initializer does.
+ */
+export function toProxyType(value: unknown): ProxyType {
+  return PROXY_TYPES.includes(value as ProxyType) ? (value as ProxyType) : "http";
+}

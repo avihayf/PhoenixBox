@@ -13,8 +13,10 @@ import { getUserAgents, type UserAgentData } from "../lib/userAgent";
 import { DEFAULT_PROXY_PRESETS, type ProxyPreset } from "../lib/proxyPresets";
 import { logError } from "../lib/logger";
 import { type AccentValue, ACCENT_PRESETS, applyCustomHue, clearCustomHue, serializeAccent, deserializeAccent, type LogoAccentValue, applyLogoAccentToDOM, serializeLogoAccent, deserializeLogoAccent } from "../lib/accentColors";
-import type { Container, Tab, AssignedSite } from "../lib/types";
+import { toProxyType, type Container, type Tab, type AssignedSite } from "../lib/types";
 import * as msg from "../lib/messages";
+import { readProxyMap, getProxyForContainer, mergeProxyForContainer, removeProxyForContainer,
+  setProxyForContainer as storeSetProxyForContainer, type ContainerProxy } from "../lib/proxyStore";
 
 type View = "main" | "detail" | "edit" | "picker" | "manage" | "assignedSites" | "advancedProxy" | "onboarding";
 
@@ -400,15 +402,10 @@ function App() {
       }
     }
     const tabQuery = await browser.tabs.query(winId ? { windowId: winId } : {});
-    const { proxifiedContainersKey = [] } = await browser.storage.local.get({
-      proxifiedContainersKey: [],
-    });
     const { containerUserAgents = {} } = await browser.storage.local.get({
       containerUserAgents: {},
     });
-    const proxifiedMap = new Map(
-      (proxifiedContainersKey as any[]).map((p) => [p.cookieStoreId, p.proxy]),
-    );
+    const proxifiedMap = await readProxyMap();
 
     const tabsGrouped: Record<string, Tab[]> = {};
     for (const t of tabQuery) {
@@ -506,25 +503,7 @@ function App() {
     proxy: { type: string; host: string; port: number; mozProxyEnabled: boolean; proxyDNS?: boolean; source?: string } | null,
   ) => {
     try {
-      const browser = requireWebExt();
-      const { proxifiedContainersKey = [] } = await browser.storage.local.get({
-        proxifiedContainersKey: [],
-      });
-      const store = Array.isArray(proxifiedContainersKey) ? [...(proxifiedContainersKey as any[])] : [];
-      const idx = store.findIndex((p) => p.cookieStoreId === cookieStoreId);
-      if (!proxy) {
-        if (idx !== -1) {
-          store.splice(idx, 1);
-          await browser.storage.local.set({ proxifiedContainersKey: store });
-        }
-        return;
-      }
-      if (idx === -1) {
-        store.push({ cookieStoreId, proxy });
-      } else {
-        store[idx] = { cookieStoreId, proxy };
-      }
-      await browser.storage.local.set({ proxifiedContainersKey: store });
+      await storeSetProxyForContainer(cookieStoreId, proxy);
     } catch (err) {
       logError("Failed to set proxy for container:", err);
     }
@@ -532,19 +511,15 @@ function App() {
 
   const loadAdvancedProxyInitial = async (cookieStoreId: string) => {
     try {
-      const browser = requireWebExt();
-      const { proxifiedContainersKey = [] } = await browser.storage.local.get({
-        proxifiedContainersKey: [],
-      });
-      const entries = Array.isArray(proxifiedContainersKey) ? (proxifiedContainersKey as any[]) : [];
-      const entry = entries.find((p) => p.cookieStoreId === cookieStoreId);
+      const entryProxy = await getProxyForContainer(cookieStoreId);
+      const entry = entryProxy ? { proxy: entryProxy } : undefined;
       // Show whatever proxy is configured (including VPN proxies) so the
       // user can see what's active.  Previously, VPN proxies (which have
       // countryCode) were silently filtered out, letting users unknowingly
       // overwrite them.
       if (entry?.proxy?.host && entry?.proxy?.port) {
         setAdvancedProxyInitial({
-          type: entry.proxy.type || "http",
+          type: toProxyType(entry.proxy.type),
           host: entry.proxy.host,
           port: String(entry.proxy.port),
           proxyDNS: !!entry.proxy.proxyDNS,
@@ -960,31 +935,15 @@ function App() {
               const parsed = parseGlobalProxyUrl(proxyUrl);
               if (parsed) {
                 if (targetId) {
-                  const { proxifiedContainersKey = [] } = await browser.storage.local.get({
-                    proxifiedContainersKey: [],
-                  });
-                  const store = [...(proxifiedContainersKey as any[])];
-                  const idx = store.findIndex(p => p.cookieStoreId === targetId);
-                  // Preserve existing proxy properties (e.g. proxyDNS set
-                  // via Advanced Proxy Settings) when updating from the
-                  // simple URL input.
-                  const existing = idx !== -1 ? store[idx].proxy : {};
-                  const merged = { ...existing, ...parsed };
-                  if (idx === -1) {
-                    store.push({ cookieStoreId: targetId, proxy: merged });
-                  } else {
-                    store[idx] = { cookieStoreId: targetId, proxy: merged };
-                  }
-                  await browser.storage.local.set({ proxifiedContainersKey: store });
+                  // Merge rather than replace: the simple URL field only knows
+                  // type/host/port, and a replace would drop proxyDNS and any
+                  // other setting made in Advanced Proxy Settings.
+                  await mergeProxyForContainer(targetId, parsed as ContainerProxy);
                 }
               }
             } else if (!isNew) {
               // Clear proxy if empty
-              const { proxifiedContainersKey = [] } = await browser.storage.local.get({
-                proxifiedContainersKey: [],
-              });
-              const store = (proxifiedContainersKey as any[]).filter(p => p.cookieStoreId !== selectedContainer.cookieStoreId);
-              await browser.storage.local.set({ proxifiedContainersKey: store });
+              await removeProxyForContainer(selectedContainer.cookieStoreId);
             }
 
             const latestContainers = await refreshContainers();

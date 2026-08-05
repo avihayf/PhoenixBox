@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { requireWebExt } from "../../../lib/browser";
 import { Switch } from "../ui/switch";
 
-type ProxyType = "http" | "https" | "socks" | "socks4";
+import type { ProxyType } from '../../../lib/types';
 
 export type AdvancedProxyForm = {
   type: ProxyType;
