@@ -115,6 +115,8 @@ export async function getUserAgents(forceRefresh = false): Promise<UserAgentData
   return fetchFromCDN();
 }
 
+// The single implementation. A duplicate lived in src/js/userAgentFetcher.js
+// for the background page, which never called it; it has been removed.
 export function parseUserAgentForDisplay(userAgent: string): string {
   if (!userAgent) return "Unknown";
 

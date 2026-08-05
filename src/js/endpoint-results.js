@@ -121,7 +121,12 @@ async function init() {
   // works; the background page caps how many scans are retained.
 
   if (!data || !data.endpoints) {
-    document.getElementById("count").textContent = "0 endpoints";
+    // Distinguish "this scan found nothing" from "these results are gone".
+    // Scans are cleared at browser startup, so a session-restored tab lands
+    // here and a bare "0 endpoints" would read as a failed scan.
+    document.getElementById("count").textContent = "no results";
+    document.getElementById("empty-state").textContent =
+      "These scan results are no longer available. Rescan the page to see its endpoints.";
     return;
   }
 

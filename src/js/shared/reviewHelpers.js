@@ -103,6 +103,89 @@
     return createProperties;
   }
 
+  const SITE_STORE_PREFIX = "siteContainerMap@@_";
+  const ENDPOINT_SCAN_PREFIX = "endpointScanResults@@_";
+  const LEGACY_ENDPOINT_SCAN_KEY = "endpointScanResults";
+
+  // Match on the prefix rather than anywhere in the string: a URL that merely
+  // contains the sentinel (e.g. in its query string) is not a storage key.
+  // Site assignments decide which container a site opens in, so a false
+  // positive here routes traffic into the wrong container.
+  function isSiteStoreKey(value) {
+    return String(value).startsWith(SITE_STORE_PREFIX);
+  }
+
+  // Ports 80 and 443 are the defaults for the schemes we assign, so they are
+  // left off the key; anything else is kept to separate e.g. localhost:3000
+  // from localhost:8080.
+  function buildSiteStoreKey(hostname, port) {
+    const sanitized = sanitizeHostnameForStoreKey(hostname);
+    const value = (port === null || port === undefined) ? "" : String(port);
+    if (!value || value === "80" || value === "443") {
+      return `${SITE_STORE_PREFIX}${sanitized}`;
+    }
+    return `${SITE_STORE_PREFIX}${sanitized}:${value}`;
+  }
+
+  function getHostnameFromSiteStoreKey(siteStoreKey) {
+    const raw = String(siteStoreKey).replace(/^siteContainerMap@@_/, "");
+    if (!raw) return "";
+
+    const colonIdx = raw.lastIndexOf(":");
+    if (colonIdx > 0) {
+      return raw.slice(0, colonIdx);
+    }
+    return raw;
+  }
+
+  // Endpoint scan results are kept so a results tab survives a reload, so the
+  // set has to be capped. Newest wins; anything unreadable sorts oldest.
+  function selectEndpointScanKeysToRemove(allStorage, keep) {
+    const storage = allStorage && typeof allStorage === "object" ? allStorage : {};
+    const limit = Number.isFinite(Number(keep)) && Number(keep) > 0 ? Number(keep) : 0;
+
+    const scannedAt = (key) => {
+      const entry = storage[key];
+      if (!entry || typeof entry !== "object") return 0;
+      const value = Number(entry.scannedAt);
+      return Number.isFinite(value) ? value : 0;
+    };
+
+    const scanKeys = Object.keys(storage)
+      .filter((key) => key.startsWith(ENDPOINT_SCAN_PREFIX))
+      // Tiebreak on the key so equal or absent timestamps still sort
+      // deterministically; scan ids embed Date.now(), so this tracks recency.
+      .sort((a, b) => (scannedAt(b) - scannedAt(a)) || b.localeCompare(a));
+
+    const stale = LEGACY_ENDPOINT_SCAN_KEY in storage ? [LEGACY_ENDPOINT_SCAN_KEY] : [];
+    return stale.concat(scanKeys.slice(limit));
+  }
+
+  // Strip a password out of a proxy URL while leaving the username in place.
+  // Anchored on the authority section so an "@" inside a query string is not
+  // mistaken for credentials.
+  function sanitizeGlobalProxyUrl(rawUrl) {
+    const raw = String(rawUrl || "").trim();
+    if (!raw) return "";
+    return raw.replace(/(\/\/[^:@/]+):[^@/]*@/, "$1@");
+  }
+
+  function sanitizePromotedProxyContainerIds(rawIds) {
+    if (!Array.isArray(rawIds)) {
+      return [];
+    }
+    const seen = new Set();
+    const result = [];
+    for (const id of rawIds) {
+      const value = String(id || "");
+      if (value && !seen.has(value)) {
+        seen.add(value);
+        result.push(value);
+      }
+    }
+    return result;
+  }
+
   // Build the hostname portion of a site-assignment storage key.
   //
   // Characters outside the allowed set used to be deleted, which let two
@@ -184,6 +267,12 @@
     buildHiddenTabCreateProperties,
     compareContainerOrder,
     sanitizeHostnameForStoreKey,
+    isSiteStoreKey,
+    buildSiteStoreKey,
+    getHostnameFromSiteStoreKey,
+    selectEndpointScanKeysToRemove,
+    sanitizeGlobalProxyUrl,
+    sanitizePromotedProxyContainerIds,
     resolveUserAgentSelection,
   };
 });

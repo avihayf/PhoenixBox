@@ -142,14 +142,6 @@ const Utils = {
     });
   },
 
-  resetCookiesForSite(pageUrl, cookieStoreId) {
-    return browser.runtime.sendMessage({ 
-      method: "resetCookiesForSite", 
-      pageUrl,
-      cookieStoreId,
-    });
-  },
-
   /**
    * @param {string} url
    * @param {string} currentUserContextId

@@ -60,7 +60,7 @@ const messageHandler = {
           response = assignManager._setOrRemoveAssignment(m.tabId, m.url, m.userContextId, m.value);
           break;
         case "resetCookiesForSite":
-          response = assignManager._resetCookiesForSite(m.pageUrl, m.cookieStoreId);
+          response = assignManager._resetCookiesForSite(m.hostname, m.cookieStoreId);
           break;
         case "sortTabs":
           backgroundLogic.sortTabs();
@@ -281,12 +281,8 @@ const messageHandler = {
   async pruneEndpointScanResults(keep = 5) {
     try {
       const all = await browser.storage.local.get();
-      const staleKeys = ["endpointScanResults"].filter((key) => key in all);
-      const scanKeys = Object.keys(all)
-        .filter((key) => key.startsWith("endpointScanResults@@_"))
-        .sort((a, b) => (all[b].scannedAt || 0) - (all[a].scannedAt || 0));
-
-      const removable = staleKeys.concat(scanKeys.slice(keep));
+      const removable =
+        PhoenixBoxReviewHelpers.selectEndpointScanKeysToRemove(all, keep);
       if (removable.length) {
         await browser.storage.local.remove(removable);
       }

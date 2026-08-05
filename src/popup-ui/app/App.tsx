@@ -857,7 +857,7 @@ function App() {
             if (!granted) return;
             await browser.runtime.sendMessage({
               method: "resetCookiesForSite",
-              pageUrl: hostname,
+              hostname,
               cookieStoreId: selectedContainer.cookieStoreId,
             });
           }}

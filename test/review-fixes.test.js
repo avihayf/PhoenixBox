@@ -10,6 +10,12 @@ const {
   buildHiddenTabCreateProperties,
   compareContainerOrder,
   sanitizeHostnameForStoreKey,
+  isSiteStoreKey,
+  buildSiteStoreKey,
+  getHostnameFromSiteStoreKey,
+  selectEndpointScanKeysToRemove,
+  sanitizeGlobalProxyUrl,
+  sanitizePromotedProxyContainerIds,
   resolveUserAgentSelection,
 } = require("../src/js/shared/reviewHelpers");
 
@@ -228,6 +234,168 @@ describe("reviewHelpers", () => {
       expect(sanitizeHostnameForStoreKey("")).to.equal("");
       expect(sanitizeHostnameForStoreKey(null)).to.equal("");
       expect(sanitizeHostnameForStoreKey(undefined)).to.equal("");
+    });
+  });
+
+  describe("isSiteStoreKey", () => {
+    it("recognises a real storage key", () => {
+      expect(isSiteStoreKey("siteContainerMap@@_example.test")).to.equal(true);
+      expect(isSiteStoreKey("siteContainerMap@@_example.test:3000")).to.equal(true);
+    });
+
+    // The reason the check is a prefix test rather than a substring test: a URL
+    // carrying the sentinel in its query string must not be mistaken for a key.
+    it("rejects a URL that merely contains the sentinel", () => {
+      expect(isSiteStoreKey("https://x.test/?q=siteContainerMap@@_evil"))
+        .to.equal(false);
+    });
+
+    it("rejects unrelated keys and plain URLs", () => {
+      expect(isSiteStoreKey("identity@@_firefox-container-1")).to.equal(false);
+      expect(isSiteStoreKey("https://example.test/")).to.equal(false);
+      expect(isSiteStoreKey("")).to.equal(false);
+    });
+  });
+
+  describe("buildSiteStoreKey", () => {
+    it("omits default ports", () => {
+      expect(buildSiteStoreKey("example.test", "")).to.equal("siteContainerMap@@_example.test");
+      expect(buildSiteStoreKey("example.test", "80")).to.equal("siteContainerMap@@_example.test");
+      expect(buildSiteStoreKey("example.test", "443")).to.equal("siteContainerMap@@_example.test");
+      expect(buildSiteStoreKey("example.test", null)).to.equal("siteContainerMap@@_example.test");
+    });
+
+    it("keeps a non-default port so ports stay distinct", () => {
+      expect(buildSiteStoreKey("localhost", "3000")).to.equal("siteContainerMap@@_localhost:3000");
+      expect(buildSiteStoreKey("localhost", "3000"))
+        .to.not.equal(buildSiteStoreKey("localhost", "8080"));
+    });
+
+    it("escapes hostnames that need it", () => {
+      expect(buildSiteStoreKey("a_b.test", "")).to.equal("siteContainerMap@@_a~5fb.test");
+    });
+
+    it("produces keys that isSiteStoreKey accepts", () => {
+      expect(isSiteStoreKey(buildSiteStoreKey("example.test", "8443"))).to.equal(true);
+    });
+  });
+
+  describe("getHostnameFromSiteStoreKey", () => {
+    it("recovers the hostname, with and without a port", () => {
+      expect(getHostnameFromSiteStoreKey("siteContainerMap@@_example.test"))
+        .to.equal("example.test");
+      expect(getHostnameFromSiteStoreKey("siteContainerMap@@_example.test:3000"))
+        .to.equal("example.test");
+    });
+
+    it("round-trips with buildSiteStoreKey", () => {
+      for (const [host, port] of [["example.test", ""], ["localhost", "3000"]]) {
+        expect(getHostnameFromSiteStoreKey(buildSiteStoreKey(host, port)))
+          .to.equal(host);
+      }
+    });
+
+    it("handles an empty key", () => {
+      expect(getHostnameFromSiteStoreKey("siteContainerMap@@_")).to.equal("");
+    });
+  });
+
+  describe("selectEndpointScanKeysToRemove", () => {
+    const scan = (id, scannedAt) => [`endpointScanResults@@_${id}`, { scannedAt }];
+
+    it("keeps the newest scans and prunes the rest", () => {
+      const storage = Object.fromEntries([
+        scan("a", 700), scan("b", 100), scan("c", 500),
+        scan("d", 300), scan("e", 900), scan("f", 200), scan("g", 400),
+      ]);
+      expect(selectEndpointScanKeysToRemove(storage, 5).sort()).to.deep.equal([
+        "endpointScanResults@@_b",
+        "endpointScanResults@@_f",
+      ]);
+    });
+
+    it("removes everything when keep is zero", () => {
+      const storage = Object.fromEntries([scan("a", 1), scan("b", 2)]);
+      expect(selectEndpointScanKeysToRemove(storage, 0)).to.have.lengthOf(2);
+    });
+
+    it("includes the legacy single-key entry when present", () => {
+      const storage = { endpointScanResults: { scannedAt: 1 }, ...Object.fromEntries([scan("a", 2)]) };
+      expect(selectEndpointScanKeysToRemove(storage, 5)).to.deep.equal(["endpointScanResults"]);
+    });
+
+    it("never selects unrelated storage keys", () => {
+      const storage = {
+        "identity@@_firefox-container-1": {},
+        globalProxyUrl: "http://x:1",
+        "siteContainerMap@@_example.test": {},
+      };
+      expect(selectEndpointScanKeysToRemove(storage, 0)).to.deep.equal([]);
+    });
+
+    // The old inline version read `.scannedAt` off whatever the key held.
+    it("does not throw when a scan key holds a non-object", () => {
+      const storage = {
+        "endpointScanResults@@_a": null,
+        "endpointScanResults@@_b": "corrupted",
+        "endpointScanResults@@_c": 42,
+        ...Object.fromEntries([scan("d", 900)]),
+      };
+      expect(() => selectEndpointScanKeysToRemove(storage, 1)).to.not.throw();
+      // The one readable entry is the newest, so it is the one kept.
+      expect(selectEndpointScanKeysToRemove(storage, 1))
+        .to.not.include("endpointScanResults@@_d");
+    });
+
+    it("returns nothing to remove when under the cap", () => {
+      expect(selectEndpointScanKeysToRemove(Object.fromEntries([scan("a", 1)]), 5))
+        .to.deep.equal([]);
+    });
+
+    it("tolerates missing or malformed input", () => {
+      expect(selectEndpointScanKeysToRemove(null, 5)).to.deep.equal([]);
+      expect(selectEndpointScanKeysToRemove(undefined, undefined)).to.deep.equal([]);
+    });
+  });
+
+  describe("sanitizeGlobalProxyUrl", () => {
+    it("strips a password but keeps the username", () => {
+      expect(sanitizeGlobalProxyUrl("http://user:pass@host:8080"))
+        .to.equal("http://user@host:8080");
+      expect(sanitizeGlobalProxyUrl("http://user:p%40ss+w.rd@host:8080"))
+        .to.equal("http://user@host:8080");
+    });
+
+    it("leaves URLs without credentials untouched", () => {
+      expect(sanitizeGlobalProxyUrl("http://127.0.0.1:8080"))
+        .to.equal("http://127.0.0.1:8080");
+      expect(sanitizeGlobalProxyUrl("http://user@host:8080"))
+        .to.equal("http://user@host:8080");
+    });
+
+    // An "@" in a query string is not a credential separator.
+    it("does not mangle an @ that appears after the authority", () => {
+      expect(sanitizeGlobalProxyUrl("https://example.test/redirect?to=a:b@c"))
+        .to.equal("https://example.test/redirect?to=a:b@c");
+    });
+
+    it("handles empty and nullish input", () => {
+      expect(sanitizeGlobalProxyUrl("")).to.equal("");
+      expect(sanitizeGlobalProxyUrl(null)).to.equal("");
+      expect(sanitizeGlobalProxyUrl(undefined)).to.equal("");
+    });
+  });
+
+  describe("sanitizePromotedProxyContainerIds", () => {
+    it("stringifies, drops blanks and de-duplicates", () => {
+      expect(sanitizePromotedProxyContainerIds([
+        "firefox-container-1", "firefox-container-1", "", null, 2,
+      ])).to.deep.equal(["firefox-container-1", "2"]);
+    });
+
+    it("returns an empty list for anything that is not an array", () => {
+      expect(sanitizePromotedProxyContainerIds(null)).to.deep.equal([]);
+      expect(sanitizePromotedProxyContainerIds("firefox-container-1")).to.deep.equal([]);
     });
   });
 

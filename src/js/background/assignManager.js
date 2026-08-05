@@ -29,9 +29,7 @@ window.assignManager = {
   promotedProxyContainerIds: [],
 
   _sanitizeGlobalProxyUrl(rawUrl) {
-    const raw = String(rawUrl || "").trim();
-    if (!raw) return "";
-    return raw.replace(/(\/\/[^:@/]+):[^@/]*@/, "$1@");
+    return PhoenixBoxReviewHelpers.sanitizeGlobalProxyUrl(rawUrl);
   },
 
   _cacheGlobalProxySecret(proxy) {
@@ -76,34 +74,18 @@ window.assignManager = {
     area: browser.storage.local,
     exemptedTabs: {},
 
-    // Match on the prefix rather than anywhere in the string: a URL that merely
-    // contains the sentinel (e.g. in a query string) is not a storage key.
     isSiteStoreKey(value) {
-      return String(value).startsWith("siteContainerMap@@_");
+      return PhoenixBoxReviewHelpers.isSiteStoreKey(value);
     },
 
     getSiteStoreKey(pageUrlorUrlKey) {
       if (this.isSiteStoreKey(pageUrlorUrlKey)) return pageUrlorUrlKey;
       const url = new window.URL(pageUrlorUrlKey);
-      const storagePrefix = "siteContainerMap@@_";
-      const sanitizedHostname =
-        PhoenixBoxReviewHelpers.sanitizeHostnameForStoreKey(url.hostname);
-      if (url.port === "80" || url.port === "443" || !url.port) {
-        return `${storagePrefix}${sanitizedHostname}`;
-      } else {
-        return `${storagePrefix}${sanitizedHostname}:${url.port}`;
-      }
+      return PhoenixBoxReviewHelpers.buildSiteStoreKey(url.hostname, url.port);
     },
 
     getHostnameFromSiteStoreKey(siteStoreKey) {
-      const raw = String(siteStoreKey).replace(/^siteContainerMap@@_/, "");
-      if (!raw) return "";
-
-      const colonIdx = raw.lastIndexOf(":");
-      if (colonIdx > 0) {
-        return raw.slice(0, colonIdx);
-      }
-      return raw;
+      return PhoenixBoxReviewHelpers.getHostnameFromSiteStoreKey(siteStoreKey);
     },
 
     setExempted(pageUrlorUrlKey, tabId) {
@@ -623,19 +605,7 @@ window.assignManager = {
   },
 
   _sanitizePromotedProxyContainerIds(rawIds) {
-    if (!Array.isArray(rawIds)) {
-      return [];
-    }
-    const seen = new Set();
-    const result = [];
-    for (const id of rawIds) {
-      const value = String(id || "");
-      if (value && !seen.has(value)) {
-        seen.add(value);
-        result.push(value);
-      }
-    }
-    return result;
+    return PhoenixBoxReviewHelpers.sanitizePromotedProxyContainerIds(rawIds);
   },
 
   async _initGlobalProxy() {
