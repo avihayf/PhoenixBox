@@ -18,9 +18,9 @@ const sync = {
   classifySyncChanges(changes) {
     const categories = new Set();
     for (const key of Object.keys(changes)) {
-      if (key.includes("identity@@_") || key === "deletedIdentityList") {
+      if (key.startsWith("identity@@_") || key === "deletedIdentityList") {
         categories.add(SYNC_CATEGORY.IDENTITIES);
-      } else if (key.includes("siteContainerMap@@_") || key === "deletedSiteList") {
+      } else if (key.startsWith("siteContainerMap@@_") || key === "deletedSiteList") {
         categories.add(SYNC_CATEGORY.ASSIGNMENTS);
       } else if (key === "customProxyPresets") {
         categories.add(SYNC_CATEGORY.PRESETS);
@@ -96,7 +96,7 @@ const sync = {
       const allSyncStorage = await this.get();
       const sites = {};
       for (const storageKey of Object.keys(allSyncStorage)) {
-        if (storageKey.includes("siteContainerMap@@_")) {
+        if (storageKey.startsWith("siteContainerMap@@_")) {
           sites[storageKey] = allSyncStorage[storageKey];
         }
       }

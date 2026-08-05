@@ -12,6 +12,13 @@ window.assignManager = {
   GLOBAL_PROXY_ENABLED_KEY: "globalProxyEnabled",
   GLOBAL_PROXY_URL_KEY: "globalProxyUrl",
   GLOBAL_PROXY_PARSED_KEY: "globalProxyParsed",
+  // Set when the configured global proxy was given a password. The password
+  // itself is deliberately never persisted, so this flag is what lets us
+  // notice that the in-memory copy is gone after a restart.
+  GLOBAL_PROXY_NEEDS_PASSWORD_KEY: "globalProxyNeedsPassword",
+  // Signal for the popup: the proxy is enabled and needs a password we no
+  // longer hold, so requests through it will fail until the user re-enters it.
+  GLOBAL_PROXY_CREDENTIALS_MISSING_KEY: "globalProxyCredentialsMissing",
   PROMOTED_PROXY_CONTAINER_ID_KEY: "promotedProxyContainerId",
   PROMOTED_PROXY_CONTAINER_IDS_KEY: "promotedProxyContainerIds",
   _sessionGlobalProxyPassword: null,
@@ -47,22 +54,40 @@ window.assignManager = {
   setGlobalProxyConfig(proxy) {
     const sanitizedProxy = this._cacheGlobalProxySecret(proxy);
     this.globalProxy.proxy = sanitizedProxy;
+    // This is the one moment we see the real password, so it is also the only
+    // place that can record whether the proxy needs one. Requests are already
+    // servable from the in-memory copy, so don't block on the write.
+    browser.storage.local.set({
+      [this.GLOBAL_PROXY_NEEDS_PASSWORD_KEY]: !!this._sessionGlobalProxyPassword,
+      [this.GLOBAL_PROXY_CREDENTIALS_MISSING_KEY]: false,
+    }).catch(() => {});
     return sanitizedProxy;
   },
 
   clearGlobalProxyConfig() {
     this._sessionGlobalProxyPassword = null;
     this.globalProxy.proxy = null;
+    browser.storage.local.set({
+      [this.GLOBAL_PROXY_NEEDS_PASSWORD_KEY]: false,
+      [this.GLOBAL_PROXY_CREDENTIALS_MISSING_KEY]: false,
+    }).catch(() => {});
   },
   storageArea: {
     area: browser.storage.local,
     exemptedTabs: {},
 
+    // Match on the prefix rather than anywhere in the string: a URL that merely
+    // contains the sentinel (e.g. in a query string) is not a storage key.
+    isSiteStoreKey(value) {
+      return String(value).startsWith("siteContainerMap@@_");
+    },
+
     getSiteStoreKey(pageUrlorUrlKey) {
-      if (pageUrlorUrlKey.includes("siteContainerMap@@_")) return pageUrlorUrlKey;
+      if (this.isSiteStoreKey(pageUrlorUrlKey)) return pageUrlorUrlKey;
       const url = new window.URL(pageUrlorUrlKey);
       const storagePrefix = "siteContainerMap@@_";
-      const sanitizedHostname = url.hostname.replace(/[^a-z0-9.-]/gi, "");
+      const sanitizedHostname =
+        PhoenixBoxReviewHelpers.sanitizeHostnameForStoreKey(url.hostname);
       if (url.port === "80" || url.port === "443" || !url.port) {
         return `${storagePrefix}${sanitizedHostname}`;
       } else {
@@ -140,7 +165,7 @@ window.assignManager = {
       }
       data.identityMacAddonUUID =
         await identityState.lookupMACaddonUUID(data.userContextId);
-      if (!data.hostname && !pageUrlorUrlKey.includes("siteContainerMap@@_")) {
+      if (!data.hostname && !this.isSiteStoreKey(pageUrlorUrlKey)) {
         try {
           const parsed = new window.URL(pageUrlorUrlKey);
           data.hostname = parsed.hostname;
@@ -178,7 +203,7 @@ window.assignManager = {
       const sites = {};
       const siteConfigs = await this.area.get();
       for(const urlKey of Object.keys(siteConfigs)) {
-        if (urlKey.includes("siteContainerMap@@_")) {
+        if (this.isSiteStoreKey(urlKey)) {
         // For some reason this is stored as string... lets check
         // them both as that
           if (!!userContextId &&
@@ -203,7 +228,7 @@ window.assignManager = {
       const identitiesList = await browser.contextualIdentities.query({});
       const macConfigs = await this.area.get();
       for(const configKey of Object.keys(macConfigs)) {
-        if (configKey.includes("siteContainerMap@@_")) {
+        if (this.isSiteStoreKey(configKey)) {
           const cookieStoreId =
             "firefox-container-" + macConfigs[configKey].userContextId;
           const match = identitiesList.find(
@@ -329,19 +354,23 @@ window.assignManager = {
       browser.tabs.get(options.tabId),
       this.storageArea.get(options.url)
     ]);
-    let container;
-    try {
-      container = await browser.contextualIdentities
-        .get(backgroundLogic.cookieStoreId(siteSettings.userContextId));
-    } catch {
-      container = false;
-    }
+    if (siteSettings) {
+      const container =
+        await this._lookupAssignedContainer(siteSettings.userContextId);
 
-    // The container we have in the assignment map isn't present any
-    // more so lets remove it then continue the existing load
-    if (siteSettings && !container) {
-      await this.deleteContainer(siteSettings.userContextId);
-      return {};
+      // Lookup failed for a reason we can't attribute to a missing container.
+      // Dropping every assignment for the container is irreversible, so leave
+      // the stored data alone and let the load continue untouched.
+      if (container === null) {
+        return {};
+      }
+
+      // The container we have in the assignment map isn't present any
+      // more so lets remove it then continue the existing load
+      if (container === false) {
+        await this.deleteContainer(siteSettings.userContextId);
+        return {};
+      }
     }
     const userContextId = this.getUserContextIdFromCookieStore(tab);
 
@@ -474,6 +503,37 @@ window.assignManager = {
     };
   },
 
+  /**
+   * Resolve the container an assignment points at.
+   *
+   * `contextualIdentities.get` rejects both when the container is genuinely
+   * gone and on transient failures, and the caller deletes every assignment
+   * for the container on a negative answer. So confirm against the full
+   * identity list before reporting the container as missing.
+   *
+   * @param {string|number} userContextId
+   * @returns {Promise<object|false|null>} the identity, `false` when the
+   *   container is confirmed missing, or `null` when the state is unknown.
+   */
+  async _lookupAssignedContainer(userContextId) {
+    const cookieStoreId = backgroundLogic.cookieStoreId(userContextId);
+    try {
+      const identity = await browser.contextualIdentities.get(cookieStoreId);
+      return identity || null;
+    } catch {
+      try {
+        const identities = await browser.contextualIdentities.query({});
+        const match = identities.find(
+          (identity) => identity.cookieStoreId === cookieStoreId
+        );
+        return match || false;
+      } catch (e) {
+        LOG.warn("Could not confirm container for assignment", cookieStoreId, e);
+        return null;
+      }
+    }
+  },
+
   async _maybeSiteIsolatedReloadInDefault(siteSettings, tab) {
     // Tab doesn't support cookies, so containers not supported either.
     if (!("cookieStoreId" in tab)) {
@@ -583,6 +643,7 @@ window.assignManager = {
       [this.GLOBAL_PROXY_ENABLED_KEY]: false,
       [this.GLOBAL_PROXY_URL_KEY]: "",
       [this.GLOBAL_PROXY_PARSED_KEY]: null,
+      [this.GLOBAL_PROXY_NEEDS_PASSWORD_KEY]: false,
       [this.PROMOTED_PROXY_CONTAINER_ID_KEY]: "",
       [this.PROMOTED_PROXY_CONTAINER_IDS_KEY]: null,
     });
@@ -605,16 +666,30 @@ window.assignManager = {
       });
     }
 
-    const sanitizedProxy = this.setGlobalProxyConfig(stored[this.GLOBAL_PROXY_PARSED_KEY] || null);
+    // Use the private cache helper rather than setGlobalProxyConfig(): the
+    // stored config has already had its password stripped, so the public
+    // setter would record "this proxy needs no password" and mask the very
+    // situation we are about to detect.
+    const sanitizedProxy = this._cacheGlobalProxySecret(stored[this.GLOBAL_PROXY_PARSED_KEY] || null);
+    this.globalProxy.proxy = sanitizedProxy;
+
     const sanitizedUrl = this._sanitizeGlobalProxyUrl(stored[this.GLOBAL_PROXY_URL_KEY]);
     const needsProxyScrub = JSON.stringify(sanitizedProxy) !== JSON.stringify(stored[this.GLOBAL_PROXY_PARSED_KEY] || null);
     const needsUrlScrub = sanitizedUrl !== String(stored[this.GLOBAL_PROXY_URL_KEY] || "");
-    if (needsProxyScrub || needsUrlScrub) {
-      const updates = {};
-      if (needsProxyScrub) updates[this.GLOBAL_PROXY_PARSED_KEY] = sanitizedProxy;
-      if (needsUrlScrub) updates[this.GLOBAL_PROXY_URL_KEY] = sanitizedUrl;
-      await browser.storage.local.set(updates);
-    }
+
+    // Passwords only ever live in memory, so a configured authenticated proxy
+    // always comes back credential-less after a restart. Flag it so the popup
+    // can say so instead of the user seeing unexplained proxy failures.
+    const credentialsMissing =
+      this.globalProxy.enabled &&
+      !!stored[this.GLOBAL_PROXY_NEEDS_PASSWORD_KEY] &&
+      !this._sessionGlobalProxyPassword;
+
+    const updates = {};
+    if (needsProxyScrub) updates[this.GLOBAL_PROXY_PARSED_KEY] = sanitizedProxy;
+    if (needsUrlScrub) updates[this.GLOBAL_PROXY_URL_KEY] = sanitizedUrl;
+    updates[this.GLOBAL_PROXY_CREDENTIALS_MISSING_KEY] = credentialsMissing;
+    await browser.storage.local.set(updates);
 
     browser.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== "local") return;
@@ -784,16 +859,84 @@ window.assignManager = {
     return true;
   },
 
+  /**
+   * Clear cookies for a site within one container.
+   *
+   * browsingData.removeCookies only matches the exact hostnames it is given,
+   * so on its own it leaves behind the two kinds of cookie that matter most
+   * here: cookies set on subdomains (api.example.com) and domain cookies set
+   * on a parent (.example.com) that are still sent to this host. Both would
+   * keep a session alive after the user asked for a reset, so enumerate via
+   * the cookies API and delete those explicitly too.
+   */
   async _resetCookiesForSite(hostname, cookieStoreId) {
-    const bare = String(hostname || "").replace(/^www\./, "");
-    if (!bare) {
+    // Assignment keys can carry a ":port" suffix, but cookies are not scoped
+    // by port, so drop it before matching.
+    const host = String(hostname || "").trim()
+      .replace(/^\.+/, "")
+      .replace(/:\d+$/, "");
+    if (!host) {
       return false;
     }
+    const bare = host.replace(/^www\./, "");
+    const hostnames = [...new Set([host, bare, `www.${bare}`])];
+
     await browser.browsingData.removeCookies({
       cookieStoreId: cookieStoreId,
-      hostnames: [bare]
+      hostnames
     });
+
+    await this._removeRelatedCookies(bare, cookieStoreId);
     return true;
+  },
+
+  async _removeRelatedCookies(bareHostname, cookieStoreId) {
+    const collected = new Map();
+    const collect = (cookies) => {
+      for (const cookie of cookies || []) {
+        // domain + path + name identifies a cookie within a store.
+        collected.set(`${cookie.domain}|${cookie.path}|${cookie.name}`, cookie);
+      }
+    };
+
+    // `domain` covers the host and its subdomains; the `url` query additionally
+    // returns parent-domain cookies that apply to the host.
+    const queries = [
+      { domain: bareHostname, storeId: cookieStoreId, firstPartyDomain: null },
+      { url: `https://${bareHostname}/`, storeId: cookieStoreId, firstPartyDomain: null },
+      { url: `http://${bareHostname}/`, storeId: cookieStoreId, firstPartyDomain: null },
+    ];
+
+    for (const query of queries) {
+      try {
+        collect(await browser.cookies.getAll(query));
+      } catch (e) {
+        LOG.warn("resetCookiesForSite: cookie lookup failed", query, e);
+      }
+    }
+
+    await Promise.all(
+      [...collected.values()].map(async (cookie) => {
+        const domain = cookie.domain.replace(/^\./, "");
+        const scheme = cookie.secure ? "https" : "http";
+        const removal = {
+          url: `${scheme}://${domain}${cookie.path}`,
+          name: cookie.name,
+          storeId: cookieStoreId,
+        };
+        if (cookie.firstPartyDomain !== undefined) {
+          removal.firstPartyDomain = cookie.firstPartyDomain;
+        }
+        if (cookie.partitionKey !== undefined) {
+          removal.partitionKey = cookie.partitionKey;
+        }
+        try {
+          await browser.cookies.remove(removal);
+        } catch (e) {
+          LOG.warn("resetCookiesForSite: could not remove cookie", cookie.name, e);
+        }
+      })
+    );
   },
 
   async _setOrRemoveAssignment(tabId, pageUrl, userContextId, remove) {

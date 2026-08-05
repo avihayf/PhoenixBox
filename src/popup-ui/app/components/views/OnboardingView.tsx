@@ -86,8 +86,8 @@ export function OnboardingView({ onComplete, initialStep = 0 }: OnboardingViewPr
         const syncData = await browser.storage.sync.get();
         const syncKeys = Object.keys(syncData || {});
         const hasSyncData = syncKeys.some(
-          (key) => key.includes("identity@@_")
-            || key.includes("siteContainerMap@@_")
+          (key) => key.startsWith("identity@@_")
+            || key.startsWith("siteContainerMap@@_")
             || key.includes("MACinstance")
         );
         if (!cancelled) {

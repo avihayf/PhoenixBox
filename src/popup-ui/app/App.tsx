@@ -647,6 +647,7 @@ function App() {
         globalProxyEnabled: false,
         globalProxyUrl: "",
         globalProxyParsed: null,
+        globalProxyCredentialsMissing: false,
         addContainerColorHeaderEnabled: false,
         promotedProxyContainerId: "",
         promotedProxyContainerIds: null,
@@ -682,7 +683,13 @@ function App() {
         await browser.storage.local.set({ globalProxyEnabled: false });
       } else {
         setGlobalProxyEnabled(!!stored.globalProxyEnabled);
-        setGlobalProxyError("");
+        // Proxy passwords are never written to disk, so an authenticated proxy
+        // comes back without credentials after a browser restart.
+        setGlobalProxyError(
+          stored.globalProxyCredentialsMissing
+            ? "Proxy password isn't saved. Re-enter the proxy URL with its password to reconnect."
+            : ""
+        );
       }
       setProxyUrl(sanitizedStoredProxyUrl);
 
@@ -756,6 +763,11 @@ function App() {
         }
         if (changes.globalProxyUrl) {
           setProxyUrl(String(changes.globalProxyUrl.newValue || ""));
+        }
+        if (changes.globalProxyCredentialsMissing?.newValue) {
+          setGlobalProxyError(
+            "Proxy password isn't saved. Re-enter the proxy URL with its password to reconnect."
+          );
         }
         if (changes.addContainerColorHeaderEnabled) {
           setPaintBurp(!!changes.addContainerColorHeaderEnabled.newValue);
