@@ -125,7 +125,9 @@ The Burp extension automatically maps container colors to Burp's highlight color
 
 ## Important Security Note
 
-If you enable `X-MAC-Container-Color` without routing traffic through Burp, the header will be sent to the target server. This can reveal that you are using PhoenixBox and may leak role information such as `red` for an attacker workflow. For live targets, only enable this feature when the Burp extension is installed and actively stripping the header.
+If you enable the Highlighter without routing traffic through Burp, both headers will be sent to the target server. This can reveal that you are using PhoenixBox and may leak role information — `red` for an attacker workflow, and worse, the container's own name, which is often something like `Admin` or `Victim`. A container name discloses considerably more about your test methodology than a colour does. For live targets, only enable this feature when the Burp extension is installed and actively stripping both headers.
+
+**`X-MAC-Container-Name` requires PhoenixBox Highlighter v1.2.0 or later.** Earlier versions of the JAR only know about `X-MAC-Container-Color` and will forward the name header to the target. PhoenixBox shows a one-time notice after an update to remind you; it reappears each time you open the popup until you install the new JAR.
 
 ## Advanced Usage
 

@@ -10,6 +10,22 @@ import { requireWebExt } from '../../../lib/browser';
 import { HueAccentPicker } from '../HueAccentPicker';
 import { LogoAccentPicker } from '../LogoAccentPicker';
 import { accentToHue, type AccentValue, type LogoAccentValue } from '../../../lib/accentColors';
+import { HIGHLIGHTER_STORAGE_DEFAULTS, resolveHighlighterHeadersEnabled } from '../../../lib/highlighterSettings';
+
+/**
+ * Pinned to the release that strips both the container color and container name
+ * headers. Bump this together with the version named in the update modal.
+ */
+const HIGHLIGHTER_JAR_URL =
+  'https://github.com/avihayf/PhoenixBox-Highlighter/releases/download/v1.2.0/PhoenixBoxHighlighter.jar';
+
+/**
+ * Module scope, so it lasts exactly as long as one popup opening — Firefox
+ * rebuilds the popup document each time it is opened. This view unmounts
+ * whenever the user switches views, and a useRef would let the notice pop
+ * again every time they came back.
+ */
+let updateNoticeShownThisPopup = false;
 
 /** Compact on/off toggle tile used for the Proxy / Highlighter / User-Agent controls. */
 function ControlTile({ icon: Icon, label, active, disabled, onClick }: {
@@ -144,7 +160,45 @@ export function SiteActionsView({
   const [showPresetDropdown, setShowPresetDropdown] = useState(false);
   const [showProxyModal, setShowProxyModal] = useState(false);
   const [editingPreset, setEditingPreset] = useState<ProxyPreset | null>(null);
-  const [showPaintBurpFirstTimeMessage, setShowPaintBurpFirstTimeMessage] = useState(false);
+  // "setup" is the first-time explainer; "update" tells an existing user their
+  // JAR is too old to strip the container-name header this version now sends.
+  const [highlighterModal, setHighlighterModal] = useState<null | 'setup' | 'update'>(null);
+
+  useEffect(() => {
+    if (updateNoticeShownThisPopup) return;
+
+    void (async () => {
+      try {
+        const browser = requireWebExt();
+        const stored = await browser.storage.local.get({
+          highlighterJarUpdateNoticePending: false,
+          ...HIGHLIGHTER_STORAGE_DEFAULTS,
+        });
+        // Only surface it to people actually using the Burp integration. The
+        // flag is left pending otherwise, so they still get told if they turn
+        // the Highlighter on later.
+        if (stored.highlighterJarUpdateNoticePending &&
+            resolveHighlighterHeadersEnabled(stored as Record<string, unknown>)) {
+          updateNoticeShownThisPopup = true;
+          setHighlighterModal('update');
+        }
+      } catch {
+        // The popup is still perfectly usable without the notice.
+      }
+    })();
+  }, []);
+
+  // Deliberately not cleared just because the modal was shown: until the user
+  // acts on it their JAR is still forwarding the container name to targets, so
+  // closing the modal re-arms the notice for the next popup open.
+  const clearHighlighterUpdateNotice = async () => {
+    try {
+      const browser = requireWebExt();
+      await browser.storage.local.set({ highlighterJarUpdateNoticePending: false });
+    } catch {
+      // Nothing to do — it will simply be shown again.
+    }
+  };
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [hoveredContainerId, setHoveredContainerId] = useState<string | null>(null);
   const presetDropdownRef = useRef<HTMLDivElement>(null);
@@ -334,7 +388,7 @@ export function SiteActionsView({
                     const stored = await browser.storage.local.get({ paintBurpFirstTimeMessageShown: false });
                     if (!stored.paintBurpFirstTimeMessageShown) {
                       await browser.storage.local.set({ paintBurpFirstTimeMessageShown: true });
-                      setShowPaintBurpFirstTimeMessage(true);
+                      setHighlighterModal('setup');
                     }
                   }
                 }}
@@ -667,13 +721,13 @@ export function SiteActionsView({
 
       </div>
 
-      {/* Paint the Burp First-Time Message Modal */}
-      {showPaintBurpFirstTimeMessage && (
+      {/* Phoenix Highlighter setup / JAR update modal */}
+      {highlighterModal && (
         <>
           {/* Backdrop */}
           <div 
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 animate-in fade-in duration-200"
-            onClick={() => setShowPaintBurpFirstTimeMessage(false)}
+            onClick={() => setHighlighterModal(null)}
           />
           
           {/* Modal */}
@@ -702,11 +756,11 @@ export function SiteActionsView({
                     Burp Integration
                   </div>
                   <h2 className="font-medium uppercase tracking-wider text-[var(--ext-text)] brand-title" style={{ fontSize: '15px', lineHeight: 1.2 }}>
-                    Phoenix Highlighter Setup
+                    {highlighterModal === 'update' ? 'Update Your Phoenix JAR' : 'Phoenix Highlighter Setup'}
                   </h2>
                 </div>
                 <button
-                  onClick={() => setShowPaintBurpFirstTimeMessage(false)}
+                  onClick={() => setHighlighterModal(null)}
                   className="w-8 h-8 flex-none flex items-center justify-center rounded-lg text-[var(--ext-text-muted)] hover:bg-[var(--ext-accent-bg)] hover:text-[var(--ext-accent)] transition-all duration-200"
                 >
                   <X className="w-4 h-4" />
@@ -716,7 +770,9 @@ export function SiteActionsView({
               {/* Content */}
               <div className="px-5 pt-5 pb-6 space-y-3.5">
                 <p className="text-sm text-[var(--ext-text)] leading-relaxed">
-                  Color-codes your Burp requests by container, so you can see at a glance which container each request came from.
+                  {highlighterModal === 'update'
+                    ? 'PhoenixBox now sends the container name as well as its color, so Burp can label Repeater tabs by container.'
+                    : 'Color-codes your Burp requests by container, so you can see at a glance which container each request came from.'}
                 </p>
                 <div
                   className="flex items-start gap-3 p-3.5 rounded-xl border border-[var(--ext-accent)]/25"
@@ -724,7 +780,15 @@ export function SiteActionsView({
                 >
                   <Info className="w-4 h-4 flex-none mt-0.5 text-[var(--ext-accent)]" />
                   <p className="text-sm text-[var(--ext-text)] leading-relaxed">
-                    Make sure the <strong className="text-[var(--ext-accent)] font-semibold">Phoenix Highlighter</strong> extension (JAR) is loaded in Burp Suite.
+                    {highlighterModal === 'update' ? (
+                      <>
+                        Update to <strong className="text-[var(--ext-accent)] font-semibold">Phoenix Highlighter v1.2.0</strong> or later. Older versions do not strip the container-name header, so it will reach the target.
+                      </>
+                    ) : (
+                      <>
+                        Make sure the <strong className="text-[var(--ext-accent)] font-semibold">Phoenix Highlighter</strong> extension (JAR) is loaded in Burp Suite.
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
@@ -732,23 +796,26 @@ export function SiteActionsView({
               {/* Actions */}
               <div className="px-5 pb-5">
                 <a
-                  href="https://github.com/avihayf/PhoenixBox-Highlighter/releases/download/v1.1.0/PhoenixBoxHighlighter.jar"
+                  href={HIGHLIGHTER_JAR_URL}
                   download
                   target="_blank"
                   rel="noreferrer"
-                  onClick={() => setShowPaintBurpFirstTimeMessage(false)}
+                  onClick={() => {
+                    if (highlighterModal === 'update') void clearHighlighterUpdateNotice();
+                    setHighlighterModal(null);
+                  }}
                   className="w-full flex items-center justify-center gap-2 px-3 py-3 text-sm text-black rounded-xl font-semibold transition-all duration-200"
                   style={{ background: 'linear-gradient(180deg, var(--ext-accent-light), var(--ext-accent))', boxShadow: '0 0 22px var(--ext-glow-accent)' }}
                 >
                   <Download className="w-4 h-4" />
-                  Download Phoenix JAR
+                  {highlighterModal === 'update' ? 'Download Phoenix JAR v1.2.0' : 'Download Phoenix JAR'}
                 </a>
                 <button
                   type="button"
-                  onClick={() => setShowPaintBurpFirstTimeMessage(false)}
+                  onClick={() => setHighlighterModal(null)}
                   className="w-full mt-2 px-3 py-2 text-xs text-[var(--ext-text-muted)] hover:text-[var(--ext-accent)] transition-colors font-medium"
                 >
-                  I already have it
+                  {highlighterModal === 'update' ? 'Remind me later' : 'I already have it'}
                 </button>
               </div>
             </div>

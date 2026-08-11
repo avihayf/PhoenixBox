@@ -15,6 +15,8 @@ import { logError } from "../lib/logger";
 import { type AccentValue, ACCENT_PRESETS, applyCustomHue, clearCustomHue, serializeAccent, deserializeAccent, type LogoAccentValue, applyLogoAccentToDOM, serializeLogoAccent, deserializeLogoAccent } from "../lib/accentColors";
 import { toProxyType, type Container, type Tab, type AssignedSite } from "../lib/types";
 import * as msg from "../lib/messages";
+import { HIGHLIGHTER_HEADERS_KEY, HIGHLIGHTER_STORAGE_DEFAULTS,
+  resolveHighlighterHeadersEnabled, highlighterChangeValue } from "../lib/highlighterSettings";
 import { readProxyMap, getProxyForContainer, mergeProxyForContainer, removeProxyForContainer,
   setProxyForContainer as storeSetProxyForContainer, type ContainerProxy } from "../lib/proxyStore";
 
@@ -588,7 +590,7 @@ function App() {
         globalProxyUrl: "",
         globalProxyParsed: null,
         globalProxyCredentialsMissing: false,
-        addContainerColorHeaderEnabled: false,
+        ...HIGHLIGHTER_STORAGE_DEFAULTS,
         promotedProxyContainerId: "",
         promotedProxyContainerIds: null,
         globalUserAgentEnabled: false,
@@ -633,7 +635,7 @@ function App() {
       }
       setProxyUrl(sanitizedStoredProxyUrl);
 
-      setPaintBurp(!!stored.addContainerColorHeaderEnabled);
+      setPaintBurp(resolveHighlighterHeadersEnabled(stored as Record<string, unknown>));
       if (Array.isArray(stored.promotedProxyContainerIds)) {
         setPromotedProxyContainerIds(
           (stored.promotedProxyContainerIds as unknown[]).map((id) => String(id || "")).filter((id) => id)
@@ -713,8 +715,9 @@ function App() {
             "Proxy password isn't saved. Re-enter the proxy URL with its password to reconnect."
           );
         }
-        if (changes.addContainerColorHeaderEnabled) {
-          setPaintBurp(!!changes.addContainerColorHeaderEnabled.newValue);
+        const nextHighlighter = highlighterChangeValue(changes);
+        if (nextHighlighter !== undefined) {
+          setPaintBurp(nextHighlighter);
         }
         if (changes.promotedProxyContainerIds) {
           const next = changes.promotedProxyContainerIds.newValue;
@@ -1308,7 +1311,7 @@ function App() {
         onTogglePaintBurp={async (enabled) => {
           setPaintBurp(enabled);
           const browser = requireWebExt();
-          await browser.storage.local.set({ addContainerColorHeaderEnabled: enabled });
+          await browser.storage.local.set({ [HIGHLIGHTER_HEADERS_KEY]: enabled });
         }}
         userAgentEnabled={globalUserAgent}
         onToggleUserAgent={async (enabled) => {

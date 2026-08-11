@@ -6,7 +6,7 @@ PhoenixBox is a multi-container browser extension for security testing and penet
 
 - Per-container proxy configuration (HTTP, HTTPS, SOCKS4, SOCKS5)
 - A global proxy toggle for routing all container traffic through Burp Suite
-- An `X-MAC-Container-Color` HTTP header that lets the companion Burp Suite extension auto-highlight requests by container color
+- `X-MAC-Container-Color` and `X-MAC-Container-Name` HTTP headers that let the companion Burp Suite extension auto-highlight requests by container colour and label Repeater tabs by container name (the name is percent-encoded, since container names are arbitrary Unicode)
 - Per-container User-Agent overrides using a curated list from a public CDN
 - Optional Mozilla VPN integration via native messaging
 

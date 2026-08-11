@@ -25,13 +25,15 @@ const H = PhoenixBoxRequestHeaderHelpers;
 const GLOBAL_UA_ENABLED_KEY = "globalUserAgentEnabled";
 const GLOBAL_UA_KEY = "globalUserAgent";
 const CONTAINER_UAS_KEY = "containerUserAgents";
-const COLOR_HEADER_STORAGE_KEY = "addContainerColorHeaderEnabled";
+const HIGHLIGHTER_HEADERS_KEY = H.HIGHLIGHTER_HEADERS_KEY;
+const LEGACY_HIGHLIGHTER_HEADERS_KEY = H.LEGACY_HIGHLIGHTER_HEADERS_KEY;
 // True while the user still has to be told their Burp JAR is too old to strip
 // the container-name header. The name is withheld until then.
 const JAR_UPDATE_PENDING_KEY = "highlighterJarUpdateNoticePending";
 
 const requestHeaders = {
-  colorHeaderEnabled: false,
+  // Arms both the colour and the name header, hence not named for the colour.
+  highlighterHeadersEnabled: false,
   jarUpdatePending: false,
   userAgentEnabled: false,
   globalUserAgent: null,
@@ -51,14 +53,15 @@ const requestHeaders = {
       [GLOBAL_UA_ENABLED_KEY]: false,
       [GLOBAL_UA_KEY]: null,
       [CONTAINER_UAS_KEY]: {},
-      [COLOR_HEADER_STORAGE_KEY]: false,
+      [HIGHLIGHTER_HEADERS_KEY]: undefined,
+      [LEGACY_HIGHLIGHTER_HEADERS_KEY]: false,
       [JAR_UPDATE_PENDING_KEY]: false,
     });
 
     this.userAgentEnabled = !!stored[GLOBAL_UA_ENABLED_KEY];
     this.globalUserAgent = stored[GLOBAL_UA_KEY];
     this.containerUserAgents = stored[CONTAINER_UAS_KEY] || {};
-    this.colorHeaderEnabled = !!stored[COLOR_HEADER_STORAGE_KEY];
+    this.highlighterHeadersEnabled = H.resolveHighlighterHeadersEnabled(stored);
     this.jarUpdatePending = !!stored[JAR_UPDATE_PENDING_KEY];
 
     this._watchTabs();
@@ -88,8 +91,12 @@ const requestHeaders = {
       if (CONTAINER_UAS_KEY in changes) {
         this.containerUserAgents = changes[CONTAINER_UAS_KEY].newValue || {};
       }
-      if (COLOR_HEADER_STORAGE_KEY in changes) {
-        this.colorHeaderEnabled = !!changes[COLOR_HEADER_STORAGE_KEY].newValue;
+      // Both names are watched: the migration may not have run yet, and an
+      // older profile can still be writing the legacy key.
+      if (HIGHLIGHTER_HEADERS_KEY in changes) {
+        this.highlighterHeadersEnabled = !!changes[HIGHLIGHTER_HEADERS_KEY].newValue;
+      } else if (LEGACY_HIGHLIGHTER_HEADERS_KEY in changes) {
+        this.highlighterHeadersEnabled = !!changes[LEGACY_HIGHLIGHTER_HEADERS_KEY].newValue;
       }
       // Picked up live, so acknowledging the notice starts sending the name
       // on the very next request rather than after a restart.
@@ -216,7 +223,7 @@ const requestHeaders = {
   _colorFor(cookieStoreId) {
     return H.resolveContainerColor(
       cookieStoreId,
-      this.colorHeaderEnabled,
+      this.highlighterHeadersEnabled,
       this._containerIdentities
     );
   },
@@ -228,7 +235,7 @@ const requestHeaders = {
   _nameFor(cookieStoreId) {
     return H.resolveContainerName(
       cookieStoreId,
-      this.colorHeaderEnabled,
+      this.highlighterHeadersEnabled,
       this._containerIdentities,
       this.jarUpdatePending
     );

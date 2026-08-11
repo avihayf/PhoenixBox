@@ -6,6 +6,7 @@ const {
   isSupportedScheme,
   hasContainerUserAgents,
   shouldListen,
+  resolveHighlighterHeadersEnabled,
   resolveUserAgent,
   encodeContainerName,
   resolveContainerColor,
@@ -58,6 +59,40 @@ describe("requestHeaderHelpers", () => {
     });
   });
 
+  describe("resolveHighlighterHeadersEnabled", () => {
+    const CURRENT = "highlighterHeadersEnabled";
+    const LEGACY = "addContainerColorHeaderEnabled";
+
+    it("uses the current key when it is present", () => {
+      expect(resolveHighlighterHeadersEnabled({ [CURRENT]: true })).to.equal(true);
+      expect(resolveHighlighterHeadersEnabled({ [CURRENT]: false })).to.equal(false);
+    });
+
+    // The case that matters: an existing user whose profile predates the
+    // rename must not silently find the Highlighter switched off.
+    it("falls back to the legacy key on an un-migrated profile", () => {
+      expect(resolveHighlighterHeadersEnabled({ [LEGACY]: true })).to.equal(true);
+    });
+
+    // A deliberate "off" under the current key must win over a stale legacy
+    // "on", or turning the feature off would not stick until migration ran.
+    it("prefers the current key even when it is false", () => {
+      expect(resolveHighlighterHeadersEnabled({ [CURRENT]: false, [LEGACY]: true }))
+        .to.equal(false);
+    });
+
+    it("treats an absent current key as absent, not as false", () => {
+      expect(resolveHighlighterHeadersEnabled({ [CURRENT]: undefined, [LEGACY]: true }))
+        .to.equal(true);
+    });
+
+    it("defaults to off when neither key is set", () => {
+      expect(resolveHighlighterHeadersEnabled({})).to.equal(false);
+      expect(resolveHighlighterHeadersEnabled(null)).to.equal(false);
+      expect(resolveHighlighterHeadersEnabled(undefined)).to.equal(false);
+    });
+  });
+
   describe("hasContainerUserAgents", () => {
     it("detects whether any container has its own user agent", () => {
       expect(hasContainerUserAgents({ "firefox-container-1": "UA" })).to.equal(true);
@@ -70,7 +105,7 @@ describe("requestHeaderHelpers", () => {
   describe("shouldListen", () => {
     it("stays detached when nothing is configured", () => {
       expect(shouldListen({
-        colorHeaderEnabled: false,
+        highlighterHeadersEnabled: false,
         userAgentEnabled: false,
         globalUserAgent: null,
         containerUserAgents: {},
@@ -78,7 +113,7 @@ describe("requestHeaderHelpers", () => {
     });
 
     it("attaches for the color header alone", () => {
-      expect(shouldListen({ colorHeaderEnabled: true })).to.equal(true);
+      expect(shouldListen({ highlighterHeadersEnabled: true })).to.equal(true);
     });
 
     it("attaches when the global user agent is enabled and set", () => {

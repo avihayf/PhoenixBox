@@ -23,7 +23,7 @@ PhoenixBox's content script does not read page content, form data, or credential
 PhoenixBox does, however, intentionally interact with the sites you browse as part of its core functionality:
 
 - It can modify outbound requests by overriding the `User-Agent` header
-- It can add the `X-MAC-Container-Color` header when Burp highlighting is enabled
+- It can add the `X-MAC-Container-Color` and `X-MAC-Container-Name` headers when Burp highlighting is enabled
 - It can route your traffic through user-configured proxies or Mozilla VPN integration
 
 These behaviors are product features for security testing workflows, not telemetry.
@@ -36,7 +36,7 @@ PhoenixBox requires certain browser permissions to function:
 
 - **`<all_urls>`**: Required to inject container color headers for Burp Suite integration and apply per-container proxy settings to any site you visit during security testing.
 
-- **`webRequest` and `webRequestBlocking`**: Required to add custom HTTP headers (`X-MAC-Container-Color`) for Burp Suite integration and to override User-Agent strings per container.
+- **`webRequest` and `webRequestBlocking`**: Required to add custom HTTP headers (`X-MAC-Container-Color`, `X-MAC-Container-Name`) for Burp Suite integration and to override User-Agent strings per container.
 
 - **`contextualIdentities`**: Required to create, manage, and isolate browser containers, which is the core functionality of this extension.
 
@@ -77,12 +77,14 @@ If you explicitly enable the Mozilla VPN integration feature and grant the `nati
 
 ### Burp Suite Integration
 
-When you enable the "Add container color header" feature, the extension adds an `X-MAC-Container-Color` HTTP header to your requests. This header is visible to:
+When you enable the Highlighter feature, the extension adds `X-MAC-Container-Color` and `X-MAC-Container-Name` HTTP headers to your requests. The name is the container's own label (percent-encoded), so it may contain whatever you named that container. These headers are visible to:
 
 - Your configured proxy (e.g., Burp Suite running locally)
 - The target website server (unless stripped by your proxy)
 
-This is intentional for security testing workflows. The Burp Suite extension (`PhoenixBoxHighlighter.jar`) is designed to strip this header before forwarding requests to prevent fingerprinting. If you enable the header without routing traffic through Burp, or if the Burp extension is not stripping it, the target site can still see it.
+This is intentional for security testing workflows. The Burp Suite extension (`PhoenixBoxHighlighter.jar`) is designed to strip both headers before forwarding requests to prevent fingerprinting. If you enable the feature without routing traffic through Burp, or if the Burp extension is not stripping them, the target site can still see them.
+
+`X-MAC-Container-Name` is only stripped by **PhoenixBoxHighlighter v1.2.0 or later**. If you are running an older JAR, the container name will reach the target.
 
 ## Data Sharing
 

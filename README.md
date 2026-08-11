@@ -22,7 +22,7 @@ https://github.com/user-attachments/assets/a523d122-7a06-4dc4-a637-e08beb440f68
 - **Ready-to-go containers** — Attacker, Victim, Admin, Member ship out of the box. Create as many custom ones as you need.
 - **Proxy routing (global + per-container)** — send everything through Burp, or route only one role through a proxy while keeping the rest clean. Save custom presets and switch with one click.
 - **User-Agent spoofing** — swap browser identity globally or per-container. Pick from a live top-100 list (desktop, mobile, all), paste a custom string, or save presets for quick switching.
-- **Burp Suite highlighting** — the `X-MAC-Container-Color` header lets the companion JAR color-code HTTP history by container so you instantly see which role fired each request.
+- **Burp Suite highlighting** — the `X-MAC-Container-Color` and `X-MAC-Container-Name` headers let the companion JAR color-code HTTP history by container and label Repeater tabs by container name, so you instantly see which role fired each request.
 - **Site assignments** — lock a domain to a container and it always opens there. No more "wrong session" surprises.
 - **Full session isolation** — cookies, storage, and cache stay walled off between containers. Zero bleed.
 - **Mozilla VPN integration** — route specific containers through VPN while the rest go direct.
@@ -92,7 +92,7 @@ Popular workflows:
 
 ## Burp Suite Integration
 
-PhoenixBox can add an `X-MAC-Container-Color` header to requests so Burp can visually separate traffic by container role.
+PhoenixBox can add `X-MAC-Container-Color` and `X-MAC-Container-Name` headers to requests so Burp can visually separate traffic by container role. The companion JAR strips both before they reach the target — the name header needs **PhoenixBoxHighlighter v1.2.0 or later**.
 
 Basic setup:
 

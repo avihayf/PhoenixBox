@@ -21,9 +21,17 @@
   const COLOR_HEADER_NAME = "X-MAC-Container-Color";
   const NAME_HEADER_NAME = "X-MAC-Container-Name";
 
+  // One switch arms both headers, so it is not named after the colour alone.
+  const HIGHLIGHTER_HEADERS_KEY = "highlighterHeadersEnabled";
+  // What the same setting was called when it only added the colour header.
+  const LEGACY_HIGHLIGHTER_HEADERS_KEY = "addContainerColorHeaderEnabled";
+
   // Container names are arbitrary user text; header values are not. Cap the raw
-  // name before encoding so the bound is easy to reason about, and so a long
-  // name cannot balloon into a multi-kilobyte header once escaped.
+  // name before encoding so the bound is easy to reason about.
+  //
+  // The bound is code points, not bytes: percent-encoding expands an astral
+  // character roughly twelvefold, so 64 emoji encode to about 768 bytes. That
+  // is the worst case, and it stays comfortably inside any sane header limit.
   const MAX_CONTAINER_NAME_LENGTH = 64;
 
   // Map Firefox container colors to standard color names for Burp Suite
@@ -47,7 +55,7 @@
 
   /**
    * @typedef {object} HeaderRewriteState
-   * @property {boolean} colorHeaderEnabled
+   * @property {boolean} highlighterHeadersEnabled
    * @property {boolean} userAgentEnabled
    * @property {string|null} globalUserAgent
    * @property {Object<string,string>} containerUserAgents
@@ -56,6 +64,24 @@
    * module, so it can pass `this` straight through. Building a fresh object
    * per request would allocate on the hot path of a blocking listener.
    */
+
+  /**
+   * Resolve the Highlighter toggle from a storage read.
+   *
+   * The key was renamed once the toggle started gating a second header, so a
+   * profile written by an older version still holds the legacy name. Readers
+   * fall back rather than relying on the migration having already run, which
+   * keeps the setting correct no matter the ordering at startup.
+   *
+   * @param {object} stored result of a storage.local.get covering both keys.
+   */
+  function resolveHighlighterHeadersEnabled(stored) {
+    const values = stored || {};
+    if (HIGHLIGHTER_HEADERS_KEY in values && values[HIGHLIGHTER_HEADERS_KEY] !== undefined) {
+      return !!values[HIGHLIGHTER_HEADERS_KEY];
+    }
+    return !!values[LEGACY_HIGHLIGHTER_HEADERS_KEY];
+  }
 
   function isSupportedScheme(url) {
     const value = String(url || "");
@@ -85,7 +111,7 @@
     const userAgentActive =
       (!!settings.userAgentEnabled && !!settings.globalUserAgent) ||
       hasContainerUserAgents(settings.containerUserAgents);
-    return !!settings.colorHeaderEnabled || userAgentActive;
+    return !!settings.highlighterHeadersEnabled || userAgentActive;
   }
 
   /**
@@ -144,14 +170,14 @@
 
   /**
    * @param {string} cookieStoreId
-   * @param {boolean} colorHeaderEnabled
+   * @param {boolean} highlighterHeadersEnabled
    * @param {Map<string, {color?: string, name?: string}>} containerIdentities
    * @returns {string|null|undefined} the header value, `null` when this request
    *   should not be labelled, or `undefined` when the container is not cached
    *   yet and the caller must look it up.
    */
-  function resolveContainerColor(cookieStoreId, colorHeaderEnabled, containerIdentities) {
-    if (!colorHeaderEnabled) return null;
+  function resolveContainerColor(cookieStoreId, highlighterHeadersEnabled, containerIdentities) {
+    if (!highlighterHeadersEnabled) return null;
     if (!cookieStoreId || NON_CONTAINER_COOKIE_STORES.has(cookieStoreId)) {
       return null;
     }
@@ -183,13 +209,13 @@
    * riding a permission they granted for the colour alone.
    *
    * @param {string} cookieStoreId
-   * @param {boolean} colorHeaderEnabled
+   * @param {boolean} highlighterHeadersEnabled
    * @param {Map<string, {color?: string, name?: string}>} containerIdentities
    * @param {boolean} [jarUpdatePending] true while the user still has to be told.
    * @returns {string|null|undefined}
    */
-  function resolveContainerName(cookieStoreId, colorHeaderEnabled, containerIdentities, jarUpdatePending) {
-    if (!colorHeaderEnabled) return null;
+  function resolveContainerName(cookieStoreId, highlighterHeadersEnabled, containerIdentities, jarUpdatePending) {
+    if (!highlighterHeadersEnabled) return null;
     // Deliberately `null`, not `undefined`: this is a decision not to send, not
     // a cache miss, so it must not push the request onto the async lookup path.
     if (jarUpdatePending) return null;
@@ -240,6 +266,9 @@
   return {
     COLOR_HEADER_NAME,
     NAME_HEADER_NAME,
+    HIGHLIGHTER_HEADERS_KEY,
+    LEGACY_HIGHLIGHTER_HEADERS_KEY,
+    resolveHighlighterHeadersEnabled,
     MAX_CONTAINER_NAME_LENGTH,
     COLOR_MAP,
     NON_CONTAINER_COOKIE_STORES,
