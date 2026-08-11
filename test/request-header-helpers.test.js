@@ -2,13 +2,36 @@ const { expect } = require("chai");
 
 const {
   COLOR_MAP,
+  MAX_CONTAINER_NAME_LENGTH,
   isSupportedScheme,
   hasContainerUserAgents,
   shouldListen,
   resolveUserAgent,
+  encodeContainerName,
   resolveContainerColor,
+  resolveContainerName,
   buildRequestHeaders,
 } = require("../src/js/shared/requestHeaderHelpers");
+
+/**
+ * Shared wire-format vectors. The Burp companion (PhoenixBox-Highlighter) keeps
+ * the same table and asserts the decode direction, so the two halves of the
+ * contract are pinned to identical values rather than to prose.
+ *
+ * Keep in sync with ContainerHighlighterTest#CONTAINER_NAME_VECTORS. The CR/LF vector is ours
+ * alone: the Java side strips control characters out of tab labels, so it cannot round-trip.
+ */
+const NAME_VECTORS = [
+  ["Attacker", "Attacker"],
+  ["Admin Account", "Admin%20Account"],
+  // encodeURIComponent leaves "+" literal while URLDecoder would read it as a
+  // space; this vector is what stops the Java side using the wrong decoder.
+  ["C++", "C%2B%2B"],
+  ["50%", "50%25"],
+  ["אבטחה", "%D7%90%D7%91%D7%98%D7%97%D7%94"],
+  ["🔥", "%F0%9F%94%A5"],
+  ["a\r\nb", "a%0D%0Ab"],
+];
 
 describe("requestHeaderHelpers", () => {
   describe("isSupportedScheme", () => {
@@ -139,7 +162,8 @@ describe("requestHeaderHelpers", () => {
   });
 
   describe("resolveContainerColor", () => {
-    const colors = () => new Map([["firefox-container-1", "turquoise"]]);
+    const colors = () =>
+      new Map([["firefox-container-1", { color: "turquoise", name: "Recon" }]]);
 
     it("returns null when the color header feature is off", () => {
       expect(resolveContainerColor("firefox-container-1", false, colors()))
@@ -155,7 +179,7 @@ describe("requestHeaderHelpers", () => {
 
     it("maps every Firefox container color to its Burp name", () => {
       for (const [firefoxColor, expected] of Object.entries(COLOR_MAP)) {
-        const map = new Map([["firefox-container-1", firefoxColor]]);
+        const map = new Map([["firefox-container-1", { color: firefoxColor }]]);
         expect(resolveContainerColor("firefox-container-1", true, map))
           .to.equal(expected);
       }
@@ -165,7 +189,7 @@ describe("requestHeaderHelpers", () => {
       expect(resolveContainerColor("firefox-container-1", true, colors()))
         .to.equal("cyan");
       expect(resolveContainerColor("firefox-container-1", true,
-        new Map([["firefox-container-1", "purple"]]))).to.equal("magenta");
+        new Map([["firefox-container-1", { color: "purple" }]]))).to.equal("magenta");
     });
 
     it("returns undefined only when the container is not cached", () => {
@@ -176,11 +200,17 @@ describe("requestHeaderHelpers", () => {
     // Anything cached must resolve to a value, never to "unknown" — otherwise
     // the caller repeats its async lookup on every single request.
     it("returns null for a cached but unmapped color", () => {
-      const map = new Map([["firefox-container-1", "toolbar"]]);
+      const map = new Map([["firefox-container-1", { color: "toolbar" }]]);
       expect(resolveContainerColor("firefox-container-1", true, map)).to.equal(null);
     });
 
     it("returns null for a container cached with no color at all", () => {
+      const map = new Map([["firefox-container-1", { color: undefined }]]);
+      expect(resolveContainerColor("firefox-container-1", true, map)).to.equal(null);
+    });
+
+    // The async path caches this shape when contextualIdentities.get throws.
+    it("returns null for a container cached as entirely unreadable", () => {
       const map = new Map([["firefox-container-1", undefined]]);
       expect(resolveContainerColor("firefox-container-1", true, map)).to.equal(null);
     });
@@ -188,6 +218,115 @@ describe("requestHeaderHelpers", () => {
     it("reports unknown when no cache was supplied", () => {
       expect(resolveContainerColor("firefox-container-1", true, null))
         .to.equal(undefined);
+    });
+  });
+
+  describe("encodeContainerName", () => {
+    it("encodes every shared wire vector exactly", () => {
+      for (const [raw, encoded] of NAME_VECTORS) {
+        expect(encodeContainerName(raw), raw).to.equal(encoded);
+      }
+    });
+
+    it("leaves no raw CR or LF in the value", () => {
+      const encoded = encodeContainerName("a\r\nb: injected");
+      expect(encoded).to.be.a("string");
+      expect(encoded).to.not.match(/[\r\n]/);
+    });
+
+    it("drops names that carry no content", () => {
+      expect(encodeContainerName("")).to.equal(null);
+      expect(encodeContainerName("   ")).to.equal(null);
+      expect(encodeContainerName("\t\r\n")).to.equal(null);
+      expect(encodeContainerName(null)).to.equal(null);
+      expect(encodeContainerName(undefined)).to.equal(null);
+      expect(encodeContainerName(42)).to.equal(null);
+    });
+
+    it("trims before encoding", () => {
+      expect(encodeContainerName("  Attacker  ")).to.equal("Attacker");
+    });
+
+    it("truncates to the code point cap", () => {
+      const raw = "a".repeat(MAX_CONTAINER_NAME_LENGTH + 6);
+      expect(encodeContainerName(raw)).to.equal("a".repeat(MAX_CONTAINER_NAME_LENGTH));
+    });
+
+    // Slicing UTF-16 units here would leave a lone surrogate, which
+    // encodeURIComponent rejects outright.
+    it("truncates without splitting a surrogate pair", () => {
+      const raw = "🔥".repeat(MAX_CONTAINER_NAME_LENGTH + 3);
+      const encoded = encodeContainerName(raw);
+      expect(encoded).to.equal("%F0%9F%94%A5".repeat(MAX_CONTAINER_NAME_LENGTH));
+      expect(decodeURIComponent(encoded)).to.equal("🔥".repeat(MAX_CONTAINER_NAME_LENGTH));
+    });
+
+    it("survives a lone surrogate rather than throwing", () => {
+      expect(encodeContainerName("bad\uD800name")).to.equal(null);
+    });
+  });
+
+  describe("resolveContainerName", () => {
+    const identities = () =>
+      new Map([["firefox-container-1", { color: "red", name: "Attacker" }]]);
+
+    it("returns null when the color header feature is off", () => {
+      expect(resolveContainerName("firefox-container-1", false, identities()))
+        .to.equal(null);
+    });
+
+    it("never labels the default or private cookie stores", () => {
+      expect(resolveContainerName("firefox-default", true, identities())).to.equal(null);
+      expect(resolveContainerName("firefox-private", true, identities())).to.equal(null);
+      expect(resolveContainerName("", true, identities())).to.equal(null);
+      expect(resolveContainerName(undefined, true, identities())).to.equal(null);
+    });
+
+    it("returns the encoded name for a cached container", () => {
+      expect(resolveContainerName("firefox-container-1", true, identities()))
+        .to.equal("Attacker");
+    });
+
+    // A colour is one of eight values; a name is arbitrary user text. An
+    // existing user who switched highlighting on consented to the colour, so
+    // the name waits until they have been told their JAR may not strip it.
+    it("withholds the name while the JAR update notice is pending", () => {
+      expect(resolveContainerName("firefox-container-1", true, identities(), true))
+        .to.equal(null);
+    });
+
+    // null, not undefined: withholding is a decision, and undefined would send
+    // every request for this container down the async lookup path.
+    it("withholds even for a container that is not cached", () => {
+      expect(resolveContainerName("firefox-container-7", true, identities(), true))
+        .to.equal(null);
+    });
+
+    it("sends the name again once the notice is acknowledged", () => {
+      expect(resolveContainerName("firefox-container-1", true, identities(), false))
+        .to.equal("Attacker");
+    });
+
+    // The colour is unaffected: it is what the user already opted into.
+    it("does not withhold the colour while the notice is pending", () => {
+      expect(resolveContainerColor("firefox-container-1", true, identities()))
+        .to.equal("red");
+    });
+
+    it("returns undefined only when the container is not cached", () => {
+      expect(resolveContainerName("firefox-container-7", true, identities()))
+        .to.equal(undefined);
+      expect(resolveContainerName("firefox-container-1", true, null))
+        .to.equal(undefined);
+    });
+
+    // Same reason as the color resolver: anything cached must resolve, or the
+    // caller repeats its async lookup forever.
+    it("returns null for a container cached without a usable name", () => {
+      for (const entry of [{ color: "red" }, { color: "red", name: "  " }, undefined]) {
+        const map = new Map([["firefox-container-1", entry]]);
+        expect(resolveContainerName("firefox-container-1", true, map)).to.equal(null);
+      }
     });
   });
 
@@ -261,9 +400,55 @@ describe("requestHeaderHelpers", () => {
       ]);
     });
 
+    it("appends the container name header", () => {
+      const result = buildRequestHeaders(headers(), null, "red", "Attacker");
+      expect(result.requestHeaders).to.deep.equal([
+        { name: "Accept", value: "*/*" },
+        { name: "User-Agent", value: "real-UA" },
+        { name: "Accept-Language", value: "en" },
+        { name: "X-MAC-Container-Color", value: "red" },
+        { name: "X-MAC-Container-Name", value: "Attacker" },
+      ]);
+    });
+
+    it("replaces an existing name header rather than duplicating it", () => {
+      const result = buildRequestHeaders(
+        [{ name: "x-mac-container-NAME", value: "spoofed" }], null, "red", "Attacker"
+      );
+      expect(result.requestHeaders).to.deep.equal([
+        { name: "X-MAC-Container-Color", value: "red" },
+        { name: "X-MAC-Container-Name", value: "Attacker" },
+      ]);
+    });
+
+    it("leaves an inbound name header alone when we are not sending one", () => {
+      const result = buildRequestHeaders(
+        [{ name: "X-MAC-Container-Name", value: "theirs" }], "spoof-UA", null, null
+      );
+      expect(result.requestHeaders).to.deep.equal([
+        { name: "X-MAC-Container-Name", value: "theirs" },
+        { name: "User-Agent", value: "spoof-UA" },
+      ]);
+    });
+
+    it("applies user agent, color and name together", () => {
+      const result = buildRequestHeaders(headers(), "spoof-UA", "cyan", "Recon%20Box");
+      expect(result.requestHeaders).to.deep.equal([
+        { name: "Accept", value: "*/*" },
+        { name: "Accept-Language", value: "en" },
+        { name: "User-Agent", value: "spoof-UA" },
+        { name: "X-MAC-Container-Color", value: "cyan" },
+        { name: "X-MAC-Container-Name", value: "Recon%20Box" },
+      ]);
+    });
+
+    it("returns an empty result when the name is the only absent value", () => {
+      expect(buildRequestHeaders(headers(), null, null, null)).to.deep.equal({});
+    });
+
     it("does not mutate the caller's header array", () => {
       const original = headers();
-      buildRequestHeaders(original, "spoof-UA", "red");
+      buildRequestHeaders(original, "spoof-UA", "red", "Attacker");
       expect(original).to.deep.equal(headers());
     });
 

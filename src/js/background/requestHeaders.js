@@ -7,7 +7,8 @@
  * which container a request belongs to:
  *
  *   - User-Agent spoofing (per-container overrides win over the global one)
- *   - the X-MAC-Container-Color header used for Burp Suite highlighting
+ *   - the X-MAC-Container-Color and X-MAC-Container-Name headers used for Burp
+ *     Suite highlighting
  *
  * They share one blocking onBeforeSendHeaders listener because every extra
  * blocking listener delays every request. Container identity is served from
@@ -25,17 +26,21 @@ const GLOBAL_UA_ENABLED_KEY = "globalUserAgentEnabled";
 const GLOBAL_UA_KEY = "globalUserAgent";
 const CONTAINER_UAS_KEY = "containerUserAgents";
 const COLOR_HEADER_STORAGE_KEY = "addContainerColorHeaderEnabled";
+// True while the user still has to be told their Burp JAR is too old to strip
+// the container-name header. The name is withheld until then.
+const JAR_UPDATE_PENDING_KEY = "highlighterJarUpdateNoticePending";
 
 const requestHeaders = {
   colorHeaderEnabled: false,
+  jarUpdatePending: false,
   userAgentEnabled: false,
   globalUserAgent: null,
   containerUserAgents: {},
 
   /** @type {Map<number, string>} tabId -> cookieStoreId */
   _tabCookieStores: new Map(),
-  /** @type {Map<string, string>} cookieStoreId -> container color */
-  _containerColors: new Map(),
+  /** @type {Map<string, {color: string|undefined, name: string|undefined}>} cookieStoreId -> identity */
+  _containerIdentities: new Map(),
   _listening: false,
   _boundHandler: null,
 
@@ -47,12 +52,14 @@ const requestHeaders = {
       [GLOBAL_UA_KEY]: null,
       [CONTAINER_UAS_KEY]: {},
       [COLOR_HEADER_STORAGE_KEY]: false,
+      [JAR_UPDATE_PENDING_KEY]: false,
     });
 
     this.userAgentEnabled = !!stored[GLOBAL_UA_ENABLED_KEY];
     this.globalUserAgent = stored[GLOBAL_UA_KEY];
     this.containerUserAgents = stored[CONTAINER_UAS_KEY] || {};
     this.colorHeaderEnabled = !!stored[COLOR_HEADER_STORAGE_KEY];
+    this.jarUpdatePending = !!stored[JAR_UPDATE_PENDING_KEY];
 
     this._watchTabs();
     this._watchContainers();
@@ -63,7 +70,7 @@ const requestHeaders = {
     this._applyListener();
     this._watchSettings();
 
-    await Promise.all([this._primeTabCache(), this._primeContainerColors()]);
+    await Promise.all([this._primeTabCache(), this._primeContainerIdentities()]);
   },
 
   // Registered before the caches are primed so a settings change made during
@@ -83,6 +90,11 @@ const requestHeaders = {
       }
       if (COLOR_HEADER_STORAGE_KEY in changes) {
         this.colorHeaderEnabled = !!changes[COLOR_HEADER_STORAGE_KEY].newValue;
+      }
+      // Picked up live, so acknowledging the notice starts sending the name
+      // on the very next request rather than after a restart.
+      if (JAR_UPDATE_PENDING_KEY in changes) {
+        this.jarUpdatePending = !!changes[JAR_UPDATE_PENDING_KEY].newValue;
       }
 
       this._applyListener();
@@ -148,14 +160,17 @@ const requestHeaders = {
     }
   },
 
-  async _primeContainerColors() {
+  async _primeContainerIdentities() {
     try {
       const identities = await browser.contextualIdentities.query({});
       for (const identity of identities) {
-        this._containerColors.set(identity.cookieStoreId, identity.color);
+        this._containerIdentities.set(identity.cookieStoreId, {
+          color: identity.color,
+          name: identity.name,
+        });
       }
     } catch (e) {
-      LOG.warn("requestHeaders: could not prime container colors", e);
+      LOG.warn("requestHeaders: could not prime container identities", e);
     }
   },
 
@@ -164,10 +179,10 @@ const requestHeaders = {
 
     const upsert = ({ contextualIdentity }) => {
       if (contextualIdentity) {
-        this._containerColors.set(
-          contextualIdentity.cookieStoreId,
-          contextualIdentity.color
-        );
+        this._containerIdentities.set(contextualIdentity.cookieStoreId, {
+          color: contextualIdentity.color,
+          name: contextualIdentity.name,
+        });
       }
     };
 
@@ -180,7 +195,7 @@ const requestHeaders = {
     if (browser.contextualIdentities.onRemoved) {
       browser.contextualIdentities.onRemoved.addListener(({ contextualIdentity }) => {
         if (contextualIdentity) {
-          this._containerColors.delete(contextualIdentity.cookieStoreId);
+          this._containerIdentities.delete(contextualIdentity.cookieStoreId);
         }
       });
     }
@@ -202,15 +217,29 @@ const requestHeaders = {
     return H.resolveContainerColor(
       cookieStoreId,
       this.colorHeaderEnabled,
-      this._containerColors
+      this._containerIdentities
     );
   },
 
-  _buildHeaders(details, userAgent, color) {
+  /**
+   * @returns {string|undefined|null} the percent-encoded container name, with
+   *   the same three states as {@link _colorFor}.
+   */
+  _nameFor(cookieStoreId) {
+    return H.resolveContainerName(
+      cookieStoreId,
+      this.colorHeaderEnabled,
+      this._containerIdentities,
+      this.jarUpdatePending
+    );
+  },
+
+  _buildHeaders(details, userAgent, color, containerName) {
     return H.buildRequestHeaders(
       details && details.requestHeaders,
       userAgent,
-      color
+      color,
+      containerName
     );
   },
 
@@ -236,7 +265,14 @@ const requestHeaders = {
       return this._handleRequestAsync(details, cookieStoreId);
     }
 
-    return this._buildHeaders(details, this._userAgentFor(cookieStoreId), color);
+    // Both resolvers gate on the same cache entry, so a defined color means the
+    // name is resolvable without another lookup.
+    return this._buildHeaders(
+      details,
+      this._userAgentFor(cookieStoreId),
+      color,
+      this._nameFor(cookieStoreId)
+    );
   },
 
   async _handleRequestAsync(details, knownCookieStoreId) {
@@ -261,16 +297,27 @@ const requestHeaders = {
         // Always populate the cache, even with an absent color: resolveContainerColor
         // tests for presence, so this is what stops the container falling down
         // this async path on every subsequent request.
-        this._containerColors.set(cookieStoreId, identity && identity.color);
+        this._containerIdentities.set(cookieStoreId, {
+          color: identity && identity.color,
+          name: identity && identity.name,
+        });
       } catch {
         // Container is gone or unreadable; cache that so we don't retry per request.
-        this._containerColors.set(cookieStoreId, undefined);
+        this._containerIdentities.set(cookieStoreId, { color: undefined, name: undefined });
       }
       color = this._colorFor(cookieStoreId);
       if (color === undefined) color = null;
     }
 
-    return this._buildHeaders(details, this._userAgentFor(cookieStoreId), color);
+    let containerName = this._nameFor(cookieStoreId);
+    if (containerName === undefined) containerName = null;
+
+    return this._buildHeaders(
+      details,
+      this._userAgentFor(cookieStoreId),
+      color,
+      containerName
+    );
   },
 };
 
