@@ -774,6 +774,11 @@ export function SiteActionsView({
                     ? 'PhoenixBox now sends the container name as well as its color, so Burp can label Repeater tabs by container.'
                     : 'Color-codes your Burp requests by container, so you can see at a glance which container each request came from.'}
                 </p>
+                {highlighterModal === 'update' && (
+                  <p className="text-xs text-[var(--ext-text-muted)] leading-relaxed">
+                    Container-name headers remain disabled until you download the update or confirm you already have v1.2.0+.
+                  </p>
+                )}
                 <div
                   className="flex items-start gap-3 p-3.5 rounded-xl border border-[var(--ext-accent)]/25"
                   style={{ background: 'var(--ext-accent-bg)' }}
@@ -800,16 +805,25 @@ export function SiteActionsView({
                   download
                   target="_blank"
                   rel="noreferrer"
-                  onClick={() => {
-                    if (highlighterModal === 'update') void clearHighlighterUpdateNotice();
-                    setHighlighterModal(null);
-                  }}
+                  onClick={() => setHighlighterModal(null)}
                   className="w-full flex items-center justify-center gap-2 px-3 py-3 text-sm text-black rounded-xl font-semibold transition-all duration-200"
                   style={{ background: 'linear-gradient(180deg, var(--ext-accent-light), var(--ext-accent))', boxShadow: '0 0 22px var(--ext-glow-accent)' }}
                 >
                   <Download className="w-4 h-4" />
                   {highlighterModal === 'update' ? 'Download Phoenix JAR v1.2.0' : 'Download Phoenix JAR'}
                 </a>
+                {highlighterModal === 'update' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void clearHighlighterUpdateNotice();
+                      setHighlighterModal(null);
+                    }}
+                    className="w-full mt-2 px-3 py-2 text-xs text-[var(--ext-text)] border border-[var(--ext-accent)]/35 rounded-xl hover:bg-[var(--ext-accent-bg)] transition-colors font-medium"
+                  >
+                    I’ve updated to v1.2.0+
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setHighlighterModal(null)}
