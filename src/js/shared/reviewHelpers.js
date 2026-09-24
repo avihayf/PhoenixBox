@@ -222,6 +222,56 @@
     return patch;
   }
 
+  // Enough to cover any realistic history while staying well inside the 8 KB
+  // storage.sync per-item quota.
+  const MAX_DELETED_PRESET_IDS = 200;
+
+  /** Preset ids present before a change and gone after it. */
+  function removedPresetIds(oldPresets, newPresets) {
+    const next = new Set((Array.isArray(newPresets) ? newPresets : [])
+      .map((preset) => preset && preset.id).filter(Boolean));
+    return (Array.isArray(oldPresets) ? oldPresets : [])
+      .map((preset) => preset && preset.id)
+      .filter((id) => id && !next.has(id));
+  }
+
+  /** Add tombstones, newest last, capped so the list cannot outgrow sync quota. */
+  function addPresetTombstones(existing, ids) {
+    const list = (Array.isArray(existing) ? existing : []).filter((id) => !ids.includes(id));
+    return list.concat(ids).slice(-MAX_DELETED_PRESET_IDS);
+  }
+
+  /**
+   * Merge synced and local proxy presets.
+   *
+   * Without tombstones a deletion never stuck across devices: device A drops
+   * preset P, device B still has P locally and merges it back, then backs the
+   * merged list up and A picks P up again. Anything tombstoned is dropped
+   * from both sides. Synced order wins; local-only presets follow.
+   */
+  function mergeProxyPresets(syncPresets, localPresets, deletedIds, isValid) {
+    const deleted = new Set(Array.isArray(deletedIds) ? deletedIds : []);
+    const valid = typeof isValid === "function" ? isValid : () => true;
+    const fromSync = (Array.isArray(syncPresets) ? syncPresets : [])
+      .filter((preset) => valid(preset) && !deleted.has(preset.id));
+    const seen = new Set(fromSync.map((preset) => preset.id));
+    const localOnly = (Array.isArray(localPresets) ? localPresets : [])
+      .filter((preset) => preset && !seen.has(preset.id) && !deleted.has(preset.id));
+    return fromSync.concat(localOnly);
+  }
+
+  /**
+   * Whether a batch of sync changes warrants a sync run.
+   *
+   * Every backup rewrites this instance's heartbeat. Treating another
+   * device's heartbeat as a reason to sync made two devices trigger each
+   * other's full backup indefinitely.
+   */
+  function shouldRunSyncForCategories(categories) {
+    const list = Array.from(categories || []);
+    return list.some((category) => category !== "instance");
+  }
+
   // Strip a password out of a proxy URL while leaving the username in place.
   // Anchored on the authority section so an "@" inside a query string is not
   // mistaken for credentials.
@@ -373,6 +423,10 @@
     sanitizeGlobalProxyUrl,
     isSameProxyEndpoint,
     planContainerSettingsCleanup,
+    removedPresetIds,
+    addPresetTombstones,
+    mergeProxyPresets,
+    shouldRunSyncForCategories,
     sanitizePromotedProxyContainerIds,
     resolveUserAgentSelection,
   };

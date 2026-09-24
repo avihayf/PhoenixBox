@@ -22,7 +22,7 @@ const sync = {
         categories.add(SYNC_CATEGORY.IDENTITIES);
       } else if (key.startsWith("siteContainerMap@@_") || key === "deletedSiteList") {
         categories.add(SYNC_CATEGORY.ASSIGNMENTS);
-      } else if (key === "customProxyPresets") {
+      } else if (key === "customProxyPresets" || key === "deletedPresetIds") {
         categories.add(SYNC_CATEGORY.PRESETS);
       } else if (key.includes("MACinstance")) {
         categories.add(SYNC_CATEGORY.INSTANCE);
@@ -38,8 +38,21 @@ const sync = {
       return this.area.get(keys);
     },
 
+    // storage.sync is quota- and rate-limited, and every write is pushed to
+    // every other device. Write only the keys whose value actually changed.
     async set(options) {
-      return this.area.set(options);
+      const keys = Object.keys(options || {});
+      if (!keys.length) return;
+      const current = await this.area.get(keys);
+      const changed = {};
+      for (const key of keys) {
+        if (JSON.stringify(current[key]) !== JSON.stringify(options[key])) {
+          changed[key] = options[key];
+        }
+      }
+      if (Object.keys(changed).length) {
+        await this.area.set(changed);
+      }
     },
 
     async deleteIdentity(deletedIdentityUUID) {
@@ -147,7 +160,7 @@ const sync = {
       try {
         const identities = await updateSyncIdentities();
         const siteAssignments = await updateSyncSiteAssignments();
-        await this.backupPresets();
+        await sync.storageArea.backupPresets();
         await updateInstanceInfo(identities, siteAssignments);
         if (options && options.uuid) {
           await this.deleteIdentity(options.uuid);
@@ -243,6 +256,7 @@ const sync = {
     onChangedListener(changes, areaName) {
       if (areaName !== "sync") return;
       const categories = sync.classifySyncChanges(changes);
+      if (!PhoenixBoxReviewHelpers.shouldRunSyncForCategories(categories)) return;
       for (const cat of categories) {
         sync.pendingCategories.add(cat);
       }
@@ -258,6 +272,16 @@ const sync = {
       if (!changes.customProxyPresets) return;
       const syncEnabled = await assignManager.storageArea.getSyncEnabled();
       if (!syncEnabled) return;
+      const removed = PhoenixBoxReviewHelpers.removedPresetIds(
+        changes.customProxyPresets.oldValue,
+        changes.customProxyPresets.newValue
+      );
+      if (removed.length) {
+        const { deletedPresetIds } = await sync.storageArea.get("deletedPresetIds");
+        await sync.storageArea.set({
+          deletedPresetIds: PhoenixBoxReviewHelpers.addPresetTombstones(deletedPresetIds, removed),
+        });
+      }
       if (sync.isSyncRunning) {
         sync.needsPresetBackup = true;
         return;
@@ -320,6 +344,10 @@ const sync = {
   },
 
   async checkForListenersMaybeAdd() {
+    // backup()'s finally calls this; without the check it re-armed the sync
+    // listeners after the user had switched sync off mid-run.
+    if (!await assignManager.storageArea.getSyncEnabled()) return;
+
     const hasStorageListener =  
       await browser.storage.onChanged.hasListener(
         sync.storageArea.onChangedListener
@@ -405,23 +433,31 @@ const sync = {
     }
   },
 
+  // Registered as the contextualIdentities listener. backup() used to be
+  // registered directly, unbound, so `this` was not the storage area and it
+  // threw on every container create or rename while sync was on. The
+  // identity event is deliberately not passed through as backup options.
+  onIdentityChanged() {
+    return sync.storageArea.backup();
+  },
+
   async addContextualIdentityListeners() {
-    await browser.contextualIdentities.onCreated.addListener(sync.storageArea.backup);
+    await browser.contextualIdentities.onCreated.addListener(sync.onIdentityChanged);
     await browser.contextualIdentities.onRemoved.addListener(sync.storageArea.addToDeletedList);
-    await browser.contextualIdentities.onUpdated.addListener(sync.storageArea.backup);
+    await browser.contextualIdentities.onUpdated.addListener(sync.onIdentityChanged);
   },
 
   async removeContextualIdentityListeners() {
-    await browser.contextualIdentities.onCreated.removeListener(sync.storageArea.backup);
+    await browser.contextualIdentities.onCreated.removeListener(sync.onIdentityChanged);
     await browser.contextualIdentities.onRemoved.removeListener(sync.storageArea.addToDeletedList);
-    await browser.contextualIdentities.onUpdated.removeListener(sync.storageArea.backup);
+    await browser.contextualIdentities.onUpdated.removeListener(sync.onIdentityChanged);
   },
 
   async hasContextualIdentityListeners() {
     return (
-      await browser.contextualIdentities.onCreated.hasListener(sync.storageArea.backup) &&
+      await browser.contextualIdentities.onCreated.hasListener(sync.onIdentityChanged) &&
       await browser.contextualIdentities.onRemoved.hasListener(sync.storageArea.addToDeletedList) &&
-      await browser.contextualIdentities.onUpdated.hasListener(sync.storageArea.backup)
+      await browser.contextualIdentities.onUpdated.hasListener(sync.onIdentityChanged)
     );
   },
 
@@ -639,20 +675,10 @@ async function reconcileProxyPresets() {
   const localData = await browser.storage.local.get({ customProxyPresets: [] });
   const localPresets = localData.customProxyPresets || [];
 
-  const validSyncPresets = syncPresets.filter(isValidProxyPreset);
-  const syncById = new Map(validSyncPresets.map(p => [p.id, p]));
-
-  const merged = [];
-
-  for (const syncPreset of validSyncPresets) {
-    merged.push(syncPreset);
-  }
-
-  for (const localPreset of localPresets) {
-    if (!syncById.has(localPreset.id)) {
-      merged.push(localPreset);
-    }
-  }
+  const { deletedPresetIds } = await sync.storageArea.get("deletedPresetIds");
+  const merged = PhoenixBoxReviewHelpers.mergeProxyPresets(
+    syncPresets, localPresets, deletedPresetIds, isValidProxyPreset
+  );
 
   if (JSON.stringify(merged) !== JSON.stringify(localPresets)) {
     await browser.storage.local.set({ customProxyPresets: merged });

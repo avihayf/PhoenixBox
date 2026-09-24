@@ -13,6 +13,10 @@ const {
   partitionTabsForHide,
   isSameProxyEndpoint,
   planContainerSettingsCleanup,
+  removedPresetIds,
+  addPresetTombstones,
+  mergeProxyPresets,
+  shouldRunSyncForCategories,
   isSiteStoreKey,
   buildSiteStoreKey,
   getHostnameFromSiteStoreKey,
@@ -302,6 +306,50 @@ describe("reviewHelpers", () => {
       const input = stored();
       planContainerSettingsCleanup(input, "firefox-container-4");
       expect(input).to.deep.equal(stored());
+    });
+  });
+
+  describe("proxy preset sync", () => {
+    const P = (id) => ({ id, name: id, scheme: "http", host: "h", port: 1 });
+
+    it("finds the presets a change removed", () => {
+      expect(removedPresetIds([P("a"), P("b"), P("c")], [P("a"), P("c")])).to.deep.equal(["b"]);
+      expect(removedPresetIds(undefined, [P("a")])).to.deep.equal([]);
+      expect(removedPresetIds([P("a")], undefined)).to.deep.equal(["a"]);
+    });
+
+    it("caps the tombstone list and keeps the newest", () => {
+      const many = Array.from({ length: 250 }, (_, i) => `id${i}`);
+      const out = addPresetTombstones([], many);
+      expect(out).to.have.lengthOf(200);
+      expect(out[out.length - 1]).to.equal("id249");
+      expect(addPresetTombstones(["a", "b"], ["a"])).to.deep.equal(["b", "a"]);
+    });
+
+    // The bug: B still held P locally, merged it back, backed it up, and A
+    // picked it up again — deletions never stuck with two devices.
+    it("does not resurrect a preset deleted on another device", () => {
+      const merged = mergeProxyPresets([P("q")], [P("q"), P("p")], ["p"]);
+      expect(merged.map((x) => x.id)).to.deep.equal(["q"]);
+    });
+
+    it("keeps local-only presets that were never deleted", () => {
+      expect(mergeProxyPresets([P("q")], [P("q"), P("new")], []).map((x) => x.id))
+        .to.deep.equal(["q", "new"]);
+    });
+
+    it("drops synced presets that fail validation", () => {
+      const merged = mergeProxyPresets([P("q"), { id: "bad" }], [], [], (p) => !!p.host);
+      expect(merged.map((x) => x.id)).to.deep.equal(["q"]);
+    });
+
+    // Every backup rewrites the heartbeat; reacting to another device's
+    // heartbeat made two devices trigger each other forever.
+    it("ignores heartbeat-only sync changes", () => {
+      expect(shouldRunSyncForCategories(new Set(["instance"]))).to.equal(false);
+      expect(shouldRunSyncForCategories(new Set())).to.equal(false);
+      expect(shouldRunSyncForCategories(new Set(["instance", "presets"]))).to.equal(true);
+      expect(shouldRunSyncForCategories(new Set(["identities"]))).to.equal(true);
     });
   });
 
