@@ -10,7 +10,12 @@ const messageHandler = {
 
   init() {
     // Handles messages from webextension code
-    browser.runtime.onMessage.addListener(async (m) => {
+    browser.runtime.onMessage.addListener(async (m, sender) => {
+      if (!PhoenixBoxReviewHelpers.isExtensionPageSender(
+        sender, browser.runtime.id, browser.runtime.getURL(""))) {
+        LOG.warn("Ignored a runtime message from outside the extension's pages", sender && sender.url);
+        return undefined;
+      }
       try {
         let response;
         let tab;
@@ -20,7 +25,9 @@ const messageHandler = {
           response = identityState.storageArea.loadKeyboardShortcuts();
           break;
         case "setShortcut":
-          identityState.storageArea.setKeyboardShortcut(m.shortcut, m.cookieStoreId);
+          // Otherwise this is a write of any value to any storage key.
+          if (!PhoenixBoxReviewHelpers.isValidShortcutAssignment(m.shortcut, m.cookieStoreId)) break;
+          response = identityState.storageArea.setKeyboardShortcut(m.shortcut, m.cookieStoreId);
           break;
         case "resetSync":
           response = sync.resetSync();
@@ -93,6 +100,7 @@ const messageHandler = {
           response = assignManager._exemptTab(m);
           break;
         case "reloadInContainer":
+          if (!backgroundLogic.isPermissibleURL(m.url)) break;
           response = assignManager.reloadPageInContainer(
             m.url,
             m.currentUserContextId,
@@ -105,6 +113,13 @@ const messageHandler = {
           );
           break;
         case "assignAndReloadInContainer":
+          if (!backgroundLogic.isPermissibleURL(m.url)) break;
+          // Save the assignment before opening the tab. The other way round,
+          // the new tab loaded the site while any old assignment was still in
+          // force, got bounced back to the old container, and — being the
+          // "last created tab" — was closed, so the new assignment was never
+          // written.
+          await assignManager._setOrRemoveAssignment(null, m.url, m.newUserContextId, m.value);
           tab = await assignManager.reloadPageInContainer(
             m.url,
             m.currentUserContextId,
@@ -115,11 +130,11 @@ const messageHandler = {
             null,
             m.groupId
           );
-          // m.tabId is used for where to place the in content message
-          // m.url is the assignment to be removed/added
-          response = browser.tabs.get(tab.id).then((tab) => {
-            return assignManager._setOrRemoveAssignment(tab.id, m.url, m.newUserContextId, m.value);
-          });
+          if (tab && tab.id) {
+            assignManager._announceToTab(tab.id,
+              "Successfully assigned site to always open in this container");
+          }
+          response = tab;
           break;
 
         case "MozillaVPN_attemptPort":
@@ -259,7 +274,10 @@ const messageHandler = {
             // if it's a container tab wait for it to complete and
             // unhide other tabs from this container
             if (tab.cookieStoreId.startsWith("firefox-container")) {
+              // Filtered to this tab, so a burst of new tabs does not make
+              // every handler run for every other tab's status change.
               browser.tabs.onUpdated.addListener(tabUpdateHandler, {
+                tabId: tab.id,
                 properties: ["status"]
               });
               // Clean up the listener if the tab is closed before loading completes
@@ -268,8 +286,10 @@ const messageHandler = {
           }
         }
       }
+      // Only forget *this* tab: an earlier tab's timer used to clear a later
+      // one, so a redirect in the second tab left a stray tab behind.
       setTimeout(() => {
-        this.lastCreatedTab = null;
+        if (this.lastCreatedTab === tab) this.lastCreatedTab = null;
       }, this.LAST_CREATED_TAB_TIMER);
     });
   },

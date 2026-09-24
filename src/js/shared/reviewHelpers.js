@@ -272,6 +272,31 @@
     return list.some((category) => category !== "instance");
   }
 
+  /**
+   * Whether a runtime message came from one of the extension's own pages.
+   *
+   * Every legitimate caller is an extension page (popup, options, page
+   * action, confirm page). The content script, which runs in every web page's
+   * process, sends nothing, so anything from a web-page URL is refused —
+   * several handlers are strong primitives (repoint the global proxy, open any
+   * URL in any container, write an arbitrary storage key via setShortcut).
+   */
+  function isExtensionPageSender(sender, extensionId, extensionBaseUrl) {
+    if (!sender || typeof sender !== "object") return false;
+    if (extensionId && sender.id !== extensionId) return false;
+    const base = String(extensionBaseUrl || "");
+    return !!base && String(sender.url || "").startsWith(base);
+  }
+
+  const SHORTCUT_ID = /^open_container_\d$/;
+  const CONTAINER_OR_NONE = /^(none|firefox-container-\d+)$/;
+
+  /** A keyboard-shortcut write must name a shortcut slot and a container. */
+  function isValidShortcutAssignment(shortcut, cookieStoreId) {
+    return SHORTCUT_ID.test(String(shortcut || "")) &&
+      CONTAINER_OR_NONE.test(String(cookieStoreId || ""));
+  }
+
   // Strip a password out of a proxy URL while leaving the username in place.
   // Anchored on the authority section so an "@" inside a query string is not
   // mistaken for credentials.
@@ -427,6 +452,8 @@
     addPresetTombstones,
     mergeProxyPresets,
     shouldRunSyncForCategories,
+    isExtensionPageSender,
+    isValidShortcutAssignment,
     sanitizePromotedProxyContainerIds,
     resolveUserAgentSelection,
   };

@@ -17,6 +17,8 @@ const {
   addPresetTombstones,
   mergeProxyPresets,
   shouldRunSyncForCategories,
+  isExtensionPageSender,
+  isValidShortcutAssignment,
   isSiteStoreKey,
   buildSiteStoreKey,
   getHostnameFromSiteStoreKey,
@@ -350,6 +352,47 @@ describe("reviewHelpers", () => {
       expect(shouldRunSyncForCategories(new Set())).to.equal(false);
       expect(shouldRunSyncForCategories(new Set(["instance", "presets"]))).to.equal(true);
       expect(shouldRunSyncForCategories(new Set(["identities"]))).to.equal(true);
+    });
+  });
+
+  describe("isExtensionPageSender", () => {
+    const ID = "phoenix-box@0xr3db0mb.com";
+    const BASE = "moz-extension://abc123/";
+
+    it("accepts the extension's own pages", () => {
+      expect(isExtensionPageSender({ id: ID, url: BASE + "popup/index.html" }, ID, BASE)).to.equal(true);
+      expect(isExtensionPageSender({ id: ID, url: BASE + "confirm-page.html?url=x" }, ID, BASE)).to.equal(true);
+    });
+
+    // Content scripts carry the extension's id but the web page's URL.
+    it("refuses a sender running in a web page", () => {
+      expect(isExtensionPageSender({ id: ID, url: "https://evil.test/" }, ID, BASE)).to.equal(false);
+    });
+
+    it("refuses another extension, or a URL that merely contains ours", () => {
+      expect(isExtensionPageSender({ id: "other@x", url: BASE + "p.html" }, ID, BASE)).to.equal(false);
+      expect(isExtensionPageSender({ id: ID, url: "https://x.test/?" + BASE }, ID, BASE)).to.equal(false);
+    });
+
+    it("refuses when there is nothing to compare against", () => {
+      expect(isExtensionPageSender(null, ID, BASE)).to.equal(false);
+      expect(isExtensionPageSender({ id: ID }, ID, BASE)).to.equal(false);
+      expect(isExtensionPageSender({ id: ID, url: BASE }, ID, "")).to.equal(false);
+    });
+  });
+
+  describe("isValidShortcutAssignment", () => {
+    it("accepts a shortcut slot and a container or none", () => {
+      expect(isValidShortcutAssignment("open_container_0", "firefox-container-3")).to.equal(true);
+      expect(isValidShortcutAssignment("open_container_9", "none")).to.equal(true);
+    });
+
+    // Otherwise setShortcut writes any value to any storage.local key.
+    it("refuses any other storage key or value", () => {
+      expect(isValidShortcutAssignment("globalProxyParsed", "firefox-container-1")).to.equal(false);
+      expect(isValidShortcutAssignment("open_container_10", "none")).to.equal(false);
+      expect(isValidShortcutAssignment("open_container_1", "http://x")).to.equal(false);
+      expect(isValidShortcutAssignment("open_container_1", undefined)).to.equal(false);
     });
   });
 

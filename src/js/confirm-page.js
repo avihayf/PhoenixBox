@@ -116,11 +116,10 @@ function confirmSubmit(redirectUrl, cookieStoreId) {
  * @returns {Promise<Tab>}
  */
 async function getCurrentTab() {
-  const tabs = await browser.tabs.query({
-    active: true,
-    windowId: browser.windows.WINDOW_ID_CURRENT
-  });
-  return tabs[0];
+  // The tab this page lives in, not whichever tab happens to be active: if
+  // focus moved while the prompt was open, the old query exempted the wrong
+  // tab from the assignment.
+  return browser.tabs.getCurrent();
 }
 
 async function denySubmit(redirectUrl, currentCookieStoreId) {

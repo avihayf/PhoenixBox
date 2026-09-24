@@ -452,16 +452,20 @@ window.assignManager = {
       }
     }
 
-    if (siteIsolatedReloadInDefault) {
-      this.reloadPageInDefaultContainer(
+    // The original request is cancelled below either way, so the reopen must
+    // succeed before the original tab may be closed — otherwise a failed
+    // create (e.g. an opener in another window) loses the navigation and,
+    // with replaceTabEnabled, the tab itself.
+    const reopened = siteIsolatedReloadInDefault
+      ? this.reloadPageInDefaultContainer(
         options.url,
         tab.index + 1,
         tab.active,
         openTabId,
-        tab.groupId
-      );
-    } else {
-      this.reloadPageInContainer(
+        tab.groupId,
+        tab.windowId
+      )
+      : this.reloadPageInContainer(
         options.url,
         userContextId,
         siteSettings.userContextId,
@@ -469,9 +473,9 @@ window.assignManager = {
         tab.active,
         siteSettings.neverAsk,
         openTabId,
-        tab.groupId
+        tab.groupId,
+        tab.windowId
       );
-    }
     this.calculateContextMenu(tab);
 
     /* Removal of existing tabs:
@@ -497,9 +501,13 @@ window.assignManager = {
         the timeout to try to capture pages which haven't had user
         interaction or history.
     */
-    if (removeTab) {
-      browser.tabs.remove(tab.id);
-    }
+    // Not awaited: this is a blocking listener, and cancelling must not wait
+    // on tab creation. The close is chained onto the reopen succeeding.
+    Promise.resolve(reopened).then(() => {
+      if (removeTab) return browser.tabs.remove(tab.id);
+    }).catch((e) => {
+      LOG.error("Could not reopen the page in its assigned container:", e);
+    });
     return {
       cancel: true,
     };
@@ -1057,16 +1065,42 @@ window.assignManager = {
     }
 
     if (tabId) {
-      const tab = await browser.tabs.get(tabId);
-      setTimeout(function(){
-        browser.tabs.sendMessage(tabId, {
-          text: `Successfully ${actionName}`
-        });
-      }, 1000);
-
-
-      this.calculateContextMenu(tab);
+      await this._announceToTab(tabId, `Successfully ${actionName}`);
     }
+  },
+
+  /**
+   * Show the in-page confirmation toast once the tab can receive it.
+   *
+   * The content script runs at document_idle, so a fixed one-second delay
+   * could arrive before it existed and the toast silently never appeared.
+   * Wait for the tab to finish loading (bounded), then send. Best-effort:
+   * pages the content script cannot run in simply get no toast.
+   */
+  async _announceToTab(tabId, text) {
+    let tab;
+    try {
+      tab = await browser.tabs.get(tabId);
+    } catch {
+      return;
+    }
+    this.calculateContextMenu(tab);
+
+    if (tab.status !== "complete") {
+      await new Promise((resolve) => {
+        const done = () => {
+          clearTimeout(timer);
+          browser.tabs.onUpdated.removeListener(onUpdated);
+          resolve();
+        };
+        const onUpdated = (id, changeInfo) => {
+          if (id === tabId && changeInfo.status === "complete") done();
+        };
+        const timer = setTimeout(done, 10000);
+        browser.tabs.onUpdated.addListener(onUpdated, { tabId, properties: ["status"] });
+      });
+    }
+    browser.tabs.sendMessage(tabId, { text }).catch(() => {});
   },
 
   async _maybeRemoveSiteIsolation(userContextId) {
@@ -1166,7 +1200,7 @@ window.assignManager = {
    * @param {number} [groupId]
    * @returns {void}
    */
-  reloadPageInDefaultContainer(url, index, active, openerTabId, groupId) {
+  reloadPageInDefaultContainer(url, index, active, openerTabId, groupId, windowId) {
     // To create a new tab in the default container, it is easiest just to omit the
     // cookieStoreId entirely.
     //
@@ -1185,7 +1219,7 @@ window.assignManager = {
     // does not automatically return to the original opener tab. To get this desired behaviour,
     // we MUST specify the openerTabId when creating the new tab.
     const cookieStoreId = "firefox-default";
-    this.createTabWrapper(url, cookieStoreId, index, active, openerTabId, groupId);
+    return this.createTabWrapper(url, cookieStoreId, index, active, openerTabId, groupId, windowId);
   },
 
 
@@ -1201,14 +1235,23 @@ window.assignManager = {
    * @param {number} [groupId] Tab group ID
    * @returns {Promise<Tab>}
    */
-  async createTabWrapper(url, cookieStoreId, index, active, openerTabId, groupId) {
-    const newTab = await browser.tabs.create({
-      url,
-      cookieStoreId,
-      index,
-      active,
-      openerTabId,
-    });
+  async createTabWrapper(url, cookieStoreId, index, active, openerTabId, groupId, windowId) {
+    // In the navigating tab's own window: `index` is a position in that
+    // window, and without it Firefox uses the last-focused window instead.
+    const props = { url, cookieStoreId, index, active, openerTabId };
+    if (typeof windowId === "number" && windowId >= 0) props.windowId = windowId;
+
+    let newTab;
+    try {
+      newTab = await browser.tabs.create(props);
+    } catch (e) {
+      // Firefox rejects an opener in another window. The opener only decides
+      // which tab gets focus when this one closes, so drop it rather than
+      // lose the navigation.
+      if (!openerTabId) throw e;
+      delete props.openerTabId;
+      newTab = await browser.tabs.create(props);
+    }
 
     if (groupId >= 0 && typeof browser.tabs.group === "function") {
       // If the original tab was in a tab group, make sure that the reopened tab
@@ -1234,19 +1277,19 @@ window.assignManager = {
    * @param {number} [groupId]
    * @returns {Promise<Tab>}
    */
-  reloadPageInContainer(url, currentUserContextId, userContextId, index, active, neverAsk = false, openerTabId = null, groupId = undefined) {
+  reloadPageInContainer(url, currentUserContextId, userContextId, index, active, neverAsk = false, openerTabId = null, groupId = undefined, windowId = undefined) {
     const cookieStoreId = backgroundLogic.cookieStoreId(userContextId);
     const loadPage = browser.runtime.getURL("confirm-page.html");
     // False represents assignment is not permitted
     // If the user has explicitly checked "Never Ask Again" on the warning page we will send them straight there
     if (neverAsk) {
-      return this.createTabWrapper(url, cookieStoreId, index, active, openerTabId, groupId);
+      return this.createTabWrapper(url, cookieStoreId, index, active, openerTabId, groupId, windowId);
     } else {
-      let confirmUrl = `${loadPage}?url=${this.encodeURLProperty(url)}&cookieStoreId=${cookieStoreId}`;
+      let confirmUrl = `${loadPage}?url=${this.encodeURLProperty(url)}&cookieStoreId=${this.encodeURLProperty(cookieStoreId)}`;
       let currentCookieStoreId;
       if (currentUserContextId) {
         currentCookieStoreId = backgroundLogic.cookieStoreId(currentUserContextId);
-        confirmUrl += `&currentCookieStoreId=${currentCookieStoreId}`;
+        confirmUrl += `&currentCookieStoreId=${this.encodeURLProperty(currentCookieStoreId)}`;
       }
       return this.createTabWrapper(
         confirmUrl,
@@ -1254,10 +1297,9 @@ window.assignManager = {
         index,
         active,
         openerTabId,
-        groupId
-      ).catch((e) => {
-        throw e;
-      });
+        groupId,
+        windowId
+      );
     }
   },
 
