@@ -26,6 +26,34 @@
   // What the same setting was called when it only added the colour header.
   const LEGACY_HIGHLIGHTER_HEADERS_KEY = "addContainerColorHeaderEnabled";
 
+  // The Highlighter JAR version the user has confirmed is loaded in Burp. Only
+  // v1.2.0+ strips X-MAC-Container-Name, so until the user confirms at least
+  // that, the name is withheld — on fresh installs as well as upgrades, since a
+  // new profile can be pointed at a Burp that still runs an old JAR.
+  const JAR_ACK_VERSION_KEY = "highlighterJarAckVersion";
+  const REQUIRED_JAR_VERSION = "1.2.0";
+
+  /** Numeric dotted-version compare; non-numeric parts count as 0. */
+  function compareVersions(a, b) {
+    const pa = String(a || "").split(".").map((n) => parseInt(n, 10) || 0);
+    const pb = String(b || "").split(".").map((n) => parseInt(n, 10) || 0);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+      const diff = (pa[i] || 0) - (pb[i] || 0);
+      if (diff !== 0) return diff < 0 ? -1 : 1;
+    }
+    return 0;
+  }
+
+  /**
+   * Whether the user has confirmed a JAR new enough to strip the name header.
+   * Keyed on the version rather than a one-shot flag, so raising the
+   * requirement later re-asks exactly once, and unrelated releases never do.
+   */
+  function isJarAcknowledged(ackVersion, requiredVersion) {
+    if (!ackVersion) return false;
+    return compareVersions(ackVersion, requiredVersion || REQUIRED_JAR_VERSION) >= 0;
+  }
+
   // Container names are arbitrary user text; header values are not. Cap the raw
   // name before encoding so the bound is easy to reason about.
   //
@@ -201,7 +229,7 @@
    * three-state contract. Gated on the same setting: the name rides the Burp
    * highlighting toggle rather than having one of its own.
    *
-   * Additionally withheld while the JAR update notice is pending. A container's
+   * Additionally withheld until the user confirms a new-enough JAR. A container's
    * colour is one of eight values; its name is arbitrary user text, so it is a
    * far larger disclosure. Only a Highlighter of v1.2.0 or later strips it, and
    * an existing user who had highlighting switched on never consented to
@@ -211,14 +239,16 @@
    * @param {string} cookieStoreId
    * @param {boolean} highlighterHeadersEnabled
    * @param {Map<string, {color?: string, name?: string}>} containerIdentities
-   * @param {boolean} [jarUpdatePending] true while the user still has to be told.
+   * @param {boolean} jarAcknowledged true once the user has confirmed a JAR
+   *   that strips this header. Anything else withholds the name.
    * @returns {string|null|undefined}
    */
-  function resolveContainerName(cookieStoreId, highlighterHeadersEnabled, containerIdentities, jarUpdatePending) {
+  function resolveContainerName(cookieStoreId, highlighterHeadersEnabled, containerIdentities, jarAcknowledged) {
     if (!highlighterHeadersEnabled) return null;
     // Deliberately `null`, not `undefined`: this is a decision not to send, not
     // a cache miss, so it must not push the request onto the async lookup path.
-    if (jarUpdatePending) return null;
+    // Strictly `true`: a missing argument must fail closed.
+    if (jarAcknowledged !== true) return null;
     if (!cookieStoreId || NON_CONTAINER_COOKIE_STORES.has(cookieStoreId)) {
       return null;
     }
@@ -268,6 +298,10 @@
     NAME_HEADER_NAME,
     HIGHLIGHTER_HEADERS_KEY,
     LEGACY_HIGHLIGHTER_HEADERS_KEY,
+    JAR_ACK_VERSION_KEY,
+    REQUIRED_JAR_VERSION,
+    compareVersions,
+    isJarAcknowledged,
     resolveHighlighterHeadersEnabled,
     MAX_CONTAINER_NAME_LENGTH,
     COLOR_MAP,

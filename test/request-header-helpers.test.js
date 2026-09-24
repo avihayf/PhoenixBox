@@ -7,6 +7,8 @@ const {
   hasContainerUserAgents,
   shouldListen,
   resolveHighlighterHeadersEnabled,
+  isJarAcknowledged,
+  compareVersions,
   resolveUserAgent,
   encodeContainerName,
   resolveContainerColor,
@@ -304,54 +306,58 @@ describe("requestHeaderHelpers", () => {
   describe("resolveContainerName", () => {
     const identities = () =>
       new Map([["firefox-container-1", { color: "red", name: "Attacker" }]]);
+    // The name is only sent once the user has confirmed a JAR that strips it.
+    const ACK = true;
 
-    it("returns null when the color header feature is off", () => {
-      expect(resolveContainerName("firefox-container-1", false, identities()))
+    it("returns null when the Highlighter is off", () => {
+      expect(resolveContainerName("firefox-container-1", false, identities(), ACK))
         .to.equal(null);
     });
 
     it("never labels the default or private cookie stores", () => {
-      expect(resolveContainerName("firefox-default", true, identities())).to.equal(null);
-      expect(resolveContainerName("firefox-private", true, identities())).to.equal(null);
-      expect(resolveContainerName("", true, identities())).to.equal(null);
-      expect(resolveContainerName(undefined, true, identities())).to.equal(null);
+      expect(resolveContainerName("firefox-default", true, identities(), ACK)).to.equal(null);
+      expect(resolveContainerName("firefox-private", true, identities(), ACK)).to.equal(null);
+      expect(resolveContainerName("", true, identities(), ACK)).to.equal(null);
+      expect(resolveContainerName(undefined, true, identities(), ACK)).to.equal(null);
     });
 
-    it("returns the encoded name for a cached container", () => {
-      expect(resolveContainerName("firefox-container-1", true, identities()))
+    it("returns the encoded name once the JAR is acknowledged", () => {
+      expect(resolveContainerName("firefox-container-1", true, identities(), ACK))
         .to.equal("Attacker");
     });
 
-    // A colour is one of eight values; a name is arbitrary user text. An
-    // existing user who switched highlighting on consented to the colour, so
-    // the name waits until they have been told their JAR may not strip it.
-    it("withholds the name while the JAR update notice is pending", () => {
-      expect(resolveContainerName("firefox-container-1", true, identities(), true))
+    // A colour is one of eight values; a name is arbitrary user text, and only
+    // Highlighter v1.2.0+ strips it before it reaches the target.
+    it("withholds the name until the JAR is acknowledged", () => {
+      expect(resolveContainerName("firefox-container-1", true, identities(), false))
+        .to.equal(null);
+    });
+
+    // Fail closed: a caller that forgets the argument must not leak the name.
+    it("withholds the name when acknowledgement is not passed at all", () => {
+      expect(resolveContainerName("firefox-container-1", true, identities()))
+        .to.equal(null);
+      expect(resolveContainerName("firefox-container-1", true, identities(), "yes"))
         .to.equal(null);
     });
 
     // null, not undefined: withholding is a decision, and undefined would send
     // every request for this container down the async lookup path.
     it("withholds even for a container that is not cached", () => {
-      expect(resolveContainerName("firefox-container-7", true, identities(), true))
+      expect(resolveContainerName("firefox-container-7", true, identities(), false))
         .to.equal(null);
     });
 
-    it("sends the name again once the notice is acknowledged", () => {
-      expect(resolveContainerName("firefox-container-1", true, identities(), false))
-        .to.equal("Attacker");
-    });
-
     // The colour is unaffected: it is what the user already opted into.
-    it("does not withhold the colour while the notice is pending", () => {
+    it("does not withhold the colour before acknowledgement", () => {
       expect(resolveContainerColor("firefox-container-1", true, identities()))
         .to.equal("red");
     });
 
     it("returns undefined only when the container is not cached", () => {
-      expect(resolveContainerName("firefox-container-7", true, identities()))
+      expect(resolveContainerName("firefox-container-7", true, identities(), ACK))
         .to.equal(undefined);
-      expect(resolveContainerName("firefox-container-1", true, null))
+      expect(resolveContainerName("firefox-container-1", true, null, ACK))
         .to.equal(undefined);
     });
 
@@ -360,8 +366,37 @@ describe("requestHeaderHelpers", () => {
     it("returns null for a container cached without a usable name", () => {
       for (const entry of [{ color: "red" }, { color: "red", name: "  " }, undefined]) {
         const map = new Map([["firefox-container-1", entry]]);
-        expect(resolveContainerName("firefox-container-1", true, map)).to.equal(null);
+        expect(resolveContainerName("firefox-container-1", true, map, ACK)).to.equal(null);
       }
+    });
+  });
+
+  describe("isJarAcknowledged", () => {
+    it("accepts the required version and anything newer", () => {
+      expect(isJarAcknowledged("1.2.0")).to.equal(true);
+      expect(isJarAcknowledged("1.2.1")).to.equal(true);
+      expect(isJarAcknowledged("1.10.0")).to.equal(true);
+      expect(isJarAcknowledged("2.0")).to.equal(true);
+    });
+
+    it("rejects older, missing and junk versions", () => {
+      expect(isJarAcknowledged("1.1.9")).to.equal(false);
+      expect(isJarAcknowledged("1.2")).to.equal(true);
+      expect(isJarAcknowledged(null)).to.equal(false);
+      expect(isJarAcknowledged(undefined)).to.equal(false);
+      expect(isJarAcknowledged("")).to.equal(false);
+      expect(isJarAcknowledged(true)).to.equal(false);
+    });
+
+    // Raising the requirement later must re-ask users who confirmed the old one.
+    it("re-asks when the requirement is raised", () => {
+      expect(isJarAcknowledged("1.2.0", "1.3.0")).to.equal(false);
+    });
+
+    it("compares numerically, not lexically", () => {
+      expect(compareVersions("1.10.0", "1.9.0")).to.equal(1);
+      expect(compareVersions("1.2.0", "1.2")).to.equal(0);
+      expect(compareVersions("1.1", "1.2.0")).to.equal(-1);
     });
   });
 

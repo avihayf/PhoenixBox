@@ -10,14 +10,11 @@ import { requireWebExt } from '../../../lib/browser';
 import { HueAccentPicker } from '../HueAccentPicker';
 import { LogoAccentPicker } from '../LogoAccentPicker';
 import { accentToHue, type AccentValue, type LogoAccentValue } from '../../../lib/accentColors';
-import { HIGHLIGHTER_STORAGE_DEFAULTS, resolveHighlighterHeadersEnabled } from '../../../lib/highlighterSettings';
-
-/**
- * Pinned to the release that strips both the container color and container name
- * headers. Bump this together with the version named in the update modal.
- */
-const HIGHLIGHTER_JAR_URL =
-  'https://github.com/avihayf/PhoenixBox-Highlighter/releases/download/v1.2.0/PhoenixBoxHighlighter.jar';
+import {
+  HIGHLIGHTER_STORAGE_DEFAULTS, HIGHLIGHTER_RELEASES_URL, JAR_ACK_VERSION_KEY, REQUIRED_JAR_VERSION,
+  resolveHighlighterHeadersEnabled, isJarAcknowledged, noticeOnPopupOpen, noticeOnEnable,
+  acknowledgementFor, type HighlighterNotice, type NoticeAction,
+} from '../../../lib/highlighterSettings';
 
 /**
  * Module scope, so it lasts exactly as long as one popup opening — Firefox
@@ -160,9 +157,16 @@ export function SiteActionsView({
   const [showPresetDropdown, setShowPresetDropdown] = useState(false);
   const [showProxyModal, setShowProxyModal] = useState(false);
   const [editingPreset, setEditingPreset] = useState<ProxyPreset | null>(null);
-  // "setup" is the first-time explainer; "update" tells an existing user their
-  // JAR is too old to strip the container-name header this version now sends.
-  const [highlighterModal, setHighlighterModal] = useState<null | 'setup' | 'update'>(null);
+  // "setup" is the first-time explainer; "confirm" asks the user to confirm a
+  // JAR new enough to strip the container-name header, which stays withheld
+  // until they do. The decisions live in lib/highlighterSettings.ts, tested.
+  const [highlighterModal, setHighlighterModal] = useState<HighlighterNotice>(null);
+
+  const readJarAcknowledged = async (): Promise<boolean> => {
+    const browser = requireWebExt();
+    const stored = await browser.storage.local.get({ [JAR_ACK_VERSION_KEY]: null });
+    return isJarAcknowledged((stored as Record<string, unknown>)[JAR_ACK_VERSION_KEY]);
+  };
 
   useEffect(() => {
     if (updateNoticeShownThisPopup) return;
@@ -170,17 +174,14 @@ export function SiteActionsView({
     void (async () => {
       try {
         const browser = requireWebExt();
-        const stored = await browser.storage.local.get({
-          highlighterJarUpdateNoticePending: false,
-          ...HIGHLIGHTER_STORAGE_DEFAULTS,
-        });
-        // Only surface it to people actually using the Burp integration. The
-        // flag is left pending otherwise, so they still get told if they turn
-        // the Highlighter on later.
-        if (stored.highlighterJarUpdateNoticePending &&
-            resolveHighlighterHeadersEnabled(stored as Record<string, unknown>)) {
+        const stored = await browser.storage.local.get({ ...HIGHLIGHTER_STORAGE_DEFAULTS });
+        const notice = noticeOnPopupOpen(
+          resolveHighlighterHeadersEnabled(stored as Record<string, unknown>),
+          await readJarAcknowledged()
+        );
+        if (notice) {
           updateNoticeShownThisPopup = true;
-          setHighlighterModal('update');
+          setHighlighterModal(notice);
         }
       } catch {
         // The popup is still perfectly usable without the notice.
@@ -188,15 +189,14 @@ export function SiteActionsView({
     })();
   }, []);
 
-  // Deliberately not cleared just because the modal was shown: until the user
-  // acts on it their JAR is still forwarding the container name to targets, so
-  // closing the modal re-arms the notice for the next popup open.
-  const clearHighlighterUpdateNotice = async () => {
+  const handleNoticeAction = async (action: NoticeAction) => {
+    setHighlighterModal(null);
+    const ack = acknowledgementFor(action);
+    if (!ack) return;
     try {
-      const browser = requireWebExt();
-      await browser.storage.local.set({ highlighterJarUpdateNoticePending: false });
+      await requireWebExt().storage.local.set({ [JAR_ACK_VERSION_KEY]: ack });
     } catch {
-      // Nothing to do — it will simply be shown again.
+      // Not stored: the name stays withheld and the user is asked again.
     }
   };
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -386,10 +386,11 @@ export function SiteActionsView({
                   if (enabled) {
                     const browser = requireWebExt();
                     const stored = await browser.storage.local.get({ paintBurpFirstTimeMessageShown: false });
-                    if (!stored.paintBurpFirstTimeMessageShown) {
+                    const notice = noticeOnEnable(!!stored.paintBurpFirstTimeMessageShown, await readJarAcknowledged());
+                    if (notice === 'setup') {
                       await browser.storage.local.set({ paintBurpFirstTimeMessageShown: true });
-                      setHighlighterModal('setup');
                     }
+                    setHighlighterModal(notice);
                   }
                 }}
               />
@@ -721,21 +722,25 @@ export function SiteActionsView({
 
       </div>
 
-      {/* Phoenix Highlighter setup / JAR update modal */}
+      {/* Phoenix Highlighter setup / JAR confirmation modal */}
       {highlighterModal && (
         <>
-          {/* Backdrop */}
-          <div 
+          {/* Backdrop — dismissing never acknowledges the JAR */}
+          <div
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 animate-in fade-in duration-200"
-            onClick={() => setHighlighterModal(null)}
+            onClick={() => void handleNoticeAction('dismiss')}
           />
-          
+
           {/* Modal */}
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
             <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="highlighter-modal-title"
               className="relative bg-[var(--ext-bg-secondary)] border border-[var(--ext-accent)]/40 rounded-2xl overflow-hidden w-full max-w-[340px] pointer-events-auto animate-in scale-in-95 duration-200"
               style={{ boxShadow: '0 24px 60px rgba(0,0,0,0.6), 0 0 32px var(--ext-glow-accent)' }}
               onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => { if (e.key === 'Escape') void handleNoticeAction('dismiss'); }}
             >
               {/* Accent top line */}
               <div
@@ -755,12 +760,15 @@ export function SiteActionsView({
                   <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--ext-text-muted)] mb-1.5">
                     Burp Integration
                   </div>
-                  <h2 className="font-medium uppercase tracking-wider text-[var(--ext-text)] brand-title" style={{ fontSize: '15px', lineHeight: 1.2 }}>
-                    {highlighterModal === 'update' ? 'Update Your Phoenix JAR' : 'Phoenix Highlighter Setup'}
+                  <h2 id="highlighter-modal-title" className="font-medium uppercase tracking-wider text-[var(--ext-text)] brand-title" style={{ fontSize: '15px', lineHeight: 1.2 }}>
+                    {highlighterModal === 'confirm' ? 'Confirm Your Phoenix JAR' : 'Phoenix Highlighter Setup'}
                   </h2>
                 </div>
                 <button
-                  onClick={() => setHighlighterModal(null)}
+                  type="button"
+                  aria-label="Close"
+                  autoFocus
+                  onClick={() => void handleNoticeAction('dismiss')}
                   className="w-8 h-8 flex-none flex items-center justify-center rounded-lg text-[var(--ext-text-muted)] hover:bg-[var(--ext-accent-bg)] hover:text-[var(--ext-accent)] transition-all duration-200"
                 >
                   <X className="w-4 h-4" />
@@ -770,30 +778,15 @@ export function SiteActionsView({
               {/* Content */}
               <div className="px-5 pt-5 pb-6 space-y-3.5">
                 <p className="text-sm text-[var(--ext-text)] leading-relaxed">
-                  {highlighterModal === 'update'
-                    ? 'PhoenixBox now sends the container name as well as its color, so Burp can label Repeater tabs by container.'
-                    : 'Color-codes your Burp requests by container, so you can see at a glance which container each request came from.'}
+                  Color-codes your Burp requests by container, and labels Repeater tabs with the container name.
                 </p>
-                {highlighterModal === 'update' && (
-                  <p className="text-xs text-[var(--ext-text-muted)] leading-relaxed">
-                    Container-name headers remain disabled until you download the update or confirm you already have v1.2.0+.
-                  </p>
-                )}
                 <div
                   className="flex items-start gap-3 p-3.5 rounded-xl border border-[var(--ext-accent)]/25"
                   style={{ background: 'var(--ext-accent-bg)' }}
                 >
                   <Info className="w-4 h-4 flex-none mt-0.5 text-[var(--ext-accent)]" />
                   <p className="text-sm text-[var(--ext-text)] leading-relaxed">
-                    {highlighterModal === 'update' ? (
-                      <>
-                        Update to <strong className="text-[var(--ext-accent)] font-semibold">Phoenix Highlighter v1.2.0</strong> or later. Older versions do not strip the container-name header, so it will reach the target.
-                      </>
-                    ) : (
-                      <>
-                        Make sure the <strong className="text-[var(--ext-accent)] font-semibold">Phoenix Highlighter</strong> extension (JAR) is loaded in Burp Suite.
-                      </>
-                    )}
+                    The container name is only sent once you confirm <strong className="text-[var(--ext-accent)] font-semibold">Phoenix Highlighter v{REQUIRED_JAR_VERSION}</strong> or later is loaded in Burp. Older versions do not strip it, so it would reach the target. Downloading alone does not count.
                   </p>
                 </div>
               </div>
@@ -801,35 +794,29 @@ export function SiteActionsView({
               {/* Actions */}
               <div className="px-5 pb-5">
                 <a
-                  href={HIGHLIGHTER_JAR_URL}
-                  download
+                  href={HIGHLIGHTER_RELEASES_URL}
                   target="_blank"
                   rel="noreferrer"
-                  onClick={() => setHighlighterModal(null)}
+                  onClick={() => void handleNoticeAction('download')}
                   className="w-full flex items-center justify-center gap-2 px-3 py-3 text-sm text-black rounded-xl font-semibold transition-all duration-200"
                   style={{ background: 'linear-gradient(180deg, var(--ext-accent-light), var(--ext-accent))', boxShadow: '0 0 22px var(--ext-glow-accent)' }}
                 >
                   <Download className="w-4 h-4" />
-                  {highlighterModal === 'update' ? 'Download Phoenix JAR v1.2.0' : 'Download Phoenix JAR'}
+                  Get Phoenix Highlighter
                 </a>
-                {highlighterModal === 'update' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void clearHighlighterUpdateNotice();
-                      setHighlighterModal(null);
-                    }}
-                    className="w-full mt-2 px-3 py-2 text-xs text-[var(--ext-text)] border border-[var(--ext-accent)]/35 rounded-xl hover:bg-[var(--ext-accent-bg)] transition-colors font-medium"
-                  >
-                    I’ve updated to v1.2.0+
-                  </button>
-                )}
                 <button
                   type="button"
-                  onClick={() => setHighlighterModal(null)}
+                  onClick={() => void handleNoticeAction('confirm-installed')}
+                  className="w-full mt-2 px-3 py-2 text-xs text-[var(--ext-text)] border border-[var(--ext-accent)]/35 rounded-xl hover:bg-[var(--ext-accent-bg)] transition-colors font-medium"
+                >
+                  I have v{REQUIRED_JAR_VERSION}+ loaded in Burp
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleNoticeAction('dismiss')}
                   className="w-full mt-2 px-3 py-2 text-xs text-[var(--ext-text-muted)] hover:text-[var(--ext-accent)] transition-colors font-medium"
                 >
-                  {highlighterModal === 'update' ? 'Remind me later' : 'I already have it'}
+                  Not now
                 </button>
               </div>
             </div>

@@ -39,19 +39,11 @@ const backgroundLogic = {
     browser.permissions.onAdded.addListener(permissions => this.resetPermissions(permissions));
     browser.permissions.onRemoved.addListener(permissions => this.resetPermissions(permissions));
 
-    browser.runtime.onInstalled.addListener((details) => {
+    browser.runtime.onInstalled.addListener(() => {
       this.updateTranslationInManifest();
       this._normalizeSecurityProfiles().catch(() => {});
       this._initializeUserAgentCache();
       this._migrateHighlighterHeadersKey().catch(() => {});
-
-      // This version also sends the container name to Burp. A JAR older than
-      // v1.2.0 does not strip that header, so it would reach the target.
-      if (details && details.reason === "update") {
-        browser.storage.local
-          .set({ highlighterJarUpdateNoticePending: true })
-          .catch(() => {});
-      }
     });
     browser.runtime.onStartup.addListener(() => {
       this.updateTranslationInManifest();
@@ -72,6 +64,10 @@ const backgroundLogic = {
   async _migrateHighlighterHeadersKey() {
     const CURRENT = PhoenixBoxRequestHeaderHelpers.HIGHLIGHTER_HEADERS_KEY;
     const LEGACY = PhoenixBoxRequestHeaderHelpers.LEGACY_HIGHLIGHTER_HEADERS_KEY;
+
+    // Superseded by highlighterJarAckVersion. It never shipped in a release,
+    // so there is no acknowledgement in it worth carrying over.
+    await browser.storage.local.remove("highlighterJarUpdateNoticePending");
 
     const stored = await browser.storage.local.get([CURRENT, LEGACY]);
     if (!(LEGACY in stored)) {

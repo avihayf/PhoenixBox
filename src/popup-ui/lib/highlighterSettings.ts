@@ -42,3 +42,57 @@ export function highlighterChangeValue(
   }
   return undefined;
 }
+
+/* ---------------------------------------------------------------------------
+ * JAR acknowledgement — gates the X-MAC-Container-Name header.
+ *
+ * Keep in sync with JAR_ACK_VERSION_KEY / REQUIRED_JAR_VERSION /
+ * isJarAcknowledged in src/js/shared/requestHeaderHelpers.js (a parity test in
+ * test/highlighter-settings.test.mjs pins them together).
+ * ------------------------------------------------------------------------- */
+
+export const JAR_ACK_VERSION_KEY = "highlighterJarAckVersion";
+export const REQUIRED_JAR_VERSION = "1.2.0";
+
+/** Where to get the JAR. The releases page, not a pinned asset: it cannot 404. */
+export const HIGHLIGHTER_RELEASES_URL =
+  "https://github.com/avihayf/PhoenixBox-Highlighter/releases/latest";
+
+export function compareVersions(a: unknown, b: unknown): number {
+  const pa = String(a || "").split(".").map((n) => parseInt(n, 10) || 0);
+  const pb = String(b || "").split(".").map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] || 0) - (pb[i] || 0);
+    if (diff !== 0) return diff < 0 ? -1 : 1;
+  }
+  return 0;
+}
+
+export function isJarAcknowledged(ackVersion: unknown, required = REQUIRED_JAR_VERSION): boolean {
+  if (!ackVersion) return false;
+  return compareVersions(ackVersion, required) >= 0;
+}
+
+export type HighlighterNotice = "setup" | "confirm" | null;
+
+/** What to show when the popup opens. Reminds only people using the feature. */
+export function noticeOnPopupOpen(enabled: boolean, acknowledged: boolean): HighlighterNotice {
+  return enabled && !acknowledged ? "confirm" : null;
+}
+
+/** What to show when the user switches the Highlighter on. */
+export function noticeOnEnable(setupShownBefore: boolean, acknowledged: boolean): HighlighterNotice {
+  if (!setupShownBefore) return "setup";
+  return acknowledged ? null : "confirm";
+}
+
+export type NoticeAction = "confirm-installed" | "download" | "dismiss";
+
+/**
+ * The acknowledgement to store for a modal action, or null to store nothing.
+ * Only an explicit confirmation counts: downloading is not installing, and a
+ * dismissal must leave the name withheld.
+ */
+export function acknowledgementFor(action: NoticeAction): string | null {
+  return action === "confirm-installed" ? REQUIRED_JAR_VERSION : null;
+}

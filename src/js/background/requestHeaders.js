@@ -27,14 +27,14 @@ const GLOBAL_UA_KEY = "globalUserAgent";
 const CONTAINER_UAS_KEY = "containerUserAgents";
 const HIGHLIGHTER_HEADERS_KEY = H.HIGHLIGHTER_HEADERS_KEY;
 const LEGACY_HIGHLIGHTER_HEADERS_KEY = H.LEGACY_HIGHLIGHTER_HEADERS_KEY;
-// True while the user still has to be told their Burp JAR is too old to strip
-// the container-name header. The name is withheld until then.
-const JAR_UPDATE_PENDING_KEY = "highlighterJarUpdateNoticePending";
+// The Highlighter JAR version the user confirmed. The container name is only
+// sent once that is new enough to strip it before it reaches the target.
+const JAR_ACK_VERSION_KEY = H.JAR_ACK_VERSION_KEY;
 
 const requestHeaders = {
   // Arms both the colour and the name header, hence not named for the colour.
   highlighterHeadersEnabled: false,
-  jarUpdatePending: false,
+  jarAcknowledged: false,
   userAgentEnabled: false,
   globalUserAgent: null,
   containerUserAgents: {},
@@ -55,14 +55,14 @@ const requestHeaders = {
       [CONTAINER_UAS_KEY]: {},
       [HIGHLIGHTER_HEADERS_KEY]: undefined,
       [LEGACY_HIGHLIGHTER_HEADERS_KEY]: false,
-      [JAR_UPDATE_PENDING_KEY]: false,
+      [JAR_ACK_VERSION_KEY]: null,
     });
 
     this.userAgentEnabled = !!stored[GLOBAL_UA_ENABLED_KEY];
     this.globalUserAgent = stored[GLOBAL_UA_KEY];
     this.containerUserAgents = stored[CONTAINER_UAS_KEY] || {};
     this.highlighterHeadersEnabled = H.resolveHighlighterHeadersEnabled(stored);
-    this.jarUpdatePending = !!stored[JAR_UPDATE_PENDING_KEY];
+    this.jarAcknowledged = H.isJarAcknowledged(stored[JAR_ACK_VERSION_KEY]);
 
     this._watchTabs();
     this._watchContainers();
@@ -98,10 +98,10 @@ const requestHeaders = {
       } else if (LEGACY_HIGHLIGHTER_HEADERS_KEY in changes) {
         this.highlighterHeadersEnabled = !!changes[LEGACY_HIGHLIGHTER_HEADERS_KEY].newValue;
       }
-      // Picked up live, so acknowledging the notice starts sending the name
-      // on the very next request rather than after a restart.
-      if (JAR_UPDATE_PENDING_KEY in changes) {
-        this.jarUpdatePending = !!changes[JAR_UPDATE_PENDING_KEY].newValue;
+      // Picked up live, so confirming the JAR starts sending the name on the
+      // very next request rather than after a restart.
+      if (JAR_ACK_VERSION_KEY in changes) {
+        this.jarAcknowledged = H.isJarAcknowledged(changes[JAR_ACK_VERSION_KEY].newValue);
       }
 
       this._applyListener();
@@ -237,7 +237,7 @@ const requestHeaders = {
       cookieStoreId,
       this.highlighterHeadersEnabled,
       this._containerIdentities,
-      this.jarUpdatePending
+      this.jarAcknowledged
     );
   },
 

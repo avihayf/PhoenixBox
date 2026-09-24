@@ -63,7 +63,7 @@ module.exports = [
     },
   },
   {
-    files: ["test/**/*.js"],
+    files: ["test/**/*.js", "test/**/*.mjs"],
     languageOptions: {
       globals: {
         ...globals.mocha,
@@ -72,6 +72,10 @@ module.exports = [
     rules: {
       "no-restricted-globals": ["error", "browser"],
     },
+  },
+  {
+    files: ["**/*.mjs"],
+    languageOptions: { ecmaVersion: 2022, sourceType: "module" },
   },
   {
     files: ["src/js/**/*.js"],
