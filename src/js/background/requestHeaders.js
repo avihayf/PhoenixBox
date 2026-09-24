@@ -242,11 +242,14 @@ const requestHeaders = {
   },
 
   _buildHeaders(details, userAgent, color, containerName) {
+    // The Highlighter headers only go where Burp can strip them. The
+    // User-Agent override applies however the request is routed.
+    const toBurp = H.isHighlighterRoute(details && details.proxyInfo);
     return H.buildRequestHeaders(
       details && details.requestHeaders,
       userAgent,
-      color,
-      containerName
+      toBurp ? color : null,
+      toBurp ? containerName : null
     );
   },
 

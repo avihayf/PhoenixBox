@@ -264,6 +264,24 @@
   }
 
   /**
+   * Whether a request is headed somewhere the Highlighter can strip the
+   * colour and name headers before they reach the target.
+   *
+   * Burp listens as an HTTP proxy, so only a request Firefox is sending
+   * through an HTTP(S) proxy qualifies. A direct request — proxy off, a
+   * container outside the promoted list — would carry both headers to the
+   * site itself, as would a SOCKS route such as Mozilla VPN.
+   *
+   * @param {object|null|undefined} proxyInfo `details.proxyInfo` from
+   *   onBeforeSendHeaders; Firefox sets it only when the request is proxied,
+   *   including when the proxy was chosen by an async proxy.onRequest handler.
+   */
+  function isHighlighterRoute(proxyInfo) {
+    const type = proxyInfo && proxyInfo.type;
+    return type === "http" || type === "https";
+  }
+
+  /**
    * @param {Array<{name?: string, value?: string}>} requestHeaderList
    * @param {string|null} userAgent
    * @param {string|null} color
@@ -314,5 +332,6 @@
     resolveContainerColor,
     resolveContainerName,
     buildRequestHeaders,
+    isHighlighterRoute,
   };
 });

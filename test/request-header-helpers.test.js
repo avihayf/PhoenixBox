@@ -14,6 +14,7 @@ const {
   resolveContainerColor,
   resolveContainerName,
   buildRequestHeaders,
+  isHighlighterRoute,
 } = require("../src/js/shared/requestHeaderHelpers");
 
 /**
@@ -397,6 +398,28 @@ describe("requestHeaderHelpers", () => {
       expect(compareVersions("1.10.0", "1.9.0")).to.equal(1);
       expect(compareVersions("1.2.0", "1.2")).to.equal(0);
       expect(compareVersions("1.1", "1.2.0")).to.equal(-1);
+    });
+  });
+
+  describe("isHighlighterRoute", () => {
+    // Shapes recorded from Firefox's onBeforeSendHeaders details.proxyInfo.
+    const httpProxy = { type: "http", host: "127.0.0.1", port: 8080, proxyDNS: false };
+
+    it("allows requests going through an HTTP or HTTPS proxy, which is how Burp listens", () => {
+      expect(isHighlighterRoute(httpProxy)).to.equal(true);
+      expect(isHighlighterRoute({ ...httpProxy, type: "https" })).to.equal(true);
+    });
+
+    it("refuses direct requests, which would carry the headers straight to the target", () => {
+      expect(isHighlighterRoute(null)).to.equal(false);
+      expect(isHighlighterRoute(undefined)).to.equal(false);
+      expect(isHighlighterRoute({ type: "direct" })).to.equal(false);
+    });
+
+    it("refuses SOCKS proxies such as Mozilla VPN, which do not strip the headers", () => {
+      expect(isHighlighterRoute({ type: "socks", host: "10.0.0.1", port: 1080 })).to.equal(false);
+      expect(isHighlighterRoute({ type: "socks4", host: "10.0.0.1", port: 1080 })).to.equal(false);
+      expect(isHighlighterRoute({ type: "unknown" })).to.equal(false);
     });
   });
 
