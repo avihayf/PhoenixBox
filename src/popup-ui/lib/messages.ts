@@ -24,8 +24,8 @@ export function deleteContainer(userContextId: UserContextId) {
   return send({ method: "deleteContainer", message: { userContextId } });
 }
 
-export function deleteContainerDataOnly(userContextId: UserContextId) {
-  return send({ method: "deleteContainerDataOnly", message: { userContextId } });
+export function deleteContainerDataOnly<T = unknown>(userContextId: UserContextId) {
+  return send<T>({ method: "deleteContainerDataOnly", message: { userContextId } });
 }
 
 export function getAssignmentObjectByContainer<T = Record<string, unknown>>(

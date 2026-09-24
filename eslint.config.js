@@ -83,7 +83,6 @@ module.exports = [
       globals: {
         LOG: true,
         assignManager: true,
-        badge: true,
         backgroundLogic: true,
         identityState: true,
         messageHandler: true,

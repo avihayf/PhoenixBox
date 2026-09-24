@@ -1065,8 +1065,19 @@ function App() {
           }}
           onClearStorage={async () => {
             const browser = requireWebExt();
+            // browsingData is optional; request it from this click (a user
+            // gesture). Without it the background call failed and the user
+            // was never told, so they believed the session had been cleared.
+            let granted = false;
+            try {
+              granted = await browser.permissions.request({ permissions: ["browsingData"] });
+            } catch {
+              granted = false;
+            }
+            if (!granted) return false;
             const userContextId = Number(selectedContainer.cookieStoreId.split("-").pop());
-            await msg.deleteContainerDataOnly(userContextId);
+            const result = await msg.deleteContainerDataOnly<{ done?: boolean }>(userContextId);
+            return !!(result && result.done);
           }}
           onManageContainer={handleManageContainer}
           onCloseTab={async (tabId) => {

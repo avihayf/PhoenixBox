@@ -116,14 +116,12 @@ async function setupContainerShortcutSelects () {
   const fragment = document.createDocumentFragment();
   const noneOption = document.createElement("option");
   noneOption.value = "none";
-  noneOption.id = "none";
   noneOption.textContent = "None";
   fragment.append(noneOption);
 
   for (const identity of identities) {
     const option = document.createElement("option");
     option.value = identity.cookieStoreId;
-    option.id = identity.cookieStoreId;
     option.textContent = identity.name;
     fragment.append(option);
   }
@@ -132,9 +130,15 @@ async function setupContainerShortcutSelects () {
     const shortcutKey = "open_container_"+i;
     const shortcutSelect = document.getElementById(shortcutKey);
     shortcutSelect.appendChild(fragment.cloneNode(true));
+    // Select by value. The old querySelector("#" + id) threw on a shortcut
+    // pointing at a deleted container, which aborted the loop and left the
+    // remaining selects empty. An unknown value now just shows "None".
+    // (It also gave ten selects' options duplicate element ids.)
     if (keyboardShortcut && keyboardShortcut[shortcutKey]) {
-      const cookieStoreId = keyboardShortcut[shortcutKey];
-      shortcutSelect.querySelector("#" + cookieStoreId).selected = true;
+      shortcutSelect.value = keyboardShortcut[shortcutKey];
+      if (shortcutSelect.value !== keyboardShortcut[shortcutKey]) {
+        shortcutSelect.value = "none";
+      }
     }
   }
 }

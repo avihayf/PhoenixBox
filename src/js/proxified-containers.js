@@ -118,24 +118,6 @@ proxifiedContainers = {
     this._cache = proxifiedContainersStore;
   },
 
-  parseProxy(proxy_str, mozillaVpnData = null) {
-    const proxyRegexp = /(?<type>https?|socks4?):\/\/(?:(?<username>[^:@/]+):(?<password>[^@/]+)@)?(?<host>(?:\d{1,3}\.){3}\d{1,3}|[\w][\w.-]*)(?::(?<port>\d+))?/;
-    const matches = proxyRegexp.exec(proxy_str);
-    if (!matches) {
-      return false;
-    }
-
-    if (mozillaVpnData && mozillaVpnData.mozProxyEnabled === undefined) {
-      matches.groups.type = null;
-    }
-
-    if (!mozillaVpnData) {
-      mozillaVpnData = MozillaVPN.getMozillaProxyInfoObj();
-    }
-
-    return {...matches.groups,...mozillaVpnData};
-  },
-
   // Deletes the proxy information object for a specified cookieStoreId [useful for cleaning]
   async delete(cookieStoreId) {
     // From the raw stored list, for the same reason as set(): retrieveAll()

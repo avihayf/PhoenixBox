@@ -104,20 +104,6 @@ window.identityState = {
 
   },
 
-  _createTabObject(tab) {
-    return Object.assign({}, tab);
-  },
-
-  async getCookieStoreIDuuidMap() {
-    const containers = {};
-    const identities = await browser.contextualIdentities.query({});
-    for(const identity of identities) {
-      const containerInfo = await this.storageArea.get(identity.cookieStoreId);
-      containers[identity.cookieStoreId] = containerInfo.macAddonUUID;
-    }
-    return containers;
-  },
-
   /** @type {Map<string, Promise>} cookieStoreId -> tail of that container's write queue */
   _stateLocks: new Map(),
 

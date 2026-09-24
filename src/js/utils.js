@@ -2,99 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const DEFAULT_FAVICON = "/img/blank-favicon.svg";
-
 // eslint-disable-next-line
 const CONTAINER_ORDER_STORAGE_KEY = "container-order";
 
 const Utils = {
-
-  createFavIconElement(url) {
-    const imageElement = document.createElement("img");
-    imageElement.classList.add("icon", "offpage", "menu-icon");
-    imageElement.src = url;
-    const loadListener = (e) => {
-      e.target.classList.remove("offpage");
-      e.target.removeEventListener("load", loadListener);
-      e.target.removeEventListener("error", errorListener);
-    };
-    const errorListener = (e) => {
-      e.target.src = DEFAULT_FAVICON;
-    };
-    imageElement.addEventListener("error", errorListener);
-    imageElement.addEventListener("load", loadListener);
-    return imageElement;
-  },
-
-  // Method to block proxies by producing a sufficiently long random address
-  getBogusProxy() {
-    const bogusFailover = 1;
-    const bogusType = "socks4";
-    const bogusPort = 9999;
-    const bogusUsername = "foo";
-    if(typeof window.Utils.pregeneratedString !== "undefined")
-    {
-      return {type:bogusType, host:`w.${window.Utils.pregeneratedString}.coo`, port:bogusPort, username:bogusUsername, failoverTimeout:bogusFailover};
-    }
-    else
-    {
-      // Initialize Utils.pregeneratedString
-      window.Utils.pregeneratedString = "";
-
-      // We generate a cryptographically random string (of length specified in bogusLength), but we only do so once - thus negating any time delay caused
-      const bogusLength = 8;
-      const array = new Uint8Array(bogusLength);
-      window.crypto.getRandomValues(array);
-      for(let i = 0; i < bogusLength; i++)
-      {
-        const s = array[i].toString(16);
-        if(s.length === 1)
-          window.Utils.pregeneratedString += `0${s}`;
-        else
-          window.Utils.pregeneratedString += s;
-      }
-
-      // The only issue with this approach is that if (for some unknown reason) pregeneratedString is not saved, it will result in an infinite loop - but better than a privacy leak!
-      return Utils.getBogusProxy();
-    }
-  },
-
-  /**
- * Escapes any occurances of &, ", <, > or / with XML entities.
- *
- * @param {string} str
- *        The string to escape.
- * @return {string} The escaped string.
- */
-  escapeXML(str) {
-    const replacements = { "&": "&amp;", "\"": "&quot;", "'": "&apos;", "<": "&lt;", ">": "&gt;", "/": "&#x2F;" };
-    return String(str).replace(/[&"'<>/]/g, m => replacements[m]);
-  },
-
-  /**
- * A tagged template function which escapes any XML metacharacters in
- * interpolated values.
- *
- * @param {Array<string>} strings
- *        An array of literal strings extracted from the templates.
- * @param {Array} values
- *        An array of interpolated values extracted from the template.
- * @returns {string}
- *        The result of the escaped values interpolated with the literal
- *        strings.
- */
-  escaped(strings, ...values) {
-    const result = [];
-
-    for (const [i, string] of strings.entries()) {
-      result.push(string);
-      if (i < values.length)
-        result.push(this.escapeXML(values[i]));
-    }
-
-    return result.join("");
-  },
-
   /**
    * @returns {Promise<Tab|false>}
    */
@@ -118,15 +29,6 @@ const Utils = {
     });
   },
 
-  addEnterOnlyHandler(element, handler) {
-    element.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        handler(e);
-      }
-    });
-  },
-
   userContextId(cookieStoreId = "") {
     const userContextId = cookieStoreId.replace("firefox-container-", "");
     return (userContextId !== cookieStoreId) ? Number(userContextId) : false;
@@ -139,27 +41,6 @@ const Utils = {
       url,
       userContextId,
       value
-    });
-  },
-
-  /**
-   * @param {string} url
-   * @param {string} currentUserContextId
-   * @param {string} newUserContextId
-   * @param {number} tabIndex
-   * @param {boolean} active
-   * @param {number} [groupId]
-   * @returns {Promise<any>}
-   */
-  async reloadInContainer(url, currentUserContextId, newUserContextId, tabIndex, active, groupId = undefined) {
-    return await browser.runtime.sendMessage({
-      method: "reloadInContainer",
-      url,
-      currentUserContextId,
-      newUserContextId,
-      tabIndex,
-      active,
-      groupId
     });
   },
 

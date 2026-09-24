@@ -284,23 +284,23 @@ const backgroundLogic = {
     }
   },
 
-  async getExtensionInfo() {
-    const manifestPath = browser.runtime.getURL("manifest.json");
-    const response = await fetch(manifestPath);
-    const extensionInfo = await response.json();
-    return extensionInfo;
-  },
-
   // Remove container data (cookies, localStorage and cache)
+  // Remove a container's site data. Cookies and localStorage are required;
+  // IndexedDB and service workers are cleared when this Firefox supports
+  // container-scoped removal for them. The HTTP cache is shared across
+  // containers and cannot be cleared per container.
   async deleteContainerDataOnly(userContextId) {
-    await browser.browsingData.removeCookies({
-      cookieStoreId: this.cookieStoreId(userContextId)
-    });
-
-    await browser.browsingData.removeLocalStorage({
-      cookieStoreId: this.cookieStoreId(userContextId)
-    });
-
+    const options = { cookieStoreId: this.cookieStoreId(userContextId) };
+    await browser.browsingData.removeCookies(options);
+    await browser.browsingData.removeLocalStorage(options);
+    for (const optional of ["removeIndexedDB", "removeServiceWorkers"]) {
+      if (typeof browser.browsingData[optional] !== "function") continue;
+      try {
+        await browser.browsingData[optional](options);
+      } catch (e) {
+        LOG.warn(`deleteContainerDataOnly: ${optional} not supported per container`, e);
+      }
+    }
     return {done: true, userContextId};
   },
 
@@ -443,24 +443,6 @@ const backgroundLogic = {
         throw new Error(`${methodName} must be called with ${argument} argument.`);
       }
     }
-  },
-
-  async getTabs(options) {
-    const requiredArguments = ["cookieStoreId", "windowId"];
-    this.checkArgs(requiredArguments, options, "getTabs");
-    const { cookieStoreId, windowId } = options;
-
-    const list = [];
-    const tabs = await browser.tabs.query({
-      cookieStoreId,
-      windowId
-    });
-    tabs.forEach((tab) => {
-      list.push(identityState._createTabObject(tab));
-    });
-
-    const containerState = await identityState.storageArea.get(cookieStoreId) || { hiddenTabs: [] };
-    return list.concat(containerState.hiddenTabs || []);
   },
 
   // Concurrent un-hides are safe without a queue: showTabs claims the hidden
@@ -745,6 +727,5 @@ const backgroundLogic = {
     return `firefox-container-${userContextId}`;
   }
 };
-
 
 backgroundLogic.init();

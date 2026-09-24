@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { ArrowLeft, Plus, Eye, ArrowLeftRight, Hourglass, Trash2, X } from 'lucide-react';
 import { ContainerIcon } from '../ContainerIcon';
 import { getContainerColorHex } from '../../../lib/containerColors';
@@ -18,7 +19,8 @@ interface ContainerDetailViewProps {
   onHideContainer: () => void;
   onMoveToWindow: () => void;
   onManageSites: () => void;
-  onClearStorage: () => void;
+  /** Resolves true when the container's site data was cleared. */
+  onClearStorage: () => Promise<boolean>;
   onCloseTab: (tabId: number) => void;
   onSelectProxyPreset?: (preset: ProxyPreset | null) => void;
 }
@@ -41,6 +43,33 @@ export function ContainerDetailView({
   onSelectProxyPreset,
 }: ContainerDetailViewProps) {
   const colorHex = getContainerColorHex(containerColor);
+
+  // Clearing wipes the session this container exists to hold, with no undo,
+  // so it takes a second click; the first arms it for a few seconds.
+  const [clearState, setClearState] = useState<'idle' | 'armed' | 'busy' | 'done' | 'failed'>('idle');
+  useEffect(() => {
+    if (clearState !== 'armed' && clearState !== 'done' && clearState !== 'failed') return;
+    const timer = window.setTimeout(() => setClearState('idle'), clearState === 'armed' ? 4000 : 3000);
+    return () => window.clearTimeout(timer);
+  }, [clearState]);
+
+  const handleClearClick = async () => {
+    if (clearState === 'busy') return;
+    if (clearState !== 'armed') {
+      setClearState('armed');
+      return;
+    }
+    setClearState('busy');
+    setClearState((await onClearStorage().catch(() => false)) ? 'done' : 'failed');
+  };
+
+  const clearLabel = {
+    idle: 'Clear container storage',
+    armed: 'Click again to clear cookies & site data',
+    busy: 'Clearing…',
+    done: 'Container storage cleared',
+    failed: 'Could not clear storage',
+  }[clearState];
 
   const themed = {
     '--c-accent': colorHex,
@@ -110,10 +139,11 @@ export function ContainerDetailView({
           <div className="h-px bg-[var(--ext-border)] mx-2 my-1.5" />
           <ActionButton
             icon={<Trash2 className="w-4 h-4 text-[var(--ext-red)]" />}
-            label="Clear container storage"
-            onClick={onClearStorage}
+            label={clearLabel}
+            onClick={() => void handleClearClick()}
             variant="danger"
           />
+          <p className="sr-only" role="status" aria-live="polite">{clearState === 'idle' ? '' : clearLabel}</p>
         </div>
 
         {/* Proxy Quick-Switch */}

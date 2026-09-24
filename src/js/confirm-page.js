@@ -48,7 +48,6 @@ async function load() {
   const currentCookieStoreId = searchParams.get("currentCookieStoreId");
   const redirectUrlElement = document.getElementById("redirect-url");
   redirectUrlElement.textContent = redirectUrl;
-  appendFavicon(redirectUrl, redirectUrlElement);
 
   // Option for staying on the previous container
   document.getElementById("deny").addEventListener("click", (e) => {
@@ -89,13 +88,6 @@ function setDenyButton(currentContainerName) {
   }
   buttonDeny.style.display = "none";
   return;
-}
-
-function appendFavicon(pageUrl, redirectUrlElement) {
-  const origin = new URL(pageUrl).origin;
-  const favIconElement = Utils.createFavIconElement(`${origin}/favicon.ico`);
-
-  redirectUrlElement.prepend(favIconElement);
 }
 
 function confirmSubmit(redirectUrl, cookieStoreId) {

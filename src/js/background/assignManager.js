@@ -849,8 +849,10 @@ window.assignManager = {
       });
   },
 
+  // Registered as a listener, unbound: `this` is not assignManager here, so it
+  // used to throw and leave the deleted container in the bookmark submenu.
   contextualIdentityRemoved(changeInfo) {
-    this.removeMenuItem(changeInfo.contextualIdentity.cookieStoreId);
+    assignManager.removeMenuItem(changeInfo.contextualIdentity.cookieStoreId);
   },
 
   async _onClickedHandler(info, tab) {
@@ -1055,13 +1057,22 @@ window.assignManager = {
       }, exemptedTabIds);
       actionName = "assigned site to always open in this container";
     } else {
+      // The container that actually held the assignment. The page action's
+      // "Default" entry removes with userContextId false, which re-checked
+      // isolation for a non-existent "firefox-container-false" and left the
+      // real container locked with zero sites.
+      const existing = await this.storageArea.get(pageUrl);
+      const owner = existing && existing.userContextId ? String(existing.userContextId) : userContextId;
+
       // Remove assignment
       await this.storageArea.remove(pageUrl);
 
       actionName = "removed from assigned sites list";
 
       // remove site isolation if now empty
-      await this._maybeRemoveSiteIsolation(userContextId);
+      if (owner && owner !== "false") {
+        await this._maybeRemoveSiteIsolation(owner);
+      }
     }
 
     if (tabId) {

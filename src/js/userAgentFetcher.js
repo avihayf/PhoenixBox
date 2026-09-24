@@ -133,31 +133,6 @@ const userAgentFetcher = {
     return await this.fetchFromCDN();
   },
 
-  /**
-   * Get cache status information
-   */
-  async getCacheStatus() {
-    const stored = await browser.storage.local.get({
-      [UA_CACHE_KEY]: null,
-      [UA_CACHE_TIMESTAMP_KEY]: 0
-    });
-
-    const cached = stored[UA_CACHE_KEY];
-    const timestamp = stored[UA_CACHE_TIMESTAMP_KEY];
-    
-    let count = 0;
-    if (cached) {
-      count = (cached.all?.length || 0) + (cached.desktop?.length || 0) + (cached.mobile?.length || 0);
-    }
-
-    return {
-      exists: !!cached,
-      timestamp: timestamp,
-      lastUpdated: timestamp ? new Date(timestamp) : null,
-      isValid: await this.isCacheValid(),
-      count: count
-    };
-  }
 };
 
 // Make it available globally for popup and background scripts

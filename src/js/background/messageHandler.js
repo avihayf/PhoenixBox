@@ -53,11 +53,6 @@ const messageHandler = {
         case "addRemoveSiteIsolation":
           response = backgroundLogic.addRemoveSiteIsolation(m.cookieStoreId, !!m.remove);
           break;
-        case "getAssignment":
-          response = browser.tabs.get(m.tabId).then((tab) => {
-            return assignManager._getAssignment(tab);
-          });
-          break;
         case "getAssignmentObjectByContainer":
           response = assignManager._getByContainer(m.message.userContextId);
           break;
@@ -80,17 +75,9 @@ const messageHandler = {
             cookieStoreId: m.cookieStoreId
           });
           break;
-        case "checkIncompatibleAddons":
-          break;
         case "moveTabsToWindow":
           response = backgroundLogic.moveTabsToWindow({
             cookieStoreId: m.cookieStoreId
-          });
-          break;
-        case "getTabs":
-          response = backgroundLogic.getTabs({
-            cookieStoreId: m.cookieStoreId,
-            windowId: m.windowId
           });
           break;
         case "queryIdentitiesState":
@@ -318,7 +305,6 @@ const messageHandler = {
 
   async onFocusChangedCallback(windowId) {
     assignManager.removeContextMenu();
-    badge.displayBrowserActionBadge();
     browser.tabs.query({active: true, windowId}).then((tabs) => {
       if (tabs && tabs[0]) {
         assignManager.calculateContextMenu(tabs[0]);
