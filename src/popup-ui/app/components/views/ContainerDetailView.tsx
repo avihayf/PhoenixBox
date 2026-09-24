@@ -79,7 +79,7 @@ export function ContainerDetailView({
   } as React.CSSProperties;
 
   return (
-    <div className="w-full h-auto max-h-[720px] flex flex-col bg-[var(--ext-bg)] border border-[var(--ext-border)] rounded-xl shadow-xl overflow-hidden" style={themed}>
+    <div className="w-full h-auto max-h-[600px] flex flex-col bg-[var(--ext-bg)] border border-[var(--ext-border)] rounded-xl shadow-xl overflow-hidden" style={themed}>
       {/* Header */}
       <div className="flex items-center gap-3 px-3 py-2 border-b border-[var(--ext-border)] z-20" style={{ background: `${colorHex}08` }}>
         <button
@@ -200,7 +200,8 @@ export function ContainerDetailView({
                       e.stopPropagation();
                       onCloseTab(tab.id);
                     }}
-                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[var(--ext-red)]/10 text-[var(--ext-text-muted)] hover:text-[var(--ext-red)] rounded transition-colors"
+                    aria-label={`Close ${tab.title || tab.url}`}
+                    className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-1 hover:bg-[var(--ext-red)]/10 text-[var(--ext-text-muted)] hover:text-[var(--ext-red)] rounded transition-colors"
                   >
                     <X className="w-3 h-3" />
                   </button>

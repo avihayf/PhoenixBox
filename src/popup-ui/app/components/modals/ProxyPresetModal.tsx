@@ -87,15 +87,21 @@ export function ProxyPresetModal({
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div 
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="preset-modal-title"
           className="bg-[var(--ext-bg-secondary)] border-2 border-[var(--ext-accent)] rounded-xl shadow-2xl w-full max-w-[320px] pointer-events-auto animate-in scale-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--ext-border)]">
-            <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--ext-accent)] brand-title">
+            <h2 id="preset-modal-title" className="text-sm font-medium uppercase tracking-wider text-[var(--ext-accent)] brand-title">
               {initialData ? 'Edit Proxy Preset' : 'Add Proxy Preset'}
             </h2>
             <button
+              type="button"
+              aria-label="Close"
               onClick={onClose}
               className="p-1.5 hover:bg-[var(--ext-bg-tertiary)] rounded transition-all duration-200"
             >
@@ -139,7 +145,7 @@ export function ProxyPresetModal({
             {/* Auto Enable Paint the Burp */}
             <div className="flex items-center justify-between py-2">
               <label htmlFor="auto-enable-paint-burp" className="text-xs text-[var(--ext-text)] cursor-pointer flex-1">
-                Auto enable Paint the Burp when this preset is selected
+                Turn on the Highlighter when this preset is selected
               </label>
               <Switch
                 id="auto-enable-paint-burp"

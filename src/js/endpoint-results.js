@@ -93,7 +93,10 @@ function renderEndpoints(endpoints) {
   } else if (rawAccent && ACCENT_HUES[rawAccent] !== undefined) {
     accentHue = ACCENT_HUES[rawAccent];
   }
-  const theme = localStorage.getItem("theme") || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const storedTheme = localStorage.getItem("theme");
+  const theme = storedTheme && storedTheme !== "auto"
+    ? storedTheme
+    : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
   const isDark = theme === "dark";
   const root = document.documentElement;
   if (isDark) {
@@ -113,6 +116,16 @@ function renderEndpoints(endpoints) {
 }
 
 async function init() {
+  try {
+    await load();
+  } catch (e) {
+    document.getElementById("count").textContent = "error";
+    document.getElementById("empty-state").textContent = "Could not load the scan results.";
+    throw e;
+  }
+}
+
+async function load() {
   const storageKey = getStorageKey();
   const stored = await browser.storage.local.get(storageKey);
   const data = stored[storageKey];
@@ -130,7 +143,14 @@ async function init() {
     return;
   }
 
-  const { endpoints, pageUrl, scannedAt } = data;
+  const { pageUrl, scannedAt, scanFailed, truncated } = data;
+  const endpoints = data.endpoints.filter((e) => typeof e === "string");
+
+  if (scanFailed) {
+    document.getElementById("count").textContent = "scan failed";
+    document.getElementById("empty-state").textContent =
+      "PhoenixBox could not read this page. Firefox does not let extensions run on some pages (such as about: pages and addons.mozilla.org); reload the page and try again otherwise.";
+  }
 
   const urlEl = document.getElementById("page-url");
   urlEl.textContent = pageUrl || "";
@@ -138,10 +158,11 @@ async function init() {
 
   if (scannedAt) {
     document.getElementById("scanned-at").textContent =
-      `Scanned at ${new Date(scannedAt).toLocaleTimeString()}`;
+      `Scanned at ${new Date(scannedAt).toLocaleTimeString()}` +
+      (truncated ? " — showing the first 5000" : "");
   }
 
-  renderEndpoints(endpoints);
+  if (!scanFailed) renderEndpoints(endpoints);
 
   document.getElementById("filter-input").addEventListener("input", () => {
     renderEndpoints(endpoints);

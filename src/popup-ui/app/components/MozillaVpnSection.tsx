@@ -233,7 +233,7 @@ export function MozillaVpnSection({ cookieStoreId, expanded, onToggle }: Mozilla
             <>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-[var(--ext-text)]">Use VPN for this container</span>
-                <Switch checked={enabled} onCheckedChange={handleToggle} />
+                <Switch aria-label="Use Mozilla VPN for this container" checked={enabled} onCheckedChange={handleToggle} />
               </div>
 
               <div className="grid grid-cols-2 gap-2">

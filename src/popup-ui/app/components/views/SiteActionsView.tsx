@@ -200,6 +200,8 @@ export function SiteActionsView({
     }
   };
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmDeletePresetId, setConfirmDeletePresetId] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [hoveredContainerId, setHoveredContainerId] = useState<string | null>(null);
   const presetDropdownRef = useRef<HTMLDivElement>(null);
   const accentPickerRef = useRef<HTMLDivElement>(null);
@@ -319,6 +321,8 @@ export function SiteActionsView({
           {/* Toggle Header - Clickable */}
           <button
             onClick={toggleQuickActions}
+            aria-expanded={isQuickActionsExpanded}
+            aria-controls="quick-actions-list"
             className="w-full flex items-center gap-2.5 p-2 hover:bg-[var(--ext-bg-secondary)] rounded transition-colors group"
           >
             <Plus className="w-4 h-4 text-[var(--ext-accent)]" />
@@ -332,6 +336,11 @@ export function SiteActionsView({
 
           {/* Expandable Actions */}
           <div
+            id="quick-actions-list"
+            // Collapsed actions stay out of the tab order and the a11y tree;
+            // visually hiding them left invisible buttons focusable.
+            // (React 18's types predate `inert`; "" sets the boolean attribute.)
+            {...({ inert: isQuickActionsExpanded ? undefined : "" } as Record<string, unknown>)}
             className={`overflow-hidden transition-all duration-300 ease-in-out space-y-1 ${isQuickActionsExpanded
               ? 'max-h-40 opacity-100 mt-1'
               : 'max-h-0 opacity-0'
@@ -448,7 +457,7 @@ export function SiteActionsView({
                                 {preset.scheme}://{preset.host}:{preset.port}
                               </p>
                             </button>
-                            <div className="flex items-center pr-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center pr-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                               <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -458,16 +467,25 @@ export function SiteActionsView({
                                     }}
                                     className="p-1.5 text-[var(--ext-text-muted)] hover:text-[var(--ext-accent)] transition-colors"
                                     title="Edit preset"
+                                    aria-label={`Edit ${preset.name}`}
                                   >
                                 <Edit2 className="w-3 h-3" />
                               </button>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  // Two clicks: the built-in Burp preset cannot be
+                                  // restored once deleted.
+                                  if (confirmDeletePresetId !== preset.id) {
+                                    setConfirmDeletePresetId(preset.id);
+                                    return;
+                                  }
+                                  setConfirmDeletePresetId(null);
                                   onDeleteProxyPreset(preset.id);
                                 }}
-                                className="p-1.5 text-[var(--ext-text-muted)] hover:text-[var(--ext-red)] transition-colors"
-                                title="Delete preset"
+                                className={`p-1.5 transition-colors ${confirmDeletePresetId === preset.id ? 'text-[var(--ext-red)]' : 'text-[var(--ext-text-muted)] hover:text-[var(--ext-red)]'}`}
+                                title={confirmDeletePresetId === preset.id ? 'Click again to delete' : 'Delete preset'}
+                                aria-label={confirmDeletePresetId === preset.id ? `Confirm deleting ${preset.name}` : `Delete ${preset.name}`}
                               >
                                 <Trash2 className="w-3 h-3" />
                               </button>
@@ -550,6 +568,8 @@ export function SiteActionsView({
                 Containers
               </h2>
             <button
+              type="button"
+              onClick={() => searchInputRef.current?.focus()}
               className="p-1 hover:bg-[var(--ext-bg-secondary)] rounded transition-colors"
               aria-label="Search containers"
             >
@@ -559,7 +579,9 @@ export function SiteActionsView({
 
             {/* Search Input */}
             <input
+              ref={searchInputRef}
               type="text"
+              aria-label="Search containers"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search..."

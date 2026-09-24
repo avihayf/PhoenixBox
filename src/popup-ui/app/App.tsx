@@ -460,7 +460,11 @@ function App() {
 
     // Default to dark mode if no theme is set
     const savedTheme = localStorage.getItem("theme");
-    const shouldBeDark = savedTheme === "dark" || !savedTheme;
+    // "auto" (set from the options page) follows the system; unset keeps the
+    // popup's dark default.
+    const shouldBeDark = savedTheme === "auto"
+      ? window.matchMedia("(prefers-color-scheme: dark)").matches
+      : savedTheme === "dark" || !savedTheme;
     if (shouldBeDark) {
       document.documentElement.classList.add("dark");
       setIsDark(true);
@@ -934,13 +938,15 @@ function App() {
             const browser = requireWebExt();
             await browser.tabs.create({ cookieStoreId: selectedContainer.cookieStoreId });
           }}
+          // Refresh afterwards: the tab list otherwise kept showing tabs that
+          // had just been closed, and closing one of those failed.
           onHideContainer={async () => {
-            const browser = requireWebExt();
             await msg.hideTabs(selectedContainer.cookieStoreId);
+            await refreshContainers();
           }}
           onMoveToWindow={async () => {
-            const browser = requireWebExt();
             await msg.moveTabsToWindow(selectedContainer.cookieStoreId);
+            await refreshContainers();
           }}
           onManageSites={() => {
             if (!selectedContainer?.cookieStoreId) return;
@@ -1253,7 +1259,8 @@ function App() {
         onOpenOptions={async () => {
           try {
             const browser = requireWebExt();
-            browser.runtime.openOptionsPage();
+            // Save first: opening the options page can close the popup before
+            // a write issued after it lands, and the dot came back.
             if (vpnWarnDot) {
               const stored = await browser.storage.local.get({
                 mozillaVpnHiddenToutsList: [],
@@ -1265,6 +1272,7 @@ function App() {
               }
               setVpnWarnDot(false);
             }
+            await browser.runtime.openOptionsPage();
           } catch { /* ignore */ }
         }}
         proxyPresets={customProxyPresets}

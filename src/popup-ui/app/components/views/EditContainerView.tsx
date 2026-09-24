@@ -254,6 +254,7 @@ export function EditContainerView({
             <div className="flex items-center justify-between p-2.5 bg-[var(--ext-bg-secondary)]/50 border border-[var(--ext-border)]/50 rounded-lg hover:border-[var(--ext-border)] transition-colors">
               <span className="text-xs text-[var(--ext-text)]">Limit to designated sites</span>
               <Switch
+                aria-label="Limit to designated sites"
                 checked={siteIsolation}
                 onCheckedChange={setSiteIsolation}
               />

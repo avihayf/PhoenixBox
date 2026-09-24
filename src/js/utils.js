@@ -17,12 +17,18 @@ const Utils = {
     return false;
   },
 
+  // Click and keyboard activation for a non-button element. It also makes the
+  // element focusable and announces it as a button: the page-action rows are
+  // <tr>s, and with an Enter handler but no tabindex nothing could reach them
+  // from the keyboard. Space activates too, as it does for a real button.
   addEnterHandler(element, handler) {
+    if (!element.hasAttribute("tabindex")) element.setAttribute("tabindex", "0");
+    if (!element.hasAttribute("role")) element.setAttribute("role", "button");
     element.addEventListener("click", (e) => {
       handler(e);
     });
     element.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
+      if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         handler(e);
       }
@@ -80,7 +86,12 @@ const Utils = {
     return "light";
   },
   async applyTheme() {
-    const { currentTheme } = await browser.storage.local.get("currentTheme");
+    // localStorage is the shared setting (every extension page shares it);
+    // storage.local is only a fallback for profiles that predate that.
+    let currentTheme = localStorage.getItem("theme");
+    if (!currentTheme) {
+      ({ currentTheme } = await browser.storage.local.get("currentTheme"));
+    }
     const popup = document.getElementsByTagName("html")[0];
     const theme = Utils.getTheme(currentTheme, window);
     popup.setAttribute("data-theme", theme);

@@ -12,7 +12,10 @@
   } else if (rawAccent && ACCENT_HUES[rawAccent] !== undefined) {
     accentHue = ACCENT_HUES[rawAccent];
   }
-  const theme = localStorage.getItem("theme") || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const storedTheme = localStorage.getItem("theme");
+  const theme = storedTheme && storedTheme !== "auto"
+    ? storedTheme
+    : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
   const isDark = theme === "dark";
   const root = document.documentElement;
   if (isDark) {

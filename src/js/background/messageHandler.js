@@ -151,12 +151,21 @@ const messageHandler = {
             // Tab may have closed between click and handler; pageUrl stays empty.
           }
           let endpoints = [];
+          // A failed scan (a page the content script cannot run in, such as
+          // about: pages or addons.mozilla.org) is reported as such rather
+          // than as "0 endpoints", which read as "this page has none".
+          let scanFailed = false;
           try {
             const reply = await browser.tabs.sendMessage(tabId, { method: "scanEndpoints" });
-            endpoints = Array.isArray(reply) ? reply : [];
+            endpoints = Array.isArray(reply) ? reply.filter((e) => typeof e === "string") : [];
           } catch (scanErr) {
+            scanFailed = true;
             LOG.error("[PhoenixBox] extractEndpoints: scan failed:", scanErr);
           }
+          // Bounded: a huge bundled page can yield tens of thousands of paths.
+          const MAX_ENDPOINTS = 5000;
+          const truncated = endpoints.length > MAX_ENDPOINTS;
+          if (truncated) endpoints = endpoints.slice(0, MAX_ENDPOINTS);
           // Key each scan separately so two scans in flight can't overwrite
           // each other, and so reloading a results tab still finds its data.
           const scanId = `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
@@ -165,6 +174,8 @@ const messageHandler = {
               endpoints,
               pageUrl,
               scannedAt: Date.now(),
+              scanFailed,
+              truncated,
             }
           });
           await this.pruneEndpointScanResults();

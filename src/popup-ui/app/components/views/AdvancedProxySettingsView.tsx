@@ -54,18 +54,29 @@ export function AdvancedProxySettingsView({
     }
   }, [initialValue]);
 
+  // A bare host or IP. Pasting "127.0.0.1:8080" or "http://proxy" here used to
+  // be accepted and handed to Firefox as a hostname that could never resolve.
+  const hostError = useMemo(() => {
+    const value = host.trim();
+    if (!value) return "";
+    if (value.includes("://")) return "Enter just the host, without a scheme.";
+    if (/[\s/@?#]/.test(value)) return "The host cannot contain spaces, /, @, ? or #.";
+    if (/^[^:[\]]+:\d+$/.test(value)) return "Put the port in the Port field.";
+    return "";
+  }, [host]);
+
   const canSave = useMemo(() => {
-    if (!host.trim()) return false;
+    if (!host.trim() || hostError) return false;
     const portNum = Number(port);
     // Port must be a positive integer within the valid range (Firefox proxy
     // API rejects non-integer ports).
     return Number.isInteger(portNum) && portNum > 0 && portNum <= 65535;
-  }, [host, port]);
+  }, [host, port, hostError]);
 
   const handleSave = () => {
     setError("");
     if (!canSave) {
-      setError("Please enter a valid host and port.");
+      setError(hostError || "Please enter a valid host and port.");
       return;
     }
     onSave({ type, host: host.trim(), port: port.trim(), proxyDNS });
@@ -78,7 +89,7 @@ export function AdvancedProxySettingsView({
   };
 
   return (
-    <div className="w-full h-auto max-h-[720px] flex flex-col bg-[var(--ext-bg)] border border-[var(--ext-border)] rounded-xl shadow-xl overflow-hidden">
+    <div className="w-full h-auto max-h-[600px] flex flex-col bg-[var(--ext-bg)] border border-[var(--ext-border)] rounded-xl shadow-xl overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 px-3 py-2 border-b border-[var(--ext-border)] bg-[var(--ext-bg)] z-20">
         <button
@@ -140,6 +151,7 @@ export function AdvancedProxySettingsView({
                 value={host}
                 onChange={(e) => setHost(e.target.value)}
                 placeholder="127.0.0.1"
+                aria-invalid={!!hostError}
                 className="w-full px-2.5 py-1.5 bg-[var(--ext-bg-secondary)] border border-[var(--ext-border)] rounded-lg text-xs text-[var(--ext-text)] placeholder:text-[var(--ext-text-muted)] focus:outline-none focus:border-[var(--ext-accent)]"
               />
             </div>
@@ -160,11 +172,11 @@ export function AdvancedProxySettingsView({
             {(type === "socks" || type === "socks4") && (
               <div className="flex items-center justify-between p-2.5 bg-[var(--ext-bg-secondary)] border border-[var(--ext-border)] rounded-lg">
                 <span className="text-xs text-[var(--ext-text)]">Proxy DNS through SOCKS</span>
-                <Switch checked={proxyDNS} onCheckedChange={setProxyDNS} />
+                <Switch aria-label="Resolve DNS through the SOCKS proxy" checked={proxyDNS} onCheckedChange={setProxyDNS} />
               </div>
             )}
 
-            {error && <div className="text-xs text-[var(--ext-red)]">{error}</div>}
+            {(error || hostError) && <div className="text-xs text-[var(--ext-red)]" role="alert">{error || hostError}</div>}
           </>
         )}
       </div>
