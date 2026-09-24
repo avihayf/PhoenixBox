@@ -169,16 +169,18 @@ const messageHandler = {
           // Key each scan separately so two scans in flight can't overwrite
           // each other, and so reloading a results tab still finds its data.
           const scanId = `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+          const scanKey = `endpointScanResults@@_${scanId}`;
+          const scannedAt = Date.now();
           await browser.storage.local.set({
-            [`endpointScanResults@@_${scanId}`]: {
+            [scanKey]: {
               endpoints,
               pageUrl,
-              scannedAt: Date.now(),
+              scannedAt,
               scanFailed,
               truncated,
             }
           });
-          await this.pruneEndpointScanResults();
+          await this.pruneEndpointScanResults(5, { key: scanKey, scannedAt });
           await browser.tabs.create({
             url: browser.runtime.getURL(`endpoint-results.html?scan=${encodeURIComponent(scanId)}`)
           });
@@ -293,14 +295,38 @@ const messageHandler = {
 
   // Scan results are kept so their tab survives a reload, so they need a cap.
   // Keep the newest few and drop the legacy single-key entry on the way past.
-  async pruneEndpointScanResults(keep = 5) {
+  /**
+   * Cap the stored endpoint scans, optionally recording a new one first.
+   *
+   * Scans are tracked in a small index key. This used to read the whole of
+   * storage.local — every container's hidden tabs and site assignments — on
+   * every scan just to find these few keys. A profile without the index
+   * (upgraded from an older version) is read in full once to build it.
+   */
+  async pruneEndpointScanResults(keep = 5, added = null) {
+    const INDEX_KEY = "endpointScanIndex";
     try {
-      const all = await browser.storage.local.get();
+      const { [INDEX_KEY]: index } = await browser.storage.local.get(INDEX_KEY);
+      let candidates;
+      if (Array.isArray(index)) {
+        candidates = {};
+        for (const entry of index) {
+          if (entry && entry.key) candidates[entry.key] = { scannedAt: entry.scannedAt };
+        }
+      } else {
+        candidates = await browser.storage.local.get();
+      }
+      if (added) candidates[added.key] = { scannedAt: added.scannedAt };
+
       const removable =
-        PhoenixBoxReviewHelpers.selectEndpointScanKeysToRemove(all, keep);
+        PhoenixBoxReviewHelpers.selectEndpointScanKeysToRemove(candidates, keep);
       if (removable.length) {
         await browser.storage.local.remove(removable);
       }
+      const kept = Object.keys(candidates)
+        .filter((key) => key.startsWith("endpointScanResults@@_") && !removable.includes(key))
+        .map((key) => ({ key, scannedAt: Number(candidates[key] && candidates[key].scannedAt) || 0 }));
+      await browser.storage.local.set({ [INDEX_KEY]: kept });
     } catch (e) {
       LOG.error("Failed to prune endpoint scan results:", e);
     }

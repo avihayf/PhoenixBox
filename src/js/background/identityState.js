@@ -195,27 +195,32 @@ window.identityState = {
     await this.storageArea.get(cookieStoreId);
   },
 
+  // Both lookups used to read the whole of storage.local — every container's
+  // hidden-tab list and every site assignment — to find one entry, and sync
+  // calls them once per container and per site on every run.
+
   async lookupMACaddonUUID(cookieStoreId) {
-    // This stays a lookup, because if the cookieStoreId doesn't 
+    // This stays a lookup, because if the cookieStoreId doesn't
     // exist, this.get() will create it, which is not what we want.
-    const cookieStoreIdKey = cookieStoreId.includes("firefox-container-") ? 
+    const cookieStoreIdKey = cookieStoreId.includes("firefox-container-") ?
       cookieStoreId : "firefox-container-" + cookieStoreId;
-    const macConfigs = await this.storageArea.area.get();
-    for(const configKey of Object.keys(macConfigs)) {
-      if (configKey === this.storageArea.getContainerStoreKey(cookieStoreIdKey)) {
-        return macConfigs[configKey].macAddonUUID;
-      }
-    }
-    return false;
+    const key = this.storageArea.getContainerStoreKey(cookieStoreIdKey);
+    const stored = await this.storageArea.area.get(key);
+    return stored[key] ? stored[key].macAddonUUID : false;
   },
 
+  // Only live containers are candidates: every caller acts on the result as
+  // a container that exists (removing it, or reassigning a site to it).
   async lookupCookieStoreId(macAddonUUID) {
-    const macConfigs = await this.storageArea.area.get();
-    for(const configKey of Object.keys(macConfigs)) {
-      if (configKey.includes("identitiesState@@_")) {
-        if(macConfigs[configKey].macAddonUUID === macAddonUUID) {
-          return String(configKey).replace(/^identitiesState@@_/, "");
-        }
+    const identities = await browser.contextualIdentities.query({});
+    const keys = identities.map((identity) =>
+      this.storageArea.getContainerStoreKey(identity.cookieStoreId));
+    if (!keys.length) return false;
+    const stored = await this.storageArea.area.get(keys);
+    for (const identity of identities) {
+      const state = stored[this.storageArea.getContainerStoreKey(identity.cookieStoreId)];
+      if (state && state.macAddonUUID === macAddonUUID) {
+        return identity.cookieStoreId;
       }
     }
     return false;
