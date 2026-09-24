@@ -223,11 +223,10 @@ const messageHandler = {
       if (details.frameId !== 0 || details.tabId === -1) {
         return {};
       }
-      assignManager.removeContextMenu();
       browser.pageAction.show(details.tabId).catch(() => {});
 
       browser.tabs.get(details.tabId).then((tab) => {
-        assignManager.calculateContextMenu(tab);
+        assignManager.refreshContextMenuFor(tab);
       }).catch((e) => {
         LOG.error("Failed to update context menu onCompleted:", e);
       });

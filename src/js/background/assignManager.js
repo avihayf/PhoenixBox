@@ -351,7 +351,6 @@ window.assignManager = {
     if (options.frameId !== 0 || options.tabId === -1) {
       return {};
     }
-    this.removeContextMenu();
     const [tab, siteSettings] = await Promise.all([
       browser.tabs.get(options.tabId),
       this.storageArea.get(options.url)
@@ -476,7 +475,7 @@ window.assignManager = {
         tab.groupId,
         tab.windowId
       );
-    this.calculateContextMenu(tab);
+    this.refreshContextMenuFor(tab);
 
     /* Removal of existing tabs:
         We aim to open the new assigned container tab / warning prompt in
@@ -1095,7 +1094,7 @@ window.assignManager = {
     } catch {
       return;
     }
-    this.calculateContextMenu(tab);
+    this.refreshContextMenuFor(tab);
 
     if (tab.status !== "complete") {
       await new Promise((resolve) => {
@@ -1151,6 +1150,19 @@ window.assignManager = {
     this.removeMenuItem(this.MENU_SEPARATOR_ID);
     this.removeMenuItem(this.MENU_HIDE_ID);
     this.removeMenuItem(this.MENU_MOVE_ID);
+  },
+
+  /**
+   * Rebuild the context menu for a tab only if it is the one on screen.
+   *
+   * The menu is global, not per tab. Every main-frame load in any tab used to
+   * tear it down and rebuild it for that tab, so a background tab finishing a
+   * load left the active tab with the wrong menu, or none at all.
+   */
+  refreshContextMenuFor(tab) {
+    if (!tab || !tab.active) return;
+    this.calculateContextMenu(tab).catch((e) =>
+      LOG.error("Failed to update the context menu:", e));
   },
 
   async calculateContextMenu(tab) {
