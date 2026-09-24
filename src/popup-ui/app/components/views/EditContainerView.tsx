@@ -15,7 +15,7 @@ interface EditContainerViewProps {
   // No proxy argument: proxies are edited live by the VPN section and Advanced
   // Proxy Settings. Passing a copy captured when the form opened made Save
   // re-apply that stale value over changes made since.
-  onSave: (name: string, color: string, icon: string, siteIsolation: boolean) => void;
+  onSave: (name: string, color: string, icon: string, siteIsolation: boolean) => void | Promise<void>;
   onDelete?: () => void;
   onManageSites?: () => void;
   onAdvancedProxyToggle?: (enabled: boolean) => void;
@@ -68,10 +68,17 @@ export function EditContainerView({
   const [containerUserAgentType, setContainerUserAgentType] = useState<'all' | 'desktop' | 'mobile'>('all');
   const [pendingDelete, setPendingDelete] = useState(false);
 
-  const handleSave = () => {
+  // A double click used to create two containers: guard until the save settles.
+  const [saving, setSaving] = useState(false);
+  const handleSave = async () => {
     const trimmedName = name.trim();
-    if (!trimmedName) return;
-    onSave(trimmedName, color, icon, siteIsolation);
+    if (!trimmedName || saving) return;
+    setSaving(true);
+    try {
+      await onSave(trimmedName, color, icon, siteIsolation);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const selectedColorHex = getContainerColorHex(color);
@@ -321,9 +328,9 @@ export function EditContainerView({
           </button>
         )}
         <button
-          onClick={handleSave}
+          onClick={() => void handleSave()}
           className="flex-1 flex items-center justify-center py-2 bg-[var(--ext-accent)] text-[var(--primary-foreground)] rounded-lg hover:opacity-90 btn-brand-primary disabled:opacity-50 disabled:cursor-not-allowed text-xs uppercase tracking-wider"
-          disabled={!name.trim()}
+          disabled={!name.trim() || saving}
         >
           Save Identity
         </button>

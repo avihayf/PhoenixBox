@@ -297,6 +297,86 @@
       CONTAINER_OR_NONE.test(String(cookieStoreId || ""));
   }
 
+  // Icons Firefox's contextualIdentities API accepts. Anything else (the
+  // security icons below) is kept as a PhoenixBox display override and shown
+  // to Firefox as "fingerprint".
+  const FIREFOX_CONTAINER_ICONS = [
+    "fingerprint", "briefcase", "dollar", "cart", "circle", "gift",
+    "vacation", "food", "fruit", "pet", "tree", "chill", "fence",
+  ];
+
+  // Defaults for the four containers a fresh profile starts with. Applied
+  // once, by the startup migration; after that the user's own choices stand.
+  const SECURITY_PROFILES = {
+    1: { name: "Attacker", color: "red", icon: "skull" },
+    2: { name: "Victim", color: "orange", icon: "user-x" },
+    3: { name: "Admin", color: "green", icon: "user-cog" },
+    4: { name: "Member", color: "yellow", icon: "user-minus" },
+  };
+
+  const LEGACY_PROFILE_NAMES = {
+    Personal: 1, Work: 2, Banking: 3, Shopping: 4,
+  };
+
+  /** The icon to give Firefox for a chosen icon. */
+  function firefoxIconFor(icon) {
+    return FIREFOX_CONTAINER_ICONS.includes(icon) ? icon : "fingerprint";
+  }
+
+  /**
+   * Plan the one-time normalization of a profile's containers.
+   *
+   * Before the migration flag is set: give containers 1-4 their security
+   * profile name, colour and display icon, and rename Firefox's stock
+   * Personal/Work/Banking/Shopping. Every run: record a custom icon Firefox
+   * cannot hold as a display override and show Firefox "fingerprint".
+   *
+   * It used to force the names on every startup (reverting the user's
+   * renames) while the popup separately forced colours and icons on every
+   * open, and the two disagreed about container 1's Firefox icon.
+   *
+   * @returns {{updates: Array<{cookieStoreId: string, patch: object}>,
+   *            overrides: object, overridesChanged: boolean}}
+   */
+  function planProfileNormalization(identities, overrides, migrated) {
+    const prefix = "firefox-container-";
+    const nextOverrides = overrides && typeof overrides === "object" ? { ...overrides } : {};
+    let overridesChanged = false;
+    const updates = [];
+
+    for (const identity of (Array.isArray(identities) ? identities : [])) {
+      const id = String((identity && identity.cookieStoreId) || "");
+      if (!id.startsWith(prefix)) continue;
+      const patch = {};
+
+      if (!migrated) {
+        const num = Number(id.slice(prefix.length));
+        const profile = SECURITY_PROFILES[num] ||
+          SECURITY_PROFILES[LEGACY_PROFILE_NAMES[identity.name]];
+        const isDefaultSlot = !!SECURITY_PROFILES[num];
+        if (profile && (isDefaultSlot || LEGACY_PROFILE_NAMES[identity.name])) {
+          if (identity.name !== profile.name) patch.name = profile.name;
+          if (identity.color !== profile.color) patch.color = profile.color;
+          if (!nextOverrides[id]) {
+            nextOverrides[id] = profile.icon;
+            overridesChanged = true;
+          }
+        }
+      }
+
+      if (identity.icon && !FIREFOX_CONTAINER_ICONS.includes(identity.icon)) {
+        if (!nextOverrides[id]) {
+          nextOverrides[id] = identity.icon;
+          overridesChanged = true;
+        }
+        patch.icon = "fingerprint";
+      }
+
+      if (Object.keys(patch).length) updates.push({ cookieStoreId: id, patch });
+    }
+    return { updates, overrides: nextOverrides, overridesChanged };
+  }
+
   // Strip a password out of a proxy URL while leaving the username in place.
   // Anchored on the authority section so an "@" inside a query string is not
   // mistaken for credentials.
@@ -454,6 +534,10 @@
     shouldRunSyncForCategories,
     isExtensionPageSender,
     isValidShortcutAssignment,
+    FIREFOX_CONTAINER_ICONS,
+    SECURITY_PROFILES,
+    firefoxIconFor,
+    planProfileNormalization,
     sanitizePromotedProxyContainerIds,
     resolveUserAgentSelection,
   };

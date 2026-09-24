@@ -4,10 +4,6 @@
 
 const DEFAULT_TAB = "about:newtab";
 
-const FIREFOX_DEFAULT_ICONS = new Set([
-  "fingerprint", "briefcase", "dollar", "cart", "circle",
-  "gift", "vacation", "food", "fruit", "pet", "tree", "chill"
-]);
 
 const backgroundLogic = {
   NEW_TAB_PAGES: new Set([
@@ -113,103 +109,40 @@ const backgroundLogic = {
   },
 
   /**
-   * Single idempotent pass that normalizes all container identities.
+   * Normalize container identities; the single owner of profile defaults.
    *
-   * Combines what was previously four separate passes:
-   * 1. One-time migration of default names (Personal→Attacker, etc.)
-   * 2. Enforcement of security-profile names on default container IDs 1-4
-   * 3. Icon normalization (custom icons → fingerprint for Firefox URL bar)
-   * 4. Preservation of custom icons in storage overrides for the popup UI
-   *
-   * Queries contextualIdentities once and computes all needed updates in a
-   * single loop to avoid redundant API calls.
+   * The decisions live in PhoenixBoxReviewHelpers.planProfileNormalization:
+   * security-profile names, colours and icons are applied once, by this
+   * migration, and afterwards the user's own choices stand. Custom icons are
+   * mapped to "fingerprint" for Firefox every time, kept as display overrides.
    */
   async _normalizeSecurityProfiles() {
     const MIGRATION_KEY = "securityDefaultContainerNamesMigrated";
-    const PREFIX = "firefox-container-";
-
-    const SECURITY_NAMES = {
-      1: "Attacker",
-      2: "Victim",
-      3: "Admin",
-      4: "Member",
-    };
-
-    const LEGACY_RENAME = {
-      "Personal": "Attacker",
-      "Work": "Victim",
-      "Banking": "Admin",
-      "Shopping": "Member",
-    };
-
     try {
       const stored = await browser.storage.local.get({
         [MIGRATION_KEY]: false,
         containerDisplayIconOverrides: {},
       });
-      const migrated = !!stored[MIGRATION_KEY];
-      const overrides =
-        stored.containerDisplayIconOverrides && typeof stored.containerDisplayIconOverrides === "object"
-          ? stored.containerDisplayIconOverrides
-          : {};
-
       const identities = await browser.contextualIdentities.query({});
-      let overridesChanged = false;
+      const plan = PhoenixBoxReviewHelpers.planProfileNormalization(
+        identities, stored.containerDisplayIconOverrides, !!stored[MIGRATION_KEY]
+      );
 
-      for (const identity of identities) {
-        if (!identity.cookieStoreId || !identity.cookieStoreId.startsWith(PREFIX)) continue;
-
-        const idNum = Number(identity.cookieStoreId.slice(PREFIX.length));
-        const isDefault = Number.isFinite(idNum) && idNum >= 1 && idNum <= 4;
-
-        let desiredName = null;
-        let desiredIcon = null;
-
-        if (isDefault) {
-          desiredName = SECURITY_NAMES[idNum];
-
-          if (!migrated && LEGACY_RENAME[identity.name]) {
-            desiredName = LEGACY_RENAME[identity.name];
-          }
-
-          desiredIcon = idNum === 1 ? "circle" : identity.icon;
-          if (desiredIcon && !FIREFOX_DEFAULT_ICONS.has(desiredIcon)) {
-            desiredIcon = "fingerprint";
-          }
-        } else {
-          if (!migrated && LEGACY_RENAME[identity.name]) {
-            desiredName = LEGACY_RENAME[identity.name];
-          }
-        }
-
-        const isCustomIcon = !FIREFOX_DEFAULT_ICONS.has(identity.icon);
-        const targetIcon = desiredIcon || (isCustomIcon ? "fingerprint" : identity.icon);
-
-        if (isCustomIcon && identity.icon && identity.icon !== "fingerprint" && !overrides[identity.cookieStoreId]) {
-          overrides[identity.cookieStoreId] = identity.icon;
-          overridesChanged = true;
-        }
-
-        const nameNeedsUpdate = desiredName && identity.name !== desiredName;
-        const iconNeedsUpdate = targetIcon && identity.icon !== targetIcon;
-
-        if (nameNeedsUpdate || iconNeedsUpdate) {
-          const patch = {};
-          if (nameNeedsUpdate) patch.name = desiredName;
-          if (iconNeedsUpdate) patch.icon = targetIcon;
-          try {
-            await browser.contextualIdentities.update(identity.cookieStoreId, patch);
-          } catch {
-            // ignore per-identity failures
-          }
-        }
-      }
-
+      // Overrides first, so the popup never shows a fingerprint where a
+      // security icon belongs while the identity updates are in flight.
       const storageUpdates = {};
-      if (!migrated) storageUpdates[MIGRATION_KEY] = true;
-      if (overridesChanged) storageUpdates.containerDisplayIconOverrides = overrides;
+      if (!stored[MIGRATION_KEY]) storageUpdates[MIGRATION_KEY] = true;
+      if (plan.overridesChanged) storageUpdates.containerDisplayIconOverrides = plan.overrides;
       if (Object.keys(storageUpdates).length) {
         await browser.storage.local.set(storageUpdates);
+      }
+
+      for (const { cookieStoreId, patch } of plan.updates) {
+        try {
+          await browser.contextualIdentities.update(cookieStoreId, patch);
+        } catch {
+          // ignore per-identity failures
+        }
       }
     } catch {
       // ignore failures (e.g. contextualIdentities unavailable)
@@ -360,11 +293,13 @@ const backgroundLogic = {
   },
 
   async createOrUpdateContainer(options) {
+    // The icon the user picked. Firefox gets the nearest icon it accepts; the
+    // real choice is kept as a display override below — in one place, so the
+    // popup no longer writes a second, different override after this one.
     const desiredIcon = options?.params?.icon;
-    const isCustomIcon = desiredIcon && !FIREFOX_DEFAULT_ICONS.has(desiredIcon);
     const params = {
       ...options.params,
-      icon: isCustomIcon ? "fingerprint" : desiredIcon,
+      icon: desiredIcon ? PhoenixBoxReviewHelpers.firefoxIconFor(desiredIcon) : desiredIcon,
     };
     let identity;
     if (options.userContextId !== "new") {

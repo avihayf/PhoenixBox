@@ -15,6 +15,7 @@ import { logError } from "../lib/logger";
 import { type AccentValue, ACCENT_PRESETS, applyCustomHue, clearCustomHue, serializeAccent, deserializeAccent, type LogoAccentValue, applyLogoAccentToDOM, serializeLogoAccent, deserializeLogoAccent } from "../lib/accentColors";
 import { toProxyType, type Container, type Tab, type AssignedSite } from "../lib/types";
 import * as msg from "../lib/messages";
+import { defaultSecurityIcon } from "../lib/securityProfiles";
 import { HIGHLIGHTER_HEADERS_KEY, HIGHLIGHTER_STORAGE_DEFAULTS,
   resolveHighlighterHeadersEnabled, highlighterChangeValue } from "../lib/highlighterSettings";
 import { readProxyMap, getProxyForContainer,
@@ -28,11 +29,6 @@ function countVisibleAndHiddenTabs(visibleTabs: unknown[], hiddenTabs: unknown) 
   return visibleCount + hiddenCount;
 }
 
-// Enforce standard Firefox container colors for our security profiles.
-const FIREFOX_DEFAULT_ICONS = new Set([
-  "fingerprint", "briefcase", "dollar", "cart", "circle",
-  "gift", "vacation", "food", "fruit", "pet", "tree", "chill"
-]);
 
 function PopupWrapper({ children, isMainView = false }: { children: ReactNode; isMainView?: boolean }) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -248,29 +244,6 @@ function App() {
     return userContextId !== csid ? Number(userContextId) : false;
   };
 
-  const enforceProfileColor = (name: string, color: string) => {
-    const lower = (name || "").toLowerCase();
-    if (lower === "attacker") return "red";
-    if (lower === "victim") return "orange";
-    if (lower === "member") return "yellow";
-    return color;
-  };
-
-  const getSecurityProfileIcon = (cookieStoreId: string, name: string) => {
-    const n = Number(cookieStoreId.replace("firefox-container-", ""));
-    if (n === 1) return "skull";
-    if (n === 2) return "user-x";
-    if (n === 3) return "user-cog";
-    if (n === 4) return "user-minus";
-
-    const lower = (name || "").toLowerCase();
-    if (lower === "attacker") return "skull";
-    if (lower === "victim") return "user-x";
-    if (lower === "admin") return "user-cog";
-    if (lower === "member") return "user-minus";
-    return null;
-  };
-
   const normalizeContainerColor = (value: string) => {
     return (value || "").toLowerCase();
   };
@@ -338,84 +311,25 @@ function App() {
     }
   };
 
+  // Read-only. It used to rewrite container identities and icon overrides on
+  // every popup open — forcing colours by name (reverting a user's choice the
+  // moment they saved it), forcing icons, and fighting the background's own
+  // startup normalization. The background now owns that, once.
   const refreshContainers = async () => {
     const browser = requireWebExt();
-    const win = await browser.windows.getCurrent();
-    const winId = win?.id ?? null;
     const identities = await browser.contextualIdentities.query({});
-    const originalIconById = new Map(
-      identities.map((id) => [id.cookieStoreId, id.icon]),
-    );
-    const { containerDisplayIconOverrides = {} } = await browser.storage.local.get({
-      containerDisplayIconOverrides: {},
-    });
-    // Ensure security profiles keep their intended custom icons.
-    const securityIcons = new Set(["skull", "user-x", "user-cog", "user-minus"]);
-    const desiredSecurityIconByName: Record<string, string> = {
-      attacker: "skull",
-      victim: "user-x",
-      admin: "user-cog",
-      member: "user-minus",
-    };
-    const normalizedOverrides =
-      containerDisplayIconOverrides && typeof containerDisplayIconOverrides === "object"
-        ? { ...containerDisplayIconOverrides }
-        : {};
-    let overridesChanged = false;
-    const normalizedIdentities = identities.map((id) => ({ ...id }));
-    for (const id of normalizedIdentities) {
-      const desired = desiredSecurityIconByName[(id.name || "").toLowerCase()];
-      if (!desired) continue;
-      const current = normalizedOverrides[id.cookieStoreId];
-      if (!current || !securityIcons.has(current)) {
-        normalizedOverrides[id.cookieStoreId] = desired;
-        overridesChanged = true;
-      }
-    }
-    if (overridesChanged) {
-      await browser.storage.local.set({ containerDisplayIconOverrides: normalizedOverrides });
-    }
-    for (const id of normalizedIdentities) {
-      const updates: { name: string; color?: string; icon?: string } = {
-        name: id.name,
-      };
-      let shouldUpdate = false;
-
-      // Determine the intended icon from overrides or the current identity.
-      const overrideIcon = normalizedOverrides[id.cookieStoreId];
-      const intendedIcon = overrideIcon || id.icon;
-      const isCustomIcon = intendedIcon && !FIREFOX_DEFAULT_ICONS.has(intendedIcon);
-      const targetIconForFirefox = isCustomIcon ? "fingerprint" : intendedIcon;
-
-      if (id.icon !== targetIconForFirefox) {
-        updates.icon = targetIconForFirefox;
-        shouldUpdate = true;
-        id.icon = targetIconForFirefox;
-      }
-
-      const enforcedColor = enforceProfileColor(id.name, id.color);
-      if (enforcedColor !== id.color) {
-        updates.color = enforcedColor;
-        shouldUpdate = true;
-        id.color = enforcedColor;
-      }
-
-      if (shouldUpdate) {
-        try {
-          await browser.contextualIdentities.update(id.cookieStoreId, updates);
-        } catch (err) {
-          logError("Failed to enforce container identity:", err);
-        }
-      }
-    }
     // Every window, not just the current one. These counts drive the hide/show
     // toggle, and hiding is container-scoped — a per-window count would offer
     // "show" for a container whose tabs are simply in another window.
-    const tabQuery = await browser.tabs.query({});
-    const { containerUserAgents = {} } = await browser.storage.local.get({
-      containerUserAgents: {},
-    });
-    const proxifiedMap = await readProxyMap();
+    const stateKeys = identities.map((id) => `identitiesState@@_${id.cookieStoreId}`);
+    const [tabQuery, stored, proxifiedMap] = await Promise.all([
+      browser.tabs.query({}),
+      // One read for everything, rather than one per container.
+      browser.storage.local.get([...stateKeys, "containerUserAgents", "containerDisplayIconOverrides"]),
+      readProxyMap(),
+    ]);
+    const containerUserAgents = (stored.containerUserAgents || {}) as Record<string, string>;
+    const overrides = (stored.containerDisplayIconOverrides || {}) as Record<string, string>;
 
     const tabsGrouped: Record<string, Tab[]> = {};
     for (const t of tabQuery) {
@@ -429,33 +343,17 @@ function App() {
       });
     }
     setTabsByContainer(tabsGrouped);
-    const computed: Container[] = await Promise.all(normalizedIdentities.map(async (id) => {
-      const enforcedColor = enforceProfileColor(id.name, id.color);
-      const overrideIcon =
-        normalizedOverrides && typeof normalizedOverrides === "object"
-          ? normalizedOverrides[id.cookieStoreId]
-          : null;
-      const uiFallbackIcon =
-        originalIconById.get(id.cookieStoreId) || id.icon;
-      
-      const containerStateKey = `identitiesState@@_${id.cookieStoreId}`;
-      const containerState = await browser.storage.local.get(containerStateKey);
-      const storedContainerState = containerState[containerStateKey] || {};
-      const isIsolated = !!storedContainerState.isIsolated;
+
+    const computed: Container[] = identities.map((id) => {
+      const storedContainerState =
+        ((stored as Record<string, any>)[`identitiesState@@_${id.cookieStoreId}`] || {}) as Record<string, any>;
       const visibleTabs = tabsGrouped[id.cookieStoreId] || [];
-      const hiddenTabs = Array.isArray(storedContainerState.hiddenTabs)
-        ? storedContainerState.hiddenTabs
-        : [];
-      const tabCount = countVisibleAndHiddenTabs(
-        visibleTabs,
-        hiddenTabs,
-      );
-      
+      const hiddenTabs = Array.isArray(storedContainerState.hiddenTabs) ? storedContainerState.hiddenTabs : [];
+
       const proxyObj = proxifiedMap.get(id.cookieStoreId);
-      let proxyUrlStr = "";
-      if (proxyObj) {
-        proxyUrlStr = `${proxyObj.type}://${proxyObj.host}${proxyObj.port ? ":" + proxyObj.port : ""}`;
-      }
+      const proxyUrlStr = proxyObj
+        ? `${proxyObj.type}://${proxyObj.host}${proxyObj.port ? ":" + proxyObj.port : ""}`
+        : "";
       const legacyAdvancedProxy =
         proxyObj &&
         !proxyObj.source &&
@@ -467,21 +365,21 @@ function App() {
       return {
         cookieStoreId: id.cookieStoreId,
         name: id.name,
-        color: enforcedColor,
+        color: id.color,
         icon: id.icon,
         displayIcon:
-          overrideIcon ||
-          getSecurityProfileIcon(id.cookieStoreId, id.name) ||
-          uiFallbackIcon,
-        tabCount,
+          overrides[id.cookieStoreId] ||
+          defaultSecurityIcon(id.cookieStoreId) ||
+          id.icon,
+        tabCount: countVisibleAndHiddenTabs(visibleTabs, hiddenTabs),
         visibleTabCount: visibleTabs.length,
         hiddenTabCount: hiddenTabs.length,
         proxyUrl: proxyUrlStr,
-        proxySource: proxyObj?.source || (legacyAdvancedProxy ? "advanced" : undefined),
-        isIsolated,
+        proxySource: (proxyObj?.source as string | undefined) || (legacyAdvancedProxy ? "advanced" : undefined),
+        isIsolated: !!storedContainerState.isIsolated,
         userAgent: containerUserAgents[id.cookieStoreId] || "",
       };
-    }));
+    });
     setContainers(computed);
     return computed;
   };
@@ -905,39 +803,17 @@ function App() {
               ? "new"
               : String(cookieStoreIdToUserContextId(selectedContainer.cookieStoreId));
 
-            const nativeIcon = icon === "skull" ? "circle" : icon;
-
+            // The real chosen icon: the background maps it for Firefox and
+            // records it as the display override, once.
             const response = await msg.createOrUpdateContainer<{ cookieStoreId?: string }>(
               userContextId,
               {
                 name: name || (isNew ? "New Container" : selectedContainer.name),
                 color: normalizeContainerColor(color),
-                icon: nativeIcon,
+                icon,
               }
             );
             const targetId = isNew ? response?.cookieStoreId : selectedContainer.cookieStoreId;
-
-            // Persist the user's chosen display icon (supports security icons) so UI matches choice.
-            if (targetId) {
-              const stored = await browser.storage.local.get({
-                containerDisplayIconOverrides: {},
-              });
-              const overrides =
-                (stored.containerDisplayIconOverrides &&
-                  typeof stored.containerDisplayIconOverrides === "object"
-                  ? stored.containerDisplayIconOverrides
-                  : {}) || {};
-              overrides[targetId] = icon;
-              await browser.storage.local.set({ containerDisplayIconOverrides: overrides });
-            }
-
-            const updatedContainers = await refreshContainers();
-
-            if (isNew && response) {
-              const realId = response.cookieStoreId;
-              const newC = updatedContainers.find(c => c.cookieStoreId === realId);
-              if (newC) setSelectedContainer(newC);
-            }
 
             if (!isNew && siteIsolation !== !!selectedContainer.isIsolated) {
               await msg.addRemoveSiteIsolation(selectedContainer.cookieStoreId, !siteIsolation);

@@ -19,6 +19,7 @@ const {
   shouldRunSyncForCategories,
   isExtensionPageSender,
   isValidShortcutAssignment,
+  planProfileNormalization,
   isSiteStoreKey,
   buildSiteStoreKey,
   getHostnameFromSiteStoreKey,
@@ -393,6 +394,55 @@ describe("reviewHelpers", () => {
       expect(isValidShortcutAssignment("open_container_10", "none")).to.equal(false);
       expect(isValidShortcutAssignment("open_container_1", "http://x")).to.equal(false);
       expect(isValidShortcutAssignment("open_container_1", undefined)).to.equal(false);
+    });
+  });
+
+  describe("planProfileNormalization", () => {
+    const C = (n, name, color, icon) => ({ cookieStoreId: `firefox-container-${n}`, name, color, icon });
+    const stock = () => [
+      C(1, "Personal", "blue", "fingerprint"),
+      C(2, "Work", "orange", "briefcase"),
+      C(3, "Banking", "green", "dollar"),
+      C(4, "Shopping", "pink", "cart"),
+    ];
+
+    it("gives a fresh profile its security names, colours and icons once", () => {
+      const plan = planProfileNormalization(stock(), {}, false);
+      const byId = Object.fromEntries(plan.updates.map((u) => [u.cookieStoreId, u.patch]));
+      expect(byId["firefox-container-1"]).to.deep.equal({ name: "Attacker", color: "red" });
+      expect(byId["firefox-container-4"]).to.deep.equal({ name: "Member", color: "yellow" });
+      expect(plan.overrides).to.deep.equal({
+        "firefox-container-1": "skull",
+        "firefox-container-2": "user-x",
+        "firefox-container-3": "user-cog",
+        "firefox-container-4": "user-minus",
+      });
+    });
+
+    // It used to force names on every startup and the popup forced colours on
+    // every open, so a user's own choices never stuck.
+    it("leaves a migrated profile's names, colours and icons alone", () => {
+      const edited = [C(1, "Red Team", "blue", "briefcase"), C(2, "Victim", "purple", "fence")];
+      const plan = planProfileNormalization(edited, { "firefox-container-1": "briefcase" }, true);
+      expect(plan.updates).to.deep.equal([]);
+      expect(plan.overridesChanged).to.equal(false);
+    });
+
+    it("always shows Firefox fingerprint for an icon it cannot hold", () => {
+      const plan = planProfileNormalization([C(7, "Recon", "blue", "skull")], {}, true);
+      expect(plan.updates).to.deep.equal([{ cookieStoreId: "firefox-container-7", patch: { icon: "fingerprint" } }]);
+      expect(plan.overrides["firefox-container-7"]).to.equal("skull");
+    });
+
+    it("does not clobber an existing icon override", () => {
+      const plan = planProfileNormalization(stock(), { "firefox-container-1": "briefcase" }, false);
+      expect(plan.overrides["firefox-container-1"]).to.equal("briefcase");
+    });
+
+    it("ignores the default container and junk", () => {
+      const plan = planProfileNormalization(
+        [{ cookieStoreId: "firefox-default", name: "x", icon: "skull" }, null], {}, false);
+      expect(plan.updates).to.deep.equal([]);
     });
   });
 
