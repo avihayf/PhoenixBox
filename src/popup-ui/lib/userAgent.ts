@@ -11,7 +11,12 @@ export type UserAgentData = {
 
 const UA_CACHE_KEY = "cachedUserAgents";
 const UA_CACHE_TIMESTAMP_KEY = "userAgentsCacheTimestamp";
-const UA_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
+// The revision the cached lists were fetched from. The CDN URLs are pinned
+// to one commit, so its content can never change: a cache from this revision
+// is valid forever, and only bumping TOP_UA_REV triggers a new download.
+const UA_CACHE_REV_KEY = "userAgentsCacheRev";
+// A stalled CDN must not leave callers waiting indefinitely.
+const FETCH_TIMEOUT_MS = 8000;
 
 const TOP_UA_REV = "e1dad9fe2c6255198fff142e36aaddc5b5adc0d2";
 const CDN_URLS: Record<UserAgentCategory, string> = {
@@ -22,14 +27,8 @@ const CDN_URLS: Record<UserAgentCategory, string> = {
 
 async function isCacheValid(): Promise<boolean> {
   const browser = requireWebExt();
-  const stored = await browser.storage.local.get({
-    [UA_CACHE_TIMESTAMP_KEY]: 0,
-  });
-
-  const cacheTimestamp = stored[UA_CACHE_TIMESTAMP_KEY] as number;
-  if (!cacheTimestamp) return false;
-
-  return Date.now() - cacheTimestamp < UA_CACHE_TTL;
+  const stored = await browser.storage.local.get({ [UA_CACHE_REV_KEY]: null });
+  return stored[UA_CACHE_REV_KEY] === TOP_UA_REV;
 }
 
 async function getCached(): Promise<UserAgentData | null> {
@@ -50,9 +49,9 @@ async function fetchFromCDN(): Promise<UserAgentData> {
 
   try {
     const [allResponse, desktopResponse, mobileResponse] = await Promise.all([
-      fetch(CDN_URLS.all),
-      fetch(CDN_URLS.desktop),
-      fetch(CDN_URLS.mobile),
+      fetch(CDN_URLS.all, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }),
+      fetch(CDN_URLS.desktop, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }),
+      fetch(CDN_URLS.mobile, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }),
     ]);
 
     const validateUAData = (data: any): data is string[] =>
@@ -85,6 +84,7 @@ async function fetchFromCDN(): Promise<UserAgentData> {
     await browser.storage.local.set({
       [UA_CACHE_KEY]: results,
       [UA_CACHE_TIMESTAMP_KEY]: Date.now(),
+      [UA_CACHE_REV_KEY]: TOP_UA_REV,
     });
 
     return results;
@@ -115,72 +115,4 @@ export async function getUserAgents(forceRefresh = false): Promise<UserAgentData
   return fetchFromCDN();
 }
 
-// The single implementation. A duplicate lived in src/js/userAgentFetcher.js
-// for the background page, which never called it; it has been removed.
-export function parseUserAgentForDisplay(userAgent: string): string {
-  if (!userAgent) return "Unknown";
-
-  let browser = "Unknown";
-  let version = "";
-  let os = "";
-
-  if (userAgent.includes("Edg/")) {
-    const match = userAgent.match(/Edg\/([\d.]+)/);
-    browser = "Edge";
-    version = match ? match[1].split(".")[0] : "";
-  } else if (userAgent.includes("Chrome/")) {
-    const match = userAgent.match(/Chrome\/([\d.]+)/);
-    browser = "Chrome";
-    version = match ? match[1].split(".")[0] : "";
-  } else if (userAgent.includes("Firefox/")) {
-    const match = userAgent.match(/Firefox\/([\d.]+)/);
-    browser = "Firefox";
-    version = match ? match[1].split(".")[0] : "";
-  } else if (userAgent.includes("Safari/") && !userAgent.includes("Chrome")) {
-    const match = userAgent.match(/Version\/([\d.]+)/);
-    browser = "Safari";
-    version = match ? match[1].split(".")[0] : "";
-  } else if (userAgent.includes("OPR/") || userAgent.includes("Opera/")) {
-    const match = userAgent.match(/OPR\/([\d.]+)/) || userAgent.match(/Opera\/([\d.]+)/);
-    browser = "Opera";
-    version = match ? match[1].split(".")[0] : "";
-  }
-
-  if (userAgent.includes("Windows NT 10.0")) {
-    os = "Windows 10";
-  } else if (userAgent.includes("Windows NT 6.3")) {
-    os = "Windows 8.1";
-  } else if (userAgent.includes("Windows NT 6.2")) {
-    os = "Windows 8";
-  } else if (userAgent.includes("Windows NT 6.1")) {
-    os = "Windows 7";
-  } else if (userAgent.includes("Windows")) {
-    os = "Windows";
-  } else if (userAgent.includes("Mac OS X 10_15")) {
-    os = "macOS 10.15";
-  } else if (userAgent.includes("Mac OS X")) {
-    const match = userAgent.match(/Mac OS X ([\d_]+)/);
-    os = match ? `macOS ${match[1].replace(/_/g, ".")}` : "macOS";
-  } else if (userAgent.includes("Linux")) {
-    os = "Linux";
-  } else if (userAgent.includes("Android")) {
-    const match = userAgent.match(/Android ([\d.]+)/);
-    os = match ? `Android ${match[1]}` : "Android";
-  } else if (userAgent.includes("iPhone")) {
-    const match = userAgent.match(/iPhone OS ([\d_]+)/);
-    os = match ? `iOS ${match[1].replace(/_/g, ".")}` : "iOS";
-  } else if (userAgent.includes("iPad")) {
-    const match = userAgent.match(/CPU OS ([\d_]+)/);
-    os = match ? `iPadOS ${match[1].replace(/_/g, ".")}` : "iPadOS";
-  }
-
-  let displayName = browser;
-  if (version) {
-    displayName += ` ${version}`;
-  }
-  if (os) {
-    displayName += ` - ${os}`;
-  }
-
-  return displayName;
-}
+export { parseUserAgentForDisplay } from "./userAgentDisplay";

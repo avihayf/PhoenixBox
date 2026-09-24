@@ -231,10 +231,13 @@ export function SiteActionsView({
     }
   };
 
-  const handleCloseUserAgentModal = () => {
+  // Uses the value the modal reports rather than the selectedUserAgent prop,
+  // which after "Clear Override" was still the old agent in this render — the
+  // tile stayed on with no User-Agent set.
+  const handleCloseUserAgentModal = (userAgent: string) => {
     setShowUserAgentModal(false);
     // If no user-agent was selected, auto-disable the toggle
-    if (!selectedUserAgent) {
+    if (!userAgent) {
       onToggleUserAgent(false);
     }
   };

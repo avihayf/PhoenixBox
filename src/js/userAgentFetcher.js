@@ -10,7 +10,10 @@
 
 const UA_CACHE_KEY = "cachedUserAgents";
 const UA_CACHE_TIMESTAMP_KEY = "userAgentsCacheTimestamp";
-const UA_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+// Cached lists are keyed to the pinned revision: its content can never
+// change, so a cache from it is valid forever (see lib/userAgent.ts).
+const UA_CACHE_REV_KEY = "userAgentsCacheRev";
+const FETCH_TIMEOUT_MS = 8000;
 
 const TOP_UA_REV = "e1dad9fe2c6255198fff142e36aaddc5b5adc0d2";
 const CDN_URLS = {
@@ -24,17 +27,8 @@ const userAgentFetcher = {
    * Check if cached data exists and is still valid
    */
   async isCacheValid() {
-    const stored = await browser.storage.local.get({
-      [UA_CACHE_TIMESTAMP_KEY]: 0
-    });
-    
-    const cacheTimestamp = stored[UA_CACHE_TIMESTAMP_KEY];
-    if (!cacheTimestamp) return false;
-    
-    const now = Date.now();
-    const age = now - cacheTimestamp;
-    
-    return age < UA_CACHE_TTL;
+    const stored = await browser.storage.local.get({ [UA_CACHE_REV_KEY]: null });
+    return stored[UA_CACHE_REV_KEY] === TOP_UA_REV;
   },
 
   /**
@@ -50,9 +44,9 @@ const userAgentFetcher = {
     try {
       // Fetch all three lists in parallel
       const [allResponse, desktopResponse, mobileResponse] = await Promise.all([
-        fetch(CDN_URLS.all),
-        fetch(CDN_URLS.desktop),
-        fetch(CDN_URLS.mobile)
+        fetch(CDN_URLS.all, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }),
+        fetch(CDN_URLS.desktop, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }),
+        fetch(CDN_URLS.mobile, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
       ]);
 
       const validateUAData = (data) =>
@@ -81,7 +75,8 @@ const userAgentFetcher = {
       // Save to storage
       await browser.storage.local.set({
         [UA_CACHE_KEY]: results,
-        [UA_CACHE_TIMESTAMP_KEY]: Date.now()
+        [UA_CACHE_TIMESTAMP_KEY]: Date.now(),
+        [UA_CACHE_REV_KEY]: TOP_UA_REV
       });
 
       return results;

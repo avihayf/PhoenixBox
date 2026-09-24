@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X, RefreshCw } from 'lucide-react';
 import { parseUserAgentForDisplay, type UserAgentData } from '../../../lib/userAgent';
 
 interface UserAgentModalProps {
   isOpen: boolean;
-  onClose: () => void;
+  /** Called with the User-Agent in effect as the modal closes ("" if none). */
+  onClose: (userAgent: string) => void;
   userAgentType: 'all' | 'desktop' | 'mobile';
   selectedUserAgent: string;
   onSelectUserAgentType: (type: 'all' | 'desktop' | 'mobile') => void;
@@ -31,15 +32,55 @@ export function UserAgentModal({
   const [customMode, setCustomMode] = useState(isCustomUserAgent);
   const selectValue = customMode ? "custom" : selectedUserAgent;
 
+  // Custom text is edited locally and written after a pause (or on close),
+  // not on every keystroke: each write re-attached the header listener and
+  // made the popup rebuild every container.
+  const [customDraft, setCustomDraft] = useState(selectedUserAgent);
+  const commitTimer = useRef<number | null>(null);
+  const pendingDraft = useRef<string | null>(null);
+
+  // Decide custom mode when the modal opens, not on every change: deriving it
+  // from the current value dropped the user out of custom mode the moment
+  // they cleared the box to retype it.
   useEffect(() => {
+    if (!isOpen) return;
     setCustomMode(isCustomUserAgent);
-  }, [isCustomUserAgent, isOpen, selectedUserAgent]);
+    setCustomDraft(selectedUserAgent);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  const flushDraft = (): string | null => {
+    if (commitTimer.current !== null) {
+      window.clearTimeout(commitTimer.current);
+      commitTimer.current = null;
+    }
+    const draft = pendingDraft.current;
+    pendingDraft.current = null;
+    if (draft !== null) onSelectUserAgent(draft);
+    return draft;
+  };
+
+  useEffect(() => () => { flushDraft(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!isOpen) return null;
 
+  const close = () => {
+    const flushed = flushDraft();
+    onClose(flushed !== null ? flushed : selectedUserAgent);
+  };
+
   const handleClear = () => {
+    pendingDraft.current = null;
+    flushDraft();
     onClearUserAgent();
-    onClose();
+    onClose("");
+  };
+
+  const handleDraftChange = (value: string) => {
+    setCustomDraft(value);
+    pendingDraft.current = value;
+    if (commitTimer.current !== null) window.clearTimeout(commitTimer.current);
+    commitTimer.current = window.setTimeout(() => { flushDraft(); }, 400);
   };
 
   return (
@@ -47,22 +88,29 @@ export function UserAgentModal({
       {/* Backdrop */}
       <div 
         className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 animate-in fade-in duration-200"
-        onClick={onClose}
+        onClick={close}
       />
       
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-        <div 
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ua-modal-title"
           className="bg-[var(--ext-bg-secondary)] border-2 border-[var(--ext-accent)] rounded-xl shadow-2xl w-full max-w-[320px] pointer-events-auto animate-in scale-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => { if (e.key === 'Escape') close(); }}
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--ext-border)]">
-            <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--ext-accent)] brand-title">
+            <h2 id="ua-modal-title" className="text-sm font-medium uppercase tracking-wider text-[var(--ext-accent)] brand-title">
               User-Agent Settings
             </h2>
             <button
-              onClick={onClose}
+              type="button"
+              aria-label="Close"
+              autoFocus
+              onClick={close}
               className="p-1.5 hover:bg-[var(--ext-bg-tertiary)] rounded transition-all duration-200 active:ring-2 active:ring-[var(--ext-accent)] active:ring-offset-1 active:ring-offset-[var(--ext-bg)]"
             >
               <X className="w-4 h-4 text-[var(--ext-text-muted)]" />
@@ -117,6 +165,7 @@ export function UserAgentModal({
                 onChange={(e) => {
                   if (e.target.value === "custom") {
                     setCustomMode(true);
+                    setCustomDraft(selectedUserAgent);
                     return;
                   }
                   setCustomMode(false);
@@ -141,8 +190,9 @@ export function UserAgentModal({
                 </label>
                 <input
                   type="text"
-                  value={selectedUserAgent}
-                  onChange={(e) => onSelectUserAgent(e.target.value)}
+                  value={customDraft}
+                  onChange={(e) => handleDraftChange(e.target.value)}
+                  onBlur={() => { flushDraft(); }}
                   placeholder="Enter custom User-Agent"
                   className="w-full px-3 py-2 text-xs bg-[var(--ext-bg)] border border-[var(--ext-border)] rounded-lg text-[var(--ext-text)] focus:outline-none focus:border-[var(--ext-accent)] transition-all duration-200"
                 />
@@ -158,7 +208,7 @@ export function UserAgentModal({
                 Clear Override
               </button>
               <button
-                onClick={onClose}
+                onClick={close}
                 className="flex-1 flex items-center justify-center px-3 py-2 text-xs bg-[var(--ext-accent)] text-black rounded-lg hover:bg-[var(--ext-cyan-light)] transition-all duration-200 font-medium active:ring-2 active:ring-[var(--ext-accent)] active:ring-offset-2 active:ring-offset-[var(--ext-bg)]"
               >
                 Done

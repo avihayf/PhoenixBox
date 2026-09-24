@@ -21,6 +21,13 @@ proxifiedContainers = {
         delete item.proxy.passwordEnc;
         changed = true;
       }
+      // Presets used to be saved flagged as Mozilla VPN proxies. A real VPN
+      // entry always carries a countryCode; a preset never does.
+      if (item && item.proxy && item.proxy.source === "preset" &&
+          item.proxy.mozProxyEnabled === true && !item.proxy.countryCode) {
+        item.proxy.mozProxyEnabled = false;
+        changed = true;
+      }
     }
     if (changed) {
       await browser.storage.local.set({ proxifiedContainersKey: list });

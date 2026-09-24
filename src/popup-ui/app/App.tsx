@@ -10,7 +10,7 @@ import { OnboardingView } from "./components/views/OnboardingView";
 import { requireWebExt } from "../lib/browser";
 import { parseGlobalProxyUrl, sanitizeProxyUrlForStorage, stripSensitiveProxyFields } from "../lib/proxy";
 import { getUserAgents, type UserAgentData } from "../lib/userAgent";
-import { DEFAULT_PROXY_PRESETS, type ProxyPreset } from "../lib/proxyPresets";
+import { DEFAULT_PROXY_PRESETS, effectivePresetId, presetProxyType, type ProxyPreset } from "../lib/proxyPresets";
 import { logError } from "../lib/logger";
 import { type AccentValue, ACCENT_PRESETS, applyCustomHue, clearCustomHue, serializeAccent, deserializeAccent, type LogoAccentValue, applyLogoAccentToDOM, serializeLogoAccent, deserializeLogoAccent } from "../lib/accentColors";
 import { toProxyType, type Container, type Tab, type AssignedSite } from "../lib/types";
@@ -244,6 +244,14 @@ function App() {
     return userContextId !== csid ? Number(userContextId) : false;
   };
 
+  // container.proxyUrl is "type://host:port" built by refreshContainers
+  // (with "direct://" for a Disable-proxy entry).
+  const parseContainerProxyUrl = (url: string) => {
+    if (url === "direct://") return { type: "direct" };
+    const m = /^([a-z0-9]+):\/\/(\[[^\]]+\]|[^:/]+)(?::(\d+))?/i.exec(url);
+    return m ? { type: m[1], host: m[2].replace(/^\[|\]$/g, ""), port: Number(m[3]) } : null;
+  };
+
   const normalizeContainerColor = (value: string) => {
     return (value || "").toLowerCase();
   };
@@ -446,7 +454,7 @@ function App() {
     // Held in the effect's closure, not inside run(), so the cleanup React
     // actually receives can reach them: run() is async, so anything it returns
     // is a promise React discards.
-    let intervalId: number | null = null;
+    let permissionListener: (() => void) | null = null;
     let storageListener: ((changes: any, areaName: string) => void) | null = null;
     let cancelled = false;
 
@@ -475,12 +483,6 @@ function App() {
     const run = async () => {
       const browser = requireWebExt();
 
-      // Kick VPN status refresh (safe, uses existing background port if available)
-      try {
-        await msg.vpnQueryStatus();
-      } catch {
-        // ignore
-      }
 
       const win = await browser.windows.getCurrent();
       const winId = win?.id ?? null;
@@ -560,27 +562,20 @@ function App() {
         stored.globalUserAgent ||
         Object.keys(stored.containerUserAgents || {}).length > 0
       ) {
-        await loadUserAgents(false);
+        // Not awaited: on a cold cache this is three CDN fetches, and the
+        // presets menu, VPN state and storage listener used to wait on them.
+        void loadUserAgents(false);
       }
       await loadCustomProxyPresets();
 
       // Mozilla VPN status + permissions warning
+      // Only the permissions warning dot lives in the main view. It depends on
+      // two permissions and one storage key, all of which have change events,
+      // so it is recomputed on those rather than polled. The old 3-second poll
+      // also pinged the VPN app each time, and every status reply bumps the
+      // VPN proxy isolation key — forcing fresh proxy connections every three
+      // seconds while the popup was open.
       const refreshVpn = async () => {
-        try {
-          await msg.vpnQueryStatus();
-        } catch {
-          // ignore
-        }
-
-        try {
-          await Promise.all([
-            msg.vpnGetInstallationStatus<any>(),
-            msg.vpnGetConnectionStatus<any>(),
-          ]);
-        } catch {
-          // VPN may not be installed
-        }
-
         const permissionsOk = await browser.permissions.contains({
           permissions: ["proxy", "nativeMessaging"],
         });
@@ -599,9 +594,9 @@ function App() {
       // in which case cleanup has already run and there is nothing to register.
       if (cancelled) return;
 
-      intervalId = window.setInterval(() => {
-        refreshVpn().catch(() => {});
-      }, 3000);
+      permissionListener = () => { refreshVpn().catch(() => {}); };
+      browser.permissions.onAdded.addListener(permissionListener);
+      browser.permissions.onRemoved.addListener(permissionListener);
 
       // Listen for storage changes from background (e.g. permission rescue)
       const handleStorageChange = (changes: any, areaName: string) => {
@@ -630,7 +625,12 @@ function App() {
           );
         }
         if (changes.containerUserAgents) {
-          refreshContainers().catch((e) => logError("Failed to refresh container UAs:", e));
+          // Patch the one field locally instead of rebuilding every container.
+          const next = (changes.containerUserAgents.newValue || {}) as Record<string, string>;
+          setContainers((current) => current.map((c) => ({ ...c, userAgent: next[c.cookieStoreId] || "" })));
+        }
+        if (changes.mozillaVpnHiddenToutsList) {
+          refreshVpn().catch(() => {});
         }
       };
       storageListener = handleStorageChange;
@@ -641,7 +641,16 @@ function App() {
 
     return () => {
       cancelled = true;
-      if (intervalId) window.clearInterval(intervalId);
+      if (permissionListener) {
+        try {
+          const b = requireWebExt();
+          b.permissions.onAdded.removeListener(permissionListener);
+          b.permissions.onRemoved.removeListener(permissionListener);
+        } catch {
+          // Extension context already gone.
+        }
+        permissionListener = null;
+      }
       if (storageListener) {
         try {
           requireWebExt().storage.onChanged.removeListener(storageListener);
@@ -962,18 +971,15 @@ function App() {
             await refreshContainers();
           }}
           proxyPresets={customProxyPresets}
-          activeProxyPresetId={(() => {
-            // "Disable Proxy" — container has a direct entry overriding global proxy
-            if (selectedContainer.proxyUrl === "direct://") return "__direct__";
-            // Check per-container proxy first, then fall back to global proxy
-            const effectiveUrl = selectedContainer.proxyUrl || (globalProxyEnabled ? proxyUrl : "");
-            if (!effectiveUrl) return undefined;
-            const match = customProxyPresets.find(p => {
-              const presetUrl = `${p.scheme}://${p.host}:${p.port}`;
-              return effectiveUrl === presetUrl;
-            });
-            return match?.id;
-          })()}
+          activeProxyPresetId={effectivePresetId(
+            selectedContainer.proxyUrl
+              ? parseContainerProxyUrl(selectedContainer.proxyUrl)
+              : null,
+            globalProxyEnabled ? parseGlobalProxyUrl(proxyUrl) : null,
+            promotedProxyContainerIds.length === 0 ||
+              promotedProxyContainerIds.includes(selectedContainer.cookieStoreId),
+            customProxyPresets,
+          )}
           onSelectProxyPreset={async (preset) => {
             if (!preset) {
               await setProxyForContainer(selectedContainer.cookieStoreId, null);
@@ -987,14 +993,20 @@ function App() {
               });
             } else {
               await setProxyForContainer(selectedContainer.cookieStoreId, {
-                type: preset.scheme,
+                type: presetProxyType(preset.scheme),
                 host: preset.host,
                 port: preset.port,
-                mozProxyEnabled: true,
+                // A preset is a plain proxy. true marked it as a Mozilla VPN
+                // proxy, so the VPN section showed "Use VPN" on for it and
+                // turning that off deleted the preset.
+                mozProxyEnabled: false,
                 source: "preset",
               });
             }
-            await refreshContainers();
+            // Keep the view's copy current, or the dropdown snaps back.
+            const updated = await refreshContainers();
+            const next = updated.find((c) => c.cookieStoreId === selectedContainer.cookieStoreId);
+            if (next) setSelectedContainer(next);
           }}
         />
       </PopupWrapper>
@@ -1202,8 +1214,10 @@ function App() {
           setGlobalUserAgent(enabled);
           const browser = requireWebExt();
           if (enabled) {
-            await loadUserAgents(false);
+            // Store first, then fetch: awaiting the (network) list first let a
+            // quick close write "off" and then this late "on" win.
             await browser.storage.local.set({ globalUserAgentEnabled: true });
+            void loadUserAgents(false);
           } else {
             await browser.storage.local.set({ globalUserAgentEnabled: false, globalUserAgent: "" });
             setSelectedUserAgent("");
