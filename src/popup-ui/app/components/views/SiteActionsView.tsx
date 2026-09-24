@@ -1,4 +1,4 @@
-import { Plus, RotateCcw, ArrowUpDown, Hourglass, Sun, Moon, Info, Search, ChevronRight, ChevronDown, ChevronUp, Palette, Trash2, Edit2, X, ArrowUp, Eye, EyeOff, Globe, Highlighter, UserCog, Download, type LucideIcon } from 'lucide-react';
+import { Plus, RotateCcw, ArrowUpDown, Hourglass, Sun, Moon, Info, Search, ChevronRight, ChevronDown, ChevronUp, Palette, Trash2, Edit2, X, ArrowUp, Eye, EyeOff, Globe, Highlighter, UserCog, Download, Settings, Lock, type LucideIcon } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { ContainerIcon } from '../ContainerIcon';
 import { UserAgentModal } from '../modals/UserAgentModal';
@@ -24,28 +24,46 @@ import {
  */
 let updateNoticeShownThisPopup = false;
 
-/** Compact on/off toggle tile used for the Proxy / Highlighter / User-Agent controls. */
-function ControlTile({ icon: Icon, label, active, disabled, onClick }: {
+/**
+ * Compact on/off toggle tile used for the Proxy / Highlighter / User-Agent controls.
+ * `onConfigure` adds a corner settings button inside the tile, so turning a
+ * control on never makes the main view taller.
+ */
+function ControlTile({ icon: Icon, label, active, disabled, onClick, onConfigure }: {
   icon: LucideIcon;
   label: string;
   active: boolean;
   disabled?: boolean;
   onClick: () => void;
+  onConfigure?: () => void;
 }) {
   const color = active ? 'var(--ext-accent)' : 'var(--ext-text-muted)';
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-pressed={active}
-      className="flex-1 flex flex-col items-center gap-2 py-3 px-1.5 rounded-xl border transition-colors disabled:opacity-50"
-      style={{ borderColor: active ? 'var(--ext-accent)' : 'var(--ext-border)', background: active ? 'var(--ext-accent-bg)' : 'transparent' }}
-    >
-      <Icon className="w-5 h-5" style={{ color }} />
-      <span className="text-[11px] font-medium leading-tight text-center" style={{ color }}>{label}</span>
-      <span className="text-[9px] uppercase tracking-wide font-semibold" style={{ color }}>{active ? 'On' : 'Off'}</span>
-    </button>
+    <div className="relative flex-1">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        aria-pressed={active}
+        className="w-full flex flex-col items-center gap-1.5 py-2.5 px-1.5 rounded-xl border transition-colors disabled:opacity-50"
+        style={{ borderColor: active ? 'var(--ext-accent)' : 'var(--ext-border)', background: active ? 'var(--ext-accent-bg)' : 'transparent' }}
+      >
+        <Icon className="w-5 h-5" style={{ color }} />
+        <span className="text-[11px] font-medium leading-tight text-center" style={{ color }}>{label}</span>
+        <span className="text-[9px] uppercase tracking-wide font-semibold" style={{ color }}>{active ? 'On' : 'Off'}</span>
+      </button>
+      {onConfigure && (
+        <button
+          type="button"
+          onClick={onConfigure}
+          className="absolute top-1 right-1 p-1 rounded-md text-[var(--ext-accent)] hover:bg-[var(--ext-accent)]/15 focus-visible:bg-[var(--ext-accent)]/15 transition-colors"
+          aria-label={`Configure ${label}`}
+          title={`Configure ${label}`}
+        >
+          <Settings className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -251,7 +269,10 @@ export function SiteActionsView({
   const filteredContainers = containers.filter(container =>
     container.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
-  const shouldScrollContainers = filteredContainers.length > 6;
+  // A fresh profile has four containers, and the view is sized so those four
+  // fit the 600px popup without scrolling. Past that the list scrolls on its
+  // own, capped at four rows, so the Manage button stays in view.
+  const shouldScrollContainers = filteredContainers.length > 4;
 
   return (
     <div className="w-full max-h-[600px] flex flex-col bg-[var(--ext-bg)] rounded-xl">
@@ -294,7 +315,7 @@ export function SiteActionsView({
           </div>
         </div>
 
-        <h1 className="brand-main-title text-[32px]">
+        <h1 className="brand-main-title text-[32px] leading-none">
           {"PhoenixBox".split("").map((ch, i) => (
             <span key={i} style={{ color: i >= 7 ? 'var(--ext-logo-accent)' : 'var(--ext-accent)' }}>
               {ch}
@@ -411,6 +432,7 @@ export function SiteActionsView({
                 label="User-Agent"
                 active={userAgentEnabled}
                 onClick={() => handleToggleUserAgent(!userAgentEnabled)}
+                onConfigure={userAgentEnabled ? () => setShowUserAgentModal(true) : undefined}
               />
             </div>
 
@@ -508,27 +530,37 @@ export function SiteActionsView({
                   )}
                 </div>
                 
-                {/* Proxy URL Input */}
-                <input
-                  type="text"
-                  value={proxyUrl}
-                  onChange={(e) => onProxyUrlChange(e.target.value)}
-                  readOnly={proxyEnabled}
-                  placeholder="Select preset"
-                  className={`flex-1 px-2.5 py-1.5 bg-transparent border border-[var(--ext-border)] rounded-lg text-xs text-[var(--ext-text)] placeholder:text-[var(--ext-text-muted)] focus:outline-none focus:border-[var(--ext-accent)] ${proxyEnabled ? 'opacity-70 cursor-not-allowed' : ''}`}
-                />
+                {/* Proxy URL Input - locked while the proxy is on */}
+                <div className="relative flex-1 min-w-0">
+                  <input
+                    type="text"
+                    value={proxyUrl}
+                    onChange={(e) => onProxyUrlChange(e.target.value)}
+                    readOnly={proxyEnabled}
+                    placeholder="Select preset"
+                    aria-invalid={!!proxyError}
+                    aria-describedby={proxyError ? 'proxy-url-error' : undefined}
+                    title={proxyEnabled ? 'Disable proxy to edit URL manually' : undefined}
+                    className={`w-full px-2.5 py-1.5 bg-transparent border rounded-lg text-xs text-[var(--ext-text)] placeholder:text-[var(--ext-text-muted)] focus:outline-none focus:border-[var(--ext-accent)] ${proxyError ? 'border-[var(--ext-red)]' : 'border-[var(--ext-border)]'} ${proxyEnabled ? 'pr-7 opacity-70 cursor-not-allowed' : ''}`}
+                  />
+                  {proxyEnabled && (
+                    <Lock
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-[var(--ext-text-muted)] pointer-events-none"
+                      aria-hidden="true"
+                    />
+                  )}
+                </div>
               </div>
-              <div className="mt-1 space-y-1">
-                {proxyError && (
-                  <p className="text-[10px] text-[var(--ext-red)]">{proxyError}</p>
-                )}
-                {proxyEnabled && !proxyError && (
-                  <p className="text-[10px] text-[var(--ext-text-muted)] flex items-center gap-1">
-                    <Info className="w-2.5 h-2.5" />
-                    Disable proxy to edit URL manually
-                  </p>
-                )}
-              </div>
+              {/* Floats over the section below so an error never resizes the view */}
+              {proxyError && (
+                <p
+                  id="proxy-url-error"
+                  role="alert"
+                  className="absolute left-0 right-0 top-full mt-1 z-20 px-2 py-1 text-[10px] text-[var(--ext-red)] bg-[var(--ext-bg-secondary)] border border-[var(--ext-red)]/50 rounded-md shadow-lg"
+                >
+                  {proxyError}
+                </p>
+              )}
             </div>
 
             {/* Proxy Modal for Custom Configuration */}
@@ -548,15 +580,6 @@ export function SiteActionsView({
               initialData={editingPreset || undefined}
             />
 
-            {/* User Agent Configure Button (when enabled) */}
-            {userAgentEnabled && (
-              <button
-                onClick={() => setShowUserAgentModal(true)}
-                className="w-full px-3 py-2 text-xs bg-[var(--ext-accent-bg)] border border-[var(--ext-accent)] text-[var(--ext-accent)] rounded-lg hover:bg-[var(--ext-accent)] hover:text-black transition-colors"
-              >
-                Configure User-Agent
-              </button>
-            )}
           </div>
         </div>
 
@@ -589,7 +612,7 @@ export function SiteActionsView({
             />
 
             {/* Container List */}
-            <div className={`${shouldScrollContainers ? 'max-h-[220px] overflow-y-auto custom-scrollbar' : ''}`}>
+            <div className={`${shouldScrollContainers ? 'max-h-[164px] overflow-y-auto custom-scrollbar' : ''}`}>
               <div className="space-y-1">
                 {filteredContainers.map(container => {
                   const cHex = getContainerColorHex(container.color);
