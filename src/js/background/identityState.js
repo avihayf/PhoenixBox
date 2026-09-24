@@ -118,6 +118,63 @@ window.identityState = {
     return containers;
   },
 
+  /** @type {Map<string, Promise>} cookieStoreId -> tail of that container's write queue */
+  _stateLocks: new Map(),
+
+  /**
+   * Read-modify-write one container's state with no other writer in between.
+   *
+   * Hide, un-hide, move-to-window and the isolation toggle all read the state,
+   * await other work, then write it back. Two of them overlapping meant the
+   * later write carried a stale copy — an un-hide finishing after a hide
+   * wrote `hiddenTabs: []` over the tabs the hide had just recorded, and
+   * those tabs were gone for good. Calls for the same container now queue.
+   *
+   * `mutate` receives the state (or null if the container no longer exists,
+   * in which case nothing is written) and may change it in place; its return
+   * value is passed through.
+   */
+  withContainerState(cookieStoreId, mutate) {
+    const previous = this._stateLocks.get(cookieStoreId) || Promise.resolve();
+    const current = previous.catch(() => {}).then(async () => {
+      const state = await this.storageArea.get(cookieStoreId);
+      if (!state) return mutate(null);
+      if (!Array.isArray(state.hiddenTabs)) state.hiddenTabs = [];
+      const result = await mutate(state);
+      await this.storageArea.set(cookieStoreId, state);
+      return result;
+    });
+    this._stateLocks.set(cookieStoreId, current);
+    const release = () => {
+      if (this._stateLocks.get(cookieStoreId) === current) this._stateLocks.delete(cookieStoreId);
+    };
+    current.then(release, release).catch(() => {});
+    return current;
+  },
+
+  /**
+   * Take a container's hidden-tab list and empty it, in one locked step.
+   *
+   * Whoever claims the list owns reopening those tabs, so two un-hides (or an
+   * un-hide and a move-to-window) can no longer both reopen them.
+   */
+  claimHiddenTabs(cookieStoreId) {
+    return this.withContainerState(cookieStoreId, (state) => {
+      if (!state) return [];
+      const claimed = state.hiddenTabs;
+      state.hiddenTabs = [];
+      return claimed;
+    });
+  },
+
+  /** Put back hidden tabs that could not be reopened, so they are not lost. */
+  returnHiddenTabs(cookieStoreId, tabs) {
+    if (!tabs || !tabs.length) return Promise.resolve();
+    return this.withContainerState(cookieStoreId, (state) => {
+      if (state) state.hiddenTabs.push(...tabs);
+    });
+  },
+
   /**
    * Record tabs so un-hide can bring them back.
    *
@@ -128,21 +185,14 @@ window.identityState = {
    * @param {string} cookieStoreId
    * @param {object[]} tabs tabs the caller is about to close.
    */
-  async storeHidden(cookieStoreId, tabs) {
-    const containerState = await this.storageArea.get(cookieStoreId);
-    if (!containerState) {
-      return false;
-    }
-    if (!Array.isArray(containerState.hiddenTabs)) {
-      containerState.hiddenTabs = [];
-    }
-
-    for (const tab of (tabs || [])) {
-      containerState.hiddenTabs.push(PhoenixBoxReviewHelpers.sanitizeHiddenTab(tab));
-    }
-
-    await this.storageArea.set(cookieStoreId, containerState);
-    return containerState;
+  storeHidden(cookieStoreId, tabs) {
+    return this.withContainerState(cookieStoreId, (state) => {
+      if (!state) return false;
+      for (const tab of (tabs || [])) {
+        state.hiddenTabs.push(PhoenixBoxReviewHelpers.sanitizeHiddenTab(tab));
+      }
+      return state;
+    });
   },
 
   async updateUUID(cookieStoreId, uuid) {

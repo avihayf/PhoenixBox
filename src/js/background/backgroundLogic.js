@@ -17,7 +17,6 @@ const backgroundLogic = {
     "about:blank"
   ]),
   NUMBER_OF_KEYBOARD_SHORTCUTS: 10,
-  unhideQueue: [],
   init() {
 
     browser.commands.onCommand.addListener(function (command) {
@@ -464,34 +463,26 @@ const backgroundLogic = {
     return list.concat(containerState.hiddenTabs || []);
   },
 
-  async unhideContainer(cookieStoreId, alreadyShowingUrl) {
-    if (!this.unhideQueue.includes(cookieStoreId)) {
-      this.unhideQueue.push(cookieStoreId);
-      try {
-        await this.showTabs({
-          cookieStoreId,
-          alreadyShowingUrl
-        });
-      } finally {
-        // Always release the queue slot, even if showTabs throws, otherwise
-        // the container stays stuck and future un-hide attempts no-op.
-        this.unhideQueue.splice(this.unhideQueue.indexOf(cookieStoreId), 1);
-      }
-    }
+  // Concurrent un-hides are safe without a queue: showTabs claims the hidden
+  // list atomically, so a second caller finds it empty.
+  unhideContainer(cookieStoreId, alreadyShowingUrl) {
+    return this.showTabs({ cookieStoreId, alreadyShowingUrl });
   },
 
   // https://github.com/mozilla/multi-account-containers/issues/847
   async addRemoveSiteIsolation(cookieStoreId, remove = false) {
-    const containerState = await identityState.storageArea.get(cookieStoreId) || { hiddenTabs: [] };
     try {
-      if ("isIsolated" in containerState || remove) {
-        delete containerState.isIsolated;
-      } else {
-        containerState.isIsolated = "locked";
-      }
-      return await identityState.storageArea.set(cookieStoreId, containerState);
+      return await identityState.withContainerState(cookieStoreId, (state) => {
+        // Container may have been removed between lookup and update.
+        if (!state) return;
+        if ("isIsolated" in state || remove) {
+          delete state.isIsolated;
+        } else {
+          state.isIsolated = "locked";
+        }
+      });
     } catch {
-      // Container may have been removed between lookup and update.
+      // Same: nothing to toggle on a container that has gone.
     }
   },
 
@@ -507,71 +498,49 @@ const backgroundLogic = {
     const { cookieStoreId } = options;
 
     const list = await browser.tabs.query({ cookieStoreId });
-
-    // A container that has never had state stored returns null here, so fall
-    // back to an empty state rather than dereferencing null below.
-    const containerState =
-      await identityState.storageArea.get(cookieStoreId) || { hiddenTabs: [] };
+    // Claimed up front and atomically: this call now owns reopening them.
+    const hiddenTabs = await identityState.claimHiddenTabs(cookieStoreId);
 
     // Nothing to do
-    if (list.length === 0 &&
-        (containerState.hiddenTabs || []).length === 0) {
+    if (list.length === 0 && hiddenTabs.length === 0) {
       return;
     }
-    let newWindowObj;
-    let hiddenDefaultTabToClose;
+
+    const newWindowObj = await browser.windows.create();
+    const placeholderIds = (newWindowObj.tabs || []).map((tab) => tab.id);
+
     if (list.length) {
-      newWindowObj = await browser.windows.create();
-
-      // Pin the default tab in the new window so existing pinned tabs can be moved after it.
-      // From the docs (https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/tabs/move):
-      //   Note that you can't move pinned tabs to a position after any unpinned tabs in a window, or move any unpinned tabs to a position before any pinned tabs.
-      await browser.tabs.update(newWindowObj.tabs[0].id, { pinned: true });
-
-      browser.tabs.move(list.map((tab) => tab.id), {
+      // Pin the default tab so existing pinned tabs can be moved after it:
+      // pinned tabs cannot sit after unpinned ones, or unpinned before pinned.
+      if (placeholderIds.length) {
+        await browser.tabs.update(placeholderIds[0], { pinned: true });
+      }
+      await browser.tabs.move(list.map((tab) => tab.id), {
         windowId: newWindowObj.id,
         index: -1
       });
-    } else {
-      // As we get a blank tab here we will need to await the tabs creation
-      newWindowObj = await browser.windows.create({
-      });
-      hiddenDefaultTabToClose = true;
     }
 
-    const showHiddenPromises = [];
+    const results = await Promise.allSettled(hiddenTabs.map((object) =>
+      browser.tabs.create({
+        url: object.url || DEFAULT_TAB,
+        windowId: newWindowObj.id,
+        cookieStoreId
+      })
+    ));
+    // Any hidden tab that failed to reopen goes back on the list, not away.
+    const failed = hiddenTabs.filter((_, i) => results[i].status === "rejected");
+    await identityState.returnHiddenTabs(cookieStoreId, failed);
 
-    // Let's show the hidden tabs.
-    if (!this.unhideQueue.includes(cookieStoreId)) {
-      this.unhideQueue.push(cookieStoreId);
-      for (let object of (containerState.hiddenTabs || [])) { // eslint-disable-line prefer-const
-        showHiddenPromises.push(browser.tabs.create({
-          url: object.url || DEFAULT_TAB,
-          windowId: newWindowObj.id,
-          cookieStoreId
-        }));
-      }
+    // Close the window's own placeholder tab(s), and anything else an add-on
+    // may have opened in it that is not this container's.
+    const tabs = await browser.tabs.query({ windowId: newWindowObj.id });
+    const strays = tabs
+      .filter((tab) => placeholderIds.includes(tab.id) || tab.cookieStoreId !== cookieStoreId)
+      .map((tab) => tab.id);
+    if (strays.length && strays.length < tabs.length) {
+      await browser.tabs.remove(strays);
     }
-
-    if (hiddenDefaultTabToClose) {
-      // Lets wait for hidden tabs to show before closing the others
-      await Promise.all(showHiddenPromises);
-    }
-
-    containerState.hiddenTabs = [];
-
-    // Let's close all the normal tab in the new window. In theory it
-    // should be only the first tab, but maybe there are addons doing
-    // crazy stuff.
-    const tabs = await browser.tabs.query({windowId: newWindowObj.id});
-    for (let tab of tabs) { // eslint-disable-line prefer-const
-      if (tab.cookieStoreId !== cookieStoreId) {
-        browser.tabs.remove(tab.id);
-      }
-    }
-    const rv = await identityState.storageArea.set(cookieStoreId, containerState);
-    this.unhideQueue.splice(this.unhideQueue.indexOf(cookieStoreId), 1);
-    return rv;
   },
 
   async _closeTabs(userContextId, windowId = false) {
@@ -731,6 +700,9 @@ const backgroundLogic = {
       PhoenixBoxReviewHelpers.partitionTabsForHide(tabs, this.NEW_TAB_PAGES);
 
     const containerState = await identityState.storeHidden(cookieStoreId, toStore);
+    // Nothing was recorded (the container vanished mid-way), so closing would
+    // lose the tabs rather than hide them.
+    if (!containerState) return containerState;
 
     const tabIds = toClose.map((tab) => tab.id);
     if (tabIds.length) {
@@ -743,31 +715,29 @@ const backgroundLogic = {
     if (!("cookieStoreId" in options)) {
       return Promise.reject("showTabs must be called with cookieStoreId argument.");
     }
+    const { cookieStoreId } = options;
+    const userContextId = backgroundLogic.getUserContextIdFromCookieStoreId(cookieStoreId);
 
-    const userContextId = backgroundLogic.getUserContextIdFromCookieStoreId(options.cookieStoreId);
-    const promises = [];
+    // Claim first, open after: the state is never held while tabs are created,
+    // and a hide that lands meanwhile records its own tabs untouched.
+    const hiddenTabs = await identityState.claimHiddenTabs(cookieStoreId);
+    // The tab that triggered an automatic un-hide is already showing its URL.
+    const toOpen = hiddenTabs.filter((object) => object.url !== options.alreadyShowingUrl);
 
-    const containerState = await identityState.storageArea.get(options.cookieStoreId) || { hiddenTabs: [] };
-
-    for (let object of (containerState.hiddenTabs || [])) { // eslint-disable-line prefer-const
-      // do not show already opened url
-      const noload = !object.pinned;
-      if (object.url !== options.alreadyShowingUrl) {
-        promises.push(this.openNewTab({
-          userContextId: userContextId,
-          url: object.url,
-          title: object.title,
-          active: false,
-          noload: noload,
-          pinned: object.pinned,
-        }));
-      }
-    }
-
-    containerState.hiddenTabs = [];
-
-    await Promise.all(promises);
-    return identityState.storageArea.set(options.cookieStoreId, containerState);
+    const results = await Promise.allSettled(toOpen.map((object) =>
+      this.openNewTab({
+        userContextId,
+        url: object.url,
+        title: object.title,
+        active: false,
+        noload: !object.pinned,
+        pinned: object.pinned,
+      })
+    ));
+    // One failed create used to skip the state write entirely, so the next
+    // un-hide reopened every tab a second time. Keep only the failures.
+    const failed = toOpen.filter((_, i) => results[i].status === "rejected");
+    await identityState.returnHiddenTabs(cookieStoreId, failed);
   },
 
   cookieStoreId(userContextId) {
