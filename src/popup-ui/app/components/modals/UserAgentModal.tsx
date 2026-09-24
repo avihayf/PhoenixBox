@@ -185,6 +185,11 @@ export function UserAgentModal({
                 ))}
                 <option value="custom">-- Custom User-Agent --</option>
               </select>
+              {userAgents.length === 0 && (
+                <p className="mt-1.5 text-[10px] text-[var(--ext-text-muted)]">
+                  The User-Agent list hasn't loaded. Press Refresh, or choose Custom.
+                </p>
+              )}
             </div>
 
             {customMode && (

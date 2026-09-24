@@ -296,6 +296,11 @@ window.assignManager = {
       return { type: "direct" };
     }
 
+    // The extension's own requests are not browsing traffic to intercept.
+    if (PhoenixBoxReviewHelpers.isOwnExtensionRequest(requestInfo, browser.runtime.getURL(""))) {
+      return { type: "direct" };
+    }
+
     const cookieStoreId = await this._cookieStoreIdForProxyRequest(requestInfo);
     if (!cookieStoreId) {
       // Browser-internal traffic with no container to route by.

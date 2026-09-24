@@ -18,6 +18,7 @@ const {
   mergeProxyPresets,
   shouldRunSyncForCategories,
   isExtensionPageSender,
+  isOwnExtensionRequest,
   isValidShortcutAssignment,
   planProfileNormalization,
   isSiteStoreKey,
@@ -353,6 +354,30 @@ describe("reviewHelpers", () => {
       expect(shouldRunSyncForCategories(new Set())).to.equal(false);
       expect(shouldRunSyncForCategories(new Set(["instance", "presets"]))).to.equal(true);
       expect(shouldRunSyncForCategories(new Set(["identities"]))).to.equal(true);
+    });
+  });
+
+  describe("isOwnExtensionRequest", () => {
+    const BASE = "moz-extension://abc123/";
+
+    it("matches a fetch made from the popup or background page", () => {
+      expect(isOwnExtensionRequest({
+        cookieStoreId: "firefox-default",
+        tabId: -1,
+        originUrl: "moz-extension://abc123/popup/index.html",
+        url: "https://cdn.jsdelivr.net/gh/x/src/index.json",
+      }, BASE)).to.equal(true);
+      expect(isOwnExtensionRequest({
+        documentUrl: "moz-extension://abc123/_generated_background_page.html",
+      }, BASE)).to.equal(true);
+    });
+
+    it("does not match website traffic, service workers or other extensions", () => {
+      expect(isOwnExtensionRequest({ originUrl: "https://example.com/sw.js" }, BASE)).to.equal(false);
+      expect(isOwnExtensionRequest({ originUrl: "moz-extension://other/page.html" }, BASE)).to.equal(false);
+      expect(isOwnExtensionRequest({}, BASE)).to.equal(false);
+      expect(isOwnExtensionRequest({ originUrl: "moz-extension://abc123/x" }, "")).to.equal(false);
+      expect(isOwnExtensionRequest(null, BASE)).to.equal(false);
     });
   });
 
