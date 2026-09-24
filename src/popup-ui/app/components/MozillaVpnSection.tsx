@@ -40,16 +40,22 @@ export function MozillaVpnSection({ cookieStoreId, expanded, onToggle }: Mozilla
     const load = async () => {
       try {
         await msg.vpnAttemptPort();
-      } catch {}
+      } catch {
+        // The VPN client may not be installed; status below reflects that.
+      }
 
       try {
         await msg.vpnQueryStatus();
-      } catch {}
+      } catch {
+        // Best-effort refresh.
+      }
 
       if (isExpanded) {
         try {
           await msg.vpnQueryServers();
-        } catch {}
+        } catch {
+          // Best-effort refresh; the server list keeps its last value.
+        }
       }
 
       const [isInstalled, isConnected, permOk, stored, containerProxy] = await Promise.all([

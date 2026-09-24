@@ -620,7 +620,7 @@ window.assignManager = {
     if (this._proxyListenerAdded && this._boundHandleProxifiedRequest) {
       try {
         browser.proxy.onRequest.removeListener(this._boundHandleProxifiedRequest);
-      } catch (e) {
+      } catch {
         // Listener may already have been removed by the browser when the
         // permission was revoked – that's fine.
       }

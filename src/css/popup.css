@@ -91,32 +91,6 @@
   margin-inline: 0;
 
   /* Proton Colors */
-  --badge-destructive-bg-color: #e22850;
-  --badge-destructive-text-color: #fbfbfe;
-  --button-bg-color-primary: #0060df;
-  --button-bg-active-color-primary: #054096;
-  --button-bg-hover-color-primary: #0250bb;
-  --button-bg-focus-color-primary: #0060df;
-  --button-text-color-primary: #fbfbfe;
-  --button-bg-color-secondary: #f0f0f4;
-  --button-bg-active-color-secondary: #cfcfd8;
-  --button-bg-hover-color-secondary: #e0e0e6;
-  --button-destructive-bg-color: #e22850;
-  --button-destructive-bg-active-color: #810220;
-  --button-destructive-bg-hover-color: #c50042;
-  --button-destructive-bg-focus-color: #e22850;
-  --button-destructive-text-color: #fbfbfe;
-  --input-bg-color: #fff;
-  --input-bg-focus-color: #fff;
-  --input-bg-active-color: #054096;
-  --input-border-color: #8f8f9d;
-  --input-border-focus-color: #0060df;
-  --input-border-active-color: #054096;
-  --text-color-primary: #15141a;
-  --menu-bg-active-color: #cfcfd8;
-  --menu-bg-hover-color: #e0e0e6;
-  --panel-bg-color: #fff;
-  --panel-separator-color: rgb(240 240 244 / 1);
   --link-color: #0060df;
   --link-hover-color: #0250bb;
   --toggle-off-bg-color: #f0f0f4;
@@ -124,15 +98,7 @@
   --toggle-off-bg-hover-color: #e0e0e6;
   --toggle-off-bg-focus-color: #f0f0f4;
   --toggle-off-border-color: #8f8f9d;
-  --toggle-on-bg-color: #0060df;
-  --toggle-on-bg-active-color: #054096;
-  --toggle-on-bg-hover-color: #0250bb;
-  --toggle-on-bg-focus-color: #0060df;
-  --toggle-on-border-color: #0060df;
   --toggle-on-handle-bg-color: #fff;
-  --usercontext-bg-hover-color: #f0f0fa;
-  --usercontext-bg-focus-color: #e0e0e6;
-  --usercontext-bg-active-color: #cfcfd8;
 
   /* ------------------------------------------------------------
    * Phoenix "hacker" palette + shared tokens
@@ -197,47 +163,12 @@
   --iconArrowLeft: url("/img/arrow-icon-left-light.svg");
   --iconProxyWarning: url("/img/proxy-warning-light.svg");
   --logoMozillaVpn: url("/img/moz-vpn-logo-light.svg");
-  --bgColor: #42404c;
-  --text-normal-color: #f9f9fa;
-  --primaryCtaDefault: var(--blue40);
-  --primaryCtaHover: var(--blue50);
-  --primaryCtaActive: var(--blue60);
-  --controllerActive: rgb(90 89 102);
-  --bgDark: #2b2932;
 
   /* Proton Colors */
-  --badge-destructive-bg-color: #ff8480;
-  --badge-destructive-text-color: #15141a;
-  --button-bg-color-primary: #0df;
-  --button-bg-active-color-primary: #aaf2ff;
-  --button-bg-hover-color-primary: #80ebff;
-  --button-bg-focus-color-primary: #0df;
-  --button-text-color-primary: #15141a;
-  --button-bg-color-secondary: #2b2a33;
-  --button-bg-active-color-secondary: #5b5b66;
-  --button-bg-hover-color-secondary: #52525e;
-  --button-destructive-bg-color: #ff8480;
-  --button-destructive-bg-active-color: #ffdfe7;
-  --button-destructive-bg-hover-color: #ffbdc5;
-  --button-destructive-bg-focus-color: #ff8480;
-  --button-destructive-text-color: #15141a;
 
   /* for the input background, we use dark-grey-60 instead of dark-grey-30
    * instead the panel background is lighter than the page background
    */
-  --input-bg-color: #2b2a33;
-  --input-bg-active-color: #aaf2ff;
-  --input-bg-focus-color: #52525e;
-  --input-border-color: #8f8f9d;
-  --input-border-active-color: #aaf2ff;
-  --input-border-focus-color: #0df;
-  --link-color: #0df;
-  --link-hover-color: #80ebff;
-  --text-color-primary: #fbfbfe;
-  --menu-bg-active-color: #5b5b66;
-  --menu-bg-hover-color: #52525e;
-  --panel-bg-color: #42414d;
-  --panel-separator-color: rgb(82 82 94 / 1);
 
   /* Toggle is currently called `.slider` in the code below. This should be
    * changed in a follow-up patch to make it more inline with the terms used in
@@ -247,16 +178,6 @@
   --toggle-off-bg-active-color: #5b5b66;
   --toggle-off-bg-hover-color: #52525e;
   --toggle-off-bg-focus-color: #2b2a33;
-  --toggle-off-border-color: #8f8f9d;
-  --toggle-on-bg-color: #0df;
-  --toggle-on-bg-active-color: #aaf2ff;
-  --toggle-on-bg-hover-color: #80ebff;
-  --toggle-on-bg-focus-color: #0df;
-  --toggle-on-border-color: #0df;
-  --toggle-on-handle-bg-color: #42414d;
-  --usercontext-bg-active-color: #5b5b66;
-  --usercontext-bg-focus-color: #2b2a33;
-  --usercontext-bg-hover-color: #52525e;
 
   /* Phoenix "hacker" dark theme overrides — uses --ext-* tokens */
   --bgColor: var(--ext-bg);
@@ -1004,7 +925,6 @@ input.proxies {
   border-radius: 4px;
   display: flex;
   block-size: 32px;
-  margin-block-start: 8px;
   background-color: var(--panel-bg-color);
   background-image: var(--iconArrowRight);
   background-position: calc(100% - 24px) center;
@@ -1613,7 +1533,6 @@ input.proxies {
 }
 
 .server-radio-btn:checked + .server-radio-control {
-  border-color: var(--input-border-focus-color);
   border: 2px solid var(--input-border-focus-color);
 }
 

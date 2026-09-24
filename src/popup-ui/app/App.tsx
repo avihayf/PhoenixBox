@@ -393,7 +393,6 @@ function App() {
   };
 
   const loadAssignedSites = async (cookieStoreId: string) => {
-    const browser = requireWebExt();
     const userContextId = cookieStoreIdToUserContextId(cookieStoreId);
     if (!userContextId) return;
     setAssignedSitesLoading(true);
@@ -708,7 +707,6 @@ function App() {
           loading={assignedSitesLoading}
           onBack={handleBack}
           onRemoveSite={async (siteKey) => {
-            const browser = requireWebExt();
             const userContextId = cookieStoreIdToUserContextId(selectedContainer.cookieStoreId);
             if (!userContextId) return;
             await msg.setOrRemoveAssignment(null, siteKey, userContextId, true);
@@ -810,7 +808,6 @@ function App() {
           onBack={handleBack}
           onSave={async (name, color, icon, siteIsolation) => {
           try {
-            const browser = requireWebExt();
             const isNew = selectedContainer.cookieStoreId === "new";
             const userContextId = isNew
               ? "new"
@@ -1094,7 +1091,6 @@ function App() {
           await refreshContainers();
         }}
         onQuickHideContainer={async (container) => {
-          const browser = requireWebExt();
           if (quickHideBusyRef.current.has(container.cookieStoreId)) return;
           quickHideBusyRef.current.add(container.cookieStoreId);
           try {
@@ -1251,7 +1247,6 @@ function App() {
         onOpenInNewTab={() => openPicker("Open in new tab in…", "openNewTab")}
         onReopenSiteIn={() => openPicker("Reopen this site in…", "reopenSiteIn")}
         onSortTabs={async () => {
-          const browser = requireWebExt();
           await msg.sortTabs();
         }}
         onAlwaysOpenIn={() => openPicker("Always open this site in…", "alwaysOpenIn")}

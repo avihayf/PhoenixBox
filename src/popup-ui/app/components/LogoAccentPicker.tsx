@@ -19,14 +19,15 @@ interface LogoAccentPickerProps {
  *   (white on light, black on dark) is disabled. ("Phoenix" always follows the
  *   hue bar via --ext-accent.)
  */
+// The track has three zones: a black end, the rainbow hue span, and a white end.
+const BLACK_MAX = 0.085;
+const WHITE_MIN = 0.915;
+const HUE_SPAN = WHITE_MIN - BLACK_MAX;
+
 export function LogoAccentPicker({ value, themeHue, isDark = true, onChange }: LogoAccentPickerProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
 
-  // The track has three zones: a black end, the rainbow hue span, and a white end.
-  const BLACK_MAX = 0.085;
-  const WHITE_MIN = 0.915;
-  const HUE_SPAN = WHITE_MIN - BLACK_MAX;
 
   // White reads only on dark, black only on light — disable the invisible end.
   const whiteAllowed = isDark;
@@ -68,12 +69,12 @@ export function LogoAccentPicker({ value, themeHue, isDark = true, onChange }: L
   const minPos = blackAllowed ? 0 : 1;
   const maxPos = whiteAllowed ? 361 : 360;
   const currentPos = isBlack ? 0 : isWhite ? 361 : currentHue + 1;
-  const posToValue = (pos: number): LogoAccentValue => {
+  const posToValue = useCallback((pos: number): LogoAccentValue => {
     const p = Math.max(minPos, Math.min(maxPos, Math.round(pos)));
     if (p === 0) return { linked: false, black: true };
     if (p === 361) return { linked: false, white: true };
     return { linked: false, hue: p - 1 };
-  };
+  }, [minPos, maxPos]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (value.linked) return;
@@ -88,7 +89,7 @@ export function LogoAccentPicker({ value, themeHue, isDark = true, onChange }: L
 
     e.preventDefault();
     onChange(posToValue(currentPos + delta));
-  }, [value.linked, currentPos, minPos, maxPos, onChange]);
+  }, [value.linked, currentPos, minPos, maxPos, onChange, posToValue]);
 
   const valueText = isBlack ? 'Black' : isWhite ? 'White' : `Hue ${currentHue}`;
 

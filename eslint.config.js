@@ -2,18 +2,21 @@ const globals = require("globals");
 const promise = require("eslint-plugin-promise");
 const noUnsanitized = require("eslint-plugin-no-unsanitized");
 const js = require("@eslint/js");
+const tseslint = require("typescript-eslint");
+const reactHooks = require("eslint-plugin-react-hooks");
 
 module.exports = [
   {
     // `.claude/` holds agent scratch space, including git worktrees with their
     // own full checkout. Linting those reports errors against a copy of the
     // tree that this config's `files` globs don't apply to.
-    ignores: ["**/coverage", "dist/**", "**/dist/**", ".claude/**"],
+    ignores: ["**/coverage", "dist/**", "**/dist/**", ".claude/**", ".codex/**", "web-ext-artifacts/**"],
   },
   js.configs.recommended,
   {
+    files: ["**/*.js", "**/*.mjs", "**/*.cjs"],
     languageOptions: {
-      ecmaVersion: 2021,
+      ecmaVersion: 2022,
       parserOptions: {},
       globals: {
         ...globals.browser,
@@ -44,11 +47,7 @@ module.exports = [
       "promise/no-return-wrap": "error",
       "promise/param-names": "error",
       "no-unsanitized/method": ["error"],
-      "no-unsanitized/property": ["error", {
-        escape: {
-          taggedTemplates: ["Utils.escaped"],
-        },
-      }],
+      "no-unsanitized/property": ["error"],
 
       eqeqeq: "error",
       indent: ["error", 2],
@@ -91,5 +90,35 @@ module.exports = [
       },
     },
   },
+  // The popup (TypeScript/React). It had no lint coverage at all: ESLint's
+  // flat config only picks up JavaScript unless told otherwise. Correctness
+  // rules only — the JS style rules above would be pure churn here.
+  ...tseslint.configs.recommended.map((config) => ({
+    ...config,
+    files: ["src/popup-ui/**/*.{ts,tsx}"],
+  })),
+  {
+    files: ["src/popup-ui/**/*.{ts,tsx}"],
+    languageOptions: {
+      globals: { ...globals.browser, ...globals.webextensions },
+    },
+    plugins: {
+      "react-hooks": reactHooks,
+      "no-unsanitized": noUnsanitized,
+    },
+    rules: {
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
+      "no-unsanitized/method": "error",
+      "no-unsanitized/property": "error",
+      // The WebExtension API surface is loosely typed; `any` at that boundary
+      // is deliberate and commented where it matters.
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": ["error", {
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+        caughtErrors: "none",
+      }],
+    },
+  },
 ];
-

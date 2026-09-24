@@ -38,6 +38,10 @@ export function UserAgentModal({
   const [customDraft, setCustomDraft] = useState(selectedUserAgent);
   const commitTimer = useRef<number | null>(null);
   const pendingDraft = useRef<string | null>(null);
+  // The latest callback, so a flush on unmount (whose closure dates from the
+  // first render) still writes through the current one.
+  const onSelectRef = useRef(onSelectUserAgent);
+  onSelectRef.current = onSelectUserAgent;
 
   // Decide custom mode when the modal opens, not on every change: deriving it
   // from the current value dropped the user out of custom mode the moment
@@ -56,11 +60,11 @@ export function UserAgentModal({
     }
     const draft = pendingDraft.current;
     pendingDraft.current = null;
-    if (draft !== null) onSelectUserAgent(draft);
+    if (draft !== null) onSelectRef.current(draft);
     return draft;
   };
 
-  useEffect(() => () => { flushDraft(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { flushDraft(); }, []);
 
   if (!isOpen) return null;
 

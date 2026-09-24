@@ -183,7 +183,7 @@ async function initExtractEndpoints() {
         tabId: currentTab.id,
         pageUrl: currentTab.url,
       });
-    } catch (e) {
+    } catch {
       btn.textContent = "Error — try again";
       btn.disabled = false;
       return;

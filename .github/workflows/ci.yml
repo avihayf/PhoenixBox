@@ -1,33 +1,65 @@
 name: CI
 
 on:
+  # Every branch is covered through its pull request; pushing to main runs it
+  # once more after merge. Pushes to other branches with an open PR no longer
+  # run twice.
   push:
+    branches: [main]
   pull_request:
 
 permissions:
   contents: read
 
+# A newer push to the same ref supersedes the run in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
-    name: Verify extension
+    name: Verify (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both ends of package.json "engines" (>=22.18 <25).
+        node: [22, 24]
 
     steps:
+      # Actions are pinned to commit SHAs, not movable tags: this is a
+      # security tool, and a retagged action would run with its sources.
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
+      - name: Audit shipped dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      # Type-check, all linters (including web-ext lint, which builds dist/),
+      # then the unit tests.
       - name: Run checks
         run: npm test
 
-      - name: Build extension package
-        run: npm run build
+      - name: Package the extension
+        if: matrix.node == 22
+        run: NO_UPDATE_NOTIFIER=1 npx web-ext build -s dist/ -a web-ext-artifacts --overwrite-dest
+
+      - name: Upload the unsigned package
+        if: matrix.node == 22
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: phoenixbox-unsigned
+          path: web-ext-artifacts/*.zip
+          if-no-files-found: error
