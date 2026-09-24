@@ -4,26 +4,6 @@ import App from "./app/App";
 import "./styles/index.css";
 import { webext } from "./lib/browser";
 
-// Provide asset URLs to CSS (avoids brittle relative paths inside Vite output).
-try {
-  if (webext?.runtime?.getURL) {
-    document.documentElement.style.setProperty(
-      "--phoenix-bg-image",
-      `url(${webext.runtime.getURL("img/logo.png")})`,
-    );
-    document.documentElement.style.setProperty(
-      "--phoenix-vpn-connected-icon",
-      `url(${webext.runtime.getURL("img/moz-vpn-connected.svg")})`,
-    );
-    document.documentElement.style.setProperty(
-      "--phoenix-vpn-disconnected-icon",
-      `url(${webext.runtime.getURL("img/moz-vpn-disconnected.svg")})`,
-    );
-  }
-} catch {
-  // ignore (e.g., non-extension preview)
-}
-
 const rootEl = document.getElementById("root");
 
 if (rootEl) {

@@ -8,12 +8,8 @@
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["@types/firefox-webext-browser", "node"],
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    }
+    "types": ["@types/firefox-webext-browser", "node"]
   },
-  "include": ["src", "vite.config.ts", "vite.config.mts"]
+  "include": ["src", "vite.config.mts"]
 }
 

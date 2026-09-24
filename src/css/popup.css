@@ -2028,7 +2028,6 @@ manage things like container crud */
 }
 
 .mac-icon {
-  background-image: url('/img/PhoenixLogo.png');
   background-position: center center;
   background-repeat: no-repeat;
   background-size: 16px;
@@ -2328,7 +2327,6 @@ h3.title .title-icon {
 
 /* Phoenix logo background - faded for subtle effect */
 #container-panel::before {
-  background-image: url("/img/logo.png");
   background-position: center center;
   background-repeat: no-repeat;
   background-size: 365px auto;
