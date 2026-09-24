@@ -11,6 +11,8 @@ const {
   compareContainerOrder,
   sanitizeHostnameForStoreKey,
   partitionTabsForHide,
+  isSameProxyEndpoint,
+  planContainerSettingsCleanup,
   isSiteStoreKey,
   buildSiteStoreKey,
   getHostnameFromSiteStoreKey,
@@ -235,6 +237,71 @@ describe("reviewHelpers", () => {
       expect(sanitizeHostnameForStoreKey("")).to.equal("");
       expect(sanitizeHostnameForStoreKey(null)).to.equal("");
       expect(sanitizeHostnameForStoreKey(undefined)).to.equal("");
+    });
+  });
+
+  describe("isSameProxyEndpoint", () => {
+    const base = { type: "socks", host: "10.0.0.1", port: 1080, username: "u" };
+
+    it("matches the same endpoint and user, ignoring host case and port type", () => {
+      expect(isSameProxyEndpoint(base, { ...base, host: "10.0.0.1", port: "1080" })).to.equal(true);
+      expect(isSameProxyEndpoint({ ...base, host: "Proxy.Local" }, { ...base, host: "proxy.local" }))
+        .to.equal(true);
+    });
+
+    // Anything else means the in-memory password belongs to another proxy.
+    it("differs on type, host, port or username", () => {
+      expect(isSameProxyEndpoint(base, { ...base, type: "http" })).to.equal(false);
+      expect(isSameProxyEndpoint(base, { ...base, host: "10.0.0.2" })).to.equal(false);
+      expect(isSameProxyEndpoint(base, { ...base, port: 1081 })).to.equal(false);
+      expect(isSameProxyEndpoint(base, { ...base, username: "v" })).to.equal(false);
+    });
+
+    it("never matches a missing config", () => {
+      expect(isSameProxyEndpoint(base, null)).to.equal(false);
+      expect(isSameProxyEndpoint(null, null)).to.equal(false);
+    });
+  });
+
+  describe("planContainerSettingsCleanup", () => {
+    const stored = () => ({
+      promotedProxyContainerIds: ["firefox-container-4", "firefox-container-5"],
+      containerUserAgents: { "firefox-container-4": "UA", "firefox-container-5": "UA2" },
+      containerDisplayIconOverrides: { "firefox-container-4": "skull" },
+      open_container_0: "firefox-container-4",
+      open_container_1: "firefox-container-5",
+    });
+
+    // A stale promoted ID matches nothing, which silently routes every
+    // container DIRECT while the global proxy still shows as on.
+    it("removes the deleted container from the promoted-proxy list", () => {
+      expect(planContainerSettingsCleanup(stored(), "firefox-container-4").promotedProxyContainerIds)
+        .to.deep.equal(["firefox-container-5"]);
+    });
+
+    it("removes its User-Agent and icon override, keeping the others", () => {
+      const patch = planContainerSettingsCleanup(stored(), "firefox-container-4");
+      expect(patch.containerUserAgents).to.deep.equal({ "firefox-container-5": "UA2" });
+      expect(patch.containerDisplayIconOverrides).to.deep.equal({});
+    });
+
+    it("clears only the shortcuts that pointed at it", () => {
+      const patch = planContainerSettingsCleanup(stored(), "firefox-container-4");
+      expect(patch.open_container_0).to.equal("none");
+      expect(patch).to.not.have.property("open_container_1");
+    });
+
+    it("returns an empty patch when nothing refers to the container", () => {
+      expect(planContainerSettingsCleanup(stored(), "firefox-container-9")).to.deep.equal({});
+      expect(planContainerSettingsCleanup({}, "firefox-container-4")).to.deep.equal({});
+      expect(planContainerSettingsCleanup(stored(), "")).to.deep.equal({});
+      expect(planContainerSettingsCleanup(null, "firefox-container-4")).to.deep.equal({});
+    });
+
+    it("does not mutate the stored objects it was given", () => {
+      const input = stored();
+      planContainerSettingsCleanup(input, "firefox-container-4");
+      expect(input).to.deep.equal(stored());
     });
   });
 

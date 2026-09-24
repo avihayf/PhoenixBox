@@ -12,7 +12,10 @@ import type { Container } from '../../../lib/types';
 interface EditContainerViewProps {
   container?: Container;
   onBack: () => void;
-  onSave: (name: string, color: string, icon: string, proxyUrl: string, siteIsolation: boolean) => void;
+  // No proxy argument: proxies are edited live by the VPN section and Advanced
+  // Proxy Settings. Passing a copy captured when the form opened made Save
+  // re-apply that stale value over changes made since.
+  onSave: (name: string, color: string, icon: string, siteIsolation: boolean) => void;
   onDelete?: () => void;
   onManageSites?: () => void;
   onAdvancedProxyToggle?: (enabled: boolean) => void;
@@ -59,7 +62,6 @@ export function EditContainerView({
   const [name, setName] = useState(container?.name || '');
   const [color, setColor] = useState(container?.color || 'blue');
   const [icon, setIcon] = useState(container?.displayIcon || container?.icon || 'circle');
-  const [proxyUrl, setProxyUrl] = useState(container?.proxyUrl || '');
   const [siteIsolation, setSiteIsolation] = useState(container?.isIsolated || false);
   const [vpnExpanded, setVpnExpanded] = useState(false);
   const [showUserAgentModal, setShowUserAgentModal] = useState(false);
@@ -69,7 +71,7 @@ export function EditContainerView({
   const handleSave = () => {
     const trimmedName = name.trim();
     if (!trimmedName) return;
-    onSave(trimmedName, color, icon, proxyUrl, siteIsolation);
+    onSave(trimmedName, color, icon, siteIsolation);
   };
 
   const selectedColorHex = getContainerColorHex(color);
@@ -209,12 +211,7 @@ export function EditContainerView({
               <Switch
                 aria-label="Advanced proxy settings"
                 checked={advancedProxyEnabled}
-                onCheckedChange={(enabled) => {
-                  if (!enabled) {
-                    setProxyUrl("");
-                  }
-                  onAdvancedProxyToggle?.(enabled);
-                }}
+                onCheckedChange={(enabled) => onAdvancedProxyToggle?.(enabled)}
               />
             </div>
           </div>

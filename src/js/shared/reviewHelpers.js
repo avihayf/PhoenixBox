@@ -161,6 +161,67 @@
     return stale.concat(scanKeys.slice(limit));
   }
 
+  /**
+   * Whether two proxy configs point at the same endpoint as the same user.
+   *
+   * Stored configs never carry the password, so when one comes back through
+   * storage.onChanged this is what decides whether the password held in
+   * memory still belongs to it.
+   */
+  function isSameProxyEndpoint(a, b) {
+    if (!a || !b || typeof a !== "object" || typeof b !== "object") return false;
+    return String(a.type || "") === String(b.type || "") &&
+      String(a.host || "").toLowerCase() === String(b.host || "").toLowerCase() &&
+      Number(a.port) === Number(b.port) &&
+      String(a.username || "") === String(b.username || "");
+  }
+
+  const KEYBOARD_SHORTCUT_KEY = /^open_container_\d+$/;
+
+  /**
+   * Work out which per-container settings still reference a deleted container.
+   *
+   * Left behind, a promoted-proxy ID is actively harmful: once the promoted
+   * list is non-empty only listed containers use the global proxy, so a stale
+   * ID that matches nothing sends every container's traffic DIRECT while the
+   * proxy still shows as on. A stale container User-Agent keeps the blocking
+   * header listener attached forever, and a stale shortcut crashes the options
+   * page.
+   *
+   * @param {object} stored a storage read of the settings below plus the
+   *   open_container_N shortcut keys.
+   * @param {string} cookieStoreId the deleted container.
+   * @returns {object} the storage.local.set patch; empty when nothing changes.
+   */
+  function planContainerSettingsCleanup(stored, cookieStoreId) {
+    const values = stored && typeof stored === "object" ? stored : {};
+    const id = String(cookieStoreId || "");
+    const patch = {};
+    if (!id) return patch;
+
+    if (Array.isArray(values.promotedProxyContainerIds) &&
+        values.promotedProxyContainerIds.map(String).includes(id)) {
+      patch.promotedProxyContainerIds =
+        values.promotedProxyContainerIds.map(String).filter((entry) => entry !== id);
+    }
+
+    for (const key of ["containerUserAgents", "containerDisplayIconOverrides"]) {
+      const map = values[key];
+      if (map && typeof map === "object" && !Array.isArray(map) && id in map) {
+        const next = { ...map };
+        delete next[id];
+        patch[key] = next;
+      }
+    }
+
+    for (const key of Object.keys(values)) {
+      if (KEYBOARD_SHORTCUT_KEY.test(key) && values[key] === id) {
+        patch[key] = "none";
+      }
+    }
+    return patch;
+  }
+
   // Strip a password out of a proxy URL while leaving the username in place.
   // Anchored on the authority section so an "@" inside a query string is not
   // mistaken for credentials.
@@ -310,6 +371,8 @@
     getHostnameFromSiteStoreKey,
     selectEndpointScanKeysToRemove,
     sanitizeGlobalProxyUrl,
+    isSameProxyEndpoint,
+    planContainerSettingsCleanup,
     sanitizePromotedProxyContainerIds,
     resolveUserAgentSelection,
   };

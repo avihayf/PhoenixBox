@@ -79,34 +79,3 @@ export async function setProxyForContainer(
   }
   await write(entries);
 }
-
-/**
- * Merge over the container's existing proxy rather than replacing it.
- *
- * The simple URL field in the edit view only knows type/host/port, so a plain
- * replace would silently drop settings reached from Advanced Proxy Settings,
- * such as proxyDNS.
- */
-export async function mergeProxyForContainer(
-  cookieStoreId: string,
-  patch: ContainerProxy
-): Promise<void> {
-  const entries = await readProxyEntries();
-  const idx = entries.findIndex((entry) => entry.cookieStoreId === cookieStoreId);
-  const existing = idx === -1 ? {} : entries[idx].proxy;
-  const merged = { ...existing, ...patch };
-
-  if (idx === -1) {
-    entries.push({ cookieStoreId, proxy: merged });
-  } else {
-    entries[idx] = { cookieStoreId, proxy: merged };
-  }
-  await write(entries);
-}
-
-export async function removeProxyForContainer(cookieStoreId: string): Promise<void> {
-  const entries = await readProxyEntries();
-  const remaining = entries.filter((entry) => entry.cookieStoreId !== cookieStoreId);
-  if (remaining.length === entries.length) return;
-  await write(remaining);
-}

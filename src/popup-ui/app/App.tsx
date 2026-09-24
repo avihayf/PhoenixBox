@@ -17,8 +17,8 @@ import { toProxyType, type Container, type Tab, type AssignedSite } from "../lib
 import * as msg from "../lib/messages";
 import { HIGHLIGHTER_HEADERS_KEY, HIGHLIGHTER_STORAGE_DEFAULTS,
   resolveHighlighterHeadersEnabled, highlighterChangeValue } from "../lib/highlighterSettings";
-import { readProxyMap, getProxyForContainer, mergeProxyForContainer, removeProxyForContainer,
-  setProxyForContainer as storeSetProxyForContainer, type ContainerProxy } from "../lib/proxyStore";
+import { readProxyMap, getProxyForContainer,
+  setProxyForContainer as storeSetProxyForContainer } from "../lib/proxyStore";
 
 type View = "main" | "detail" | "edit" | "picker" | "manage" | "assignedSites" | "advancedProxy" | "onboarding";
 
@@ -106,6 +106,11 @@ function App() {
   const [globalProxyError, setGlobalProxyError] = useState<string>("");
   const [proxyToggleBusy, setProxyToggleBusy] = useState(false);
   const proxyToggleBusyRef = useRef(false);
+  // Proxy URLs this popup wrote itself. Their storage.onChanged echo must not
+  // be copied back into the input: the stored copy is password-stripped, so
+  // echoing it erased a password mid-typing (and a stale echo of an earlier
+  // keystroke rewound the text).
+  const selfWrittenProxyUrlsRef = useRef(new Set<string>());
   const quickHideBusyRef = useRef(new Set<string>());
   const [paintBurp, setPaintBurp] = useState(false);
   const [promotedProxyContainerIds, setPromotedProxyContainerIds] = useState<string[]>([]);
@@ -708,7 +713,8 @@ function App() {
           if (changes.globalProxyEnabled.newValue) setGlobalProxyError("");
         }
         if (changes.globalProxyUrl) {
-          setProxyUrl(String(changes.globalProxyUrl.newValue || ""));
+          const next = String(changes.globalProxyUrl.newValue || "");
+          if (!selfWrittenProxyUrlsRef.current.has(next)) setProxyUrl(next);
         }
         if (changes.globalProxyCredentialsMissing?.newValue) {
           setGlobalProxyError(
@@ -891,7 +897,7 @@ function App() {
         <EditContainerView
           container={selectedContainer}
           onBack={handleBack}
-          onSave={async (name, color, icon, proxyUrl, siteIsolation) => {
+          onSave={async (name, color, icon, siteIsolation) => {
           try {
             const browser = requireWebExt();
             const isNew = selectedContainer.cookieStoreId === "new";
@@ -935,21 +941,6 @@ function App() {
 
             if (!isNew && siteIsolation !== !!selectedContainer.isIsolated) {
               await msg.addRemoveSiteIsolation(selectedContainer.cookieStoreId, !siteIsolation);
-            }
-
-            if (proxyUrl) {
-              const parsed = parseGlobalProxyUrl(proxyUrl);
-              if (parsed) {
-                if (targetId) {
-                  // Merge rather than replace: the simple URL field only knows
-                  // type/host/port, and a replace would drop proxyDNS and any
-                  // other setting made in Advanced Proxy Settings.
-                  await mergeProxyForContainer(targetId, parsed as ContainerProxy);
-                }
-              }
-            } else if (!isNew) {
-              // Clear proxy if empty
-              await removeProxyForContainer(selectedContainer.cookieStoreId);
             }
 
             const latestContainers = await refreshContainers();
@@ -1271,9 +1262,11 @@ function App() {
               await msg.setGlobalProxyConfig(parsed as unknown as Record<string, unknown>);
 
               setGlobalProxyEnabled(true);
+              const storedUrl = sanitizeProxyUrlForStorage(urlToUse);
+              selfWrittenProxyUrlsRef.current.add(storedUrl);
               await browser.storage.local.set({
                 globalProxyEnabled: true,
-                globalProxyUrl: sanitizeProxyUrlForStorage(urlToUse),
+                globalProxyUrl: storedUrl,
                 globalProxyParsed: stripSensitiveProxyFields(parsed),
                 globalProxyUserDisabled: false,
               });
@@ -1297,14 +1290,18 @@ function App() {
         onProxyUrlChange={async (url) => {
           setProxyUrl(url);
           setGlobalProxyError("");
-          const browser = requireWebExt();
-          const updates: Record<string, any> = { globalProxyUrl: sanitizeProxyUrlForStorage(url) };
+          // Persist only a URL that parses. Anything else is mid-typing and may
+          // hold a half-typed password; the last valid URL stays stored.
           const parsed = parseGlobalProxyUrl(url);
-          if (parsed) {
-            await msg.setGlobalProxyConfig(parsed as unknown as Record<string, unknown>);
-            updates.globalProxyParsed = stripSensitiveProxyFields(parsed);
-          }
-          await browser.storage.local.set(updates);
+          if (!parsed) return;
+          const browser = requireWebExt();
+          await msg.setGlobalProxyConfig(parsed as unknown as Record<string, unknown>);
+          const storedUrl = sanitizeProxyUrlForStorage(url);
+          selfWrittenProxyUrlsRef.current.add(storedUrl);
+          await browser.storage.local.set({
+            globalProxyUrl: storedUrl,
+            globalProxyParsed: stripSensitiveProxyFields(parsed),
+          });
         }}
         proxyError={globalProxyError}
         paintBurp={paintBurp}

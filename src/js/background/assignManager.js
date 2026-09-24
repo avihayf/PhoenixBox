@@ -176,6 +176,9 @@ window.assignManager = {
     },
 
     async deleteContainer(userContextId) {
+      // getAssignedSites treats a falsy id as "every container", so without
+      // this guard a bad id would delete every site assignment.
+      if (!userContextId) return;
       const sitesByContainer = await this.getAssignedSites(userContextId);
       await this.area.remove(Object.keys(sitesByContainer));
       await identityState.storageArea.remove(backgroundLogic.cookieStoreId(userContextId));
@@ -265,25 +268,42 @@ window.assignManager = {
     return true;
   },
 
-  async handleProxifiedRequest(requestInfo) {
-    // The following blocks potentially dangerous requests for privacy that come without a tabId
+  /**
+   * Which container a proxied request belongs to.
+   *
+   * Firefox puts cookieStoreId on proxy.onRequest details when the extension
+   * holds the cookies permission — including requests with no tab, such as
+   * service-worker fetches and navigation preload. Keying on the tab alone
+   * sent all of those DIRECT, straight past Burp or the VPN.
+   */
+  async _cookieStoreIdForProxyRequest(requestInfo) {
+    if (requestInfo.cookieStoreId) return requestInfo.cookieStoreId;
+    if (typeof requestInfo.tabId !== "number" || requestInfo.tabId < 0) return null;
+    try {
+      const tab = await browser.tabs.get(requestInfo.tabId);
+      return tab.cookieStoreId || null;
+    } catch {
+      // Tab may have been closed between request dispatch and lookup.
+      LOG.warn("handleProxifiedRequest: tab lookup failed", requestInfo.tabId);
+      return null;
+    }
+  },
 
-    if(requestInfo.tabId === -1) {
+  async handleProxifiedRequest(requestInfo) {
+    // Runs for every request of every type. When no proxy of either kind is
+    // configured, answer without touching tabs or storage.
+    if (!this.globalProxy.enabled && proxifiedContainers.hasAnyCached() === false) {
       return { type: "direct" };
     }
 
-    let tab;
-    try {
-      tab = await browser.tabs.get(requestInfo.tabId);
-    } catch {
-      // Tab may have been closed between request dispatch and lookup.
-      // Fail safely (DIRECT) instead of throwing and breaking proxy resolution.
-      LOG.warn("handleProxifiedRequest: tab lookup failed", requestInfo.tabId);
+    const cookieStoreId = await this._cookieStoreIdForProxyRequest(requestInfo);
+    if (!cookieStoreId) {
+      // Browser-internal traffic with no container to route by.
       return { type: "direct" };
     }
 
     // 1) Container-specific proxy has priority (existing behavior).
-    const result = await proxifiedContainers.retrieve(tab.cookieStoreId);
+    const result = await proxifiedContainers.retrieve(cookieStoreId);
     if (result && result.proxy) {
       // proxyDNS only applies to SOCKS proxies.  Respect the stored
       // preference (set via Advanced Proxy Settings); default to true
@@ -304,7 +324,7 @@ window.assignManager = {
 
     // 2) Global proxy fallback (only when no container-specific proxy exists).
     const globalFallbackAllowed = PhoenixBoxReviewHelpers.shouldAllowGlobalProxyFallback(
-      tab.cookieStoreId,
+      cookieStoreId,
       this.promotedProxyContainerIds
     );
     if (globalFallbackAllowed && this.globalProxy.enabled && this.globalProxy.proxy) {
@@ -539,6 +559,42 @@ window.assignManager = {
     return currentContainerState && currentContainerState.isIsolated;
   },
 
+  /**
+   * Answer HTTP(S) proxy authentication challenges.
+   *
+   * Firefox only uses ProxyInfo username/password for SOCKS. For an HTTP or
+   * HTTPS proxy the credentials in the proxy URL were silently ignored: the
+   * proxy answered 407 and Firefox showed its own login prompt. Supply them
+   * here instead, once per request, so wrong credentials fall through to that
+   * prompt rather than looping.
+   */
+  _proxyAuthAttempts: new Set(),
+
+  async _handleProxyAuth(details) {
+    if (!details.isProxy || this._proxyAuthAttempts.has(details.requestId)) return {};
+    const challenger = details.challenger || {};
+
+    const candidates = [];
+    const cookieStoreId = details.cookieStoreId ||
+      await this._cookieStoreIdForProxyRequest(details);
+    if (cookieStoreId) {
+      const entry = await proxifiedContainers.retrieve(cookieStoreId);
+      if (entry && entry.proxy) candidates.push(entry.proxy);
+    }
+    if (this.globalProxy.enabled && this.globalProxy.proxy) {
+      candidates.push({ ...this.globalProxy.proxy, password: this._sessionGlobalProxyPassword });
+    }
+
+    const match = candidates.find((proxy) =>
+      proxy.username && proxy.password &&
+      String(proxy.host || "").toLowerCase() === String(challenger.host || "").toLowerCase() &&
+      Number(proxy.port) === Number(challenger.port));
+    if (!match) return {};
+
+    this._proxyAuthAttempts.add(details.requestId);
+    return { authCredentials: { username: String(match.username), password: String(match.password) } };
+  },
+
   _proxyListenerAdded: false,
 
   maybeAddProxyListeners() {
@@ -601,7 +657,56 @@ window.assignManager = {
       }
     },{urls: ["<all_urls>"], types: ["main_frame"]});
 
+    if (browser.webRequest.onAuthRequired) {
+      browser.webRequest.onAuthRequired.addListener(
+        (details) => this._handleProxyAuth(details),
+        { urls: ["<all_urls>"] },
+        ["blocking"]
+      );
+      const forget = (details) => this._proxyAuthAttempts.delete(details.requestId);
+      browser.webRequest.onCompleted.addListener(forget, { urls: ["<all_urls>"] });
+      browser.webRequest.onErrorOccurred.addListener(forget, { urls: ["<all_urls>"] });
+    }
+
     this.resetBookmarksMenuItem();
+  },
+
+  /**
+   * Adopt a proxy config that arrived through storage.
+   *
+   * Stored configs are password-less by design. The popup sends the real
+   * config (password included) by message first and then writes the stripped
+   * copy, so that write echoes back here. Re-caching from it blindly wiped the
+   * password milliseconds after it was set, and an authenticated global proxy
+   * never worked in the session it was configured. Keep the in-memory password
+   * while the stored config is still the same endpoint and user.
+   */
+  _applyStoredGlobalProxy(stored) {
+    if (stored && !stored.password && this._sessionGlobalProxyPassword &&
+        PhoenixBoxReviewHelpers.isSameProxyEndpoint(stored, this.globalProxy.proxy)) {
+      const password = this._sessionGlobalProxyPassword;
+      this.globalProxy.proxy = this._cacheGlobalProxySecret(stored);
+      this._sessionGlobalProxyPassword = password;
+      return;
+    }
+    this.globalProxy.proxy = this._cacheGlobalProxySecret(stored);
+  },
+
+  /** Load the stored global proxy when it is enabled without being resent. */
+  async _reloadStoredGlobalProxy() {
+    const stored = await browser.storage.local.get({
+      [this.GLOBAL_PROXY_PARSED_KEY]: null,
+      [this.GLOBAL_PROXY_NEEDS_PASSWORD_KEY]: false,
+    });
+    if (!this.globalProxy.proxy) {
+      this._applyStoredGlobalProxy(stored[this.GLOBAL_PROXY_PARSED_KEY] || null);
+    }
+    // Same signal as at startup: enabled, needs a password, none in memory.
+    const credentialsMissing =
+      !!this.globalProxy.proxy &&
+      !!stored[this.GLOBAL_PROXY_NEEDS_PASSWORD_KEY] &&
+      !this._sessionGlobalProxyPassword;
+    await browser.storage.local.set({ [this.GLOBAL_PROXY_CREDENTIALS_MISSING_KEY]: credentialsMissing });
   },
 
   _sanitizePromotedProxyContainerIds(rawIds) {
@@ -666,15 +771,20 @@ window.assignManager = {
       if (this.GLOBAL_PROXY_ENABLED_KEY in changes) {
         this.globalProxy.enabled = !!changes[this.GLOBAL_PROXY_ENABLED_KEY].newValue;
         if (!this.globalProxy.enabled) {
-          this.clearGlobalProxyConfig();
-        }
-        // Re-check if we need to add the proxy listener (in case permission was just granted)
-        if (this.globalProxy.enabled) {
+          // Drop the secret, but keep the endpoint. Clearing the whole config
+          // here meant a later re-enable that did not also resend it — the
+          // permission re-grant "rescue" in backgroundLogic — showed the proxy
+          // as ON while every request went DIRECT.
+          this._sessionGlobalProxyPassword = null;
+        } else {
+          // Re-check if we need to add the proxy listener (in case permission was just granted)
           this.maybeAddProxyListeners();
+          this._reloadStoredGlobalProxy().catch((e) =>
+            LOG.error("Failed to reload the global proxy on enable:", e));
         }
       }
       if (this.GLOBAL_PROXY_PARSED_KEY in changes) {
-        this.globalProxy.proxy = this._cacheGlobalProxySecret(changes[this.GLOBAL_PROXY_PARSED_KEY].newValue || null);
+        this._applyStoredGlobalProxy(changes[this.GLOBAL_PROXY_PARSED_KEY].newValue || null);
       }
       if (this.PROMOTED_PROXY_CONTAINER_IDS_KEY in changes) {
         this.promotedProxyContainerIds = this._sanitizePromotedProxyContainerIds(
@@ -807,7 +917,7 @@ window.assignManager = {
 
 
   deleteContainer(userContextId) {
-    this.storageArea.deleteContainer(userContextId);
+    return this.storageArea.deleteContainer(userContextId);
   },
 
   getUserContextIdFromCookieStore(tab) {

@@ -323,12 +323,41 @@ const backgroundLogic = {
       await browser.contextualIdentities.remove(this.cookieStoreId(userContextId));
     }
 
-    assignManager.deleteContainer(userContextId);
-
-    // Now remove the identity->proxy association in proxifiedContainers also
-    proxifiedContainers.delete(this.cookieStoreId(userContextId));
+    const cookieStoreId = this.cookieStoreId(userContextId);
+    // Awaited so "done" means done: callers refresh their view straight after.
+    await assignManager.deleteContainer(userContextId);
+    await proxifiedContainers.delete(cookieStoreId);
+    await this._cleanupContainerSettings(cookieStoreId);
 
     return {done: true, userContextId};
+  },
+
+  /**
+   * Drop every setting that still names a deleted container.
+   *
+   * The single owner of this cleanup: every deletion path — the popup, Firefox
+   * Settings, sync — ends in contextualIdentities.onRemoved, which lands here.
+   * Previously only the popup's quick-delete cleaned up the promoted-proxy
+   * list, and a stale entry there silently sends all traffic DIRECT.
+   */
+  async _cleanupContainerSettings(cookieStoreId) {
+    const shortcutKeys = [];
+    for (let i = 0; i < this.NUMBER_OF_KEYBOARD_SHORTCUTS; i++) {
+      shortcutKeys.push(`open_container_${i}`);
+    }
+    const stored = await browser.storage.local.get([
+      "promotedProxyContainerIds",
+      "containerUserAgents",
+      "containerDisplayIconOverrides",
+      ...shortcutKeys,
+    ]);
+    const patch = PhoenixBoxReviewHelpers.planContainerSettingsCleanup(stored, cookieStoreId);
+    if (!Object.keys(patch).length) return;
+
+    await browser.storage.local.set(patch);
+    for (const key of shortcutKeys) {
+      if (key in patch) identityState.keyboardShortcut[key] = patch[key];
+    }
   },
 
   async createOrUpdateContainer(options) {
