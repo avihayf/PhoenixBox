@@ -1,4 +1,4 @@
-# Notes to AMO Reviewer — PhoenixBox v3.0.0
+# Notes to AMO Reviewer — PhoenixBox v3.1.0
 
 ## What This Extension Does
 
@@ -9,6 +9,7 @@ PhoenixBox is a multi-container browser extension for security testing and penet
 - `X-MAC-Container-Color` and `X-MAC-Container-Name` HTTP headers that let the companion Burp Suite extension auto-highlight requests by container colour and label Repeater tabs by container name (the name is percent-encoded, since container names are arbitrary Unicode)
 - Per-container User-Agent overrides using a curated list from a public CDN
 - Optional Mozilla VPN integration via native messaging
+- An on-demand endpoint extractor that lists URL paths found in the current page's source (see **Content Script**)
 
 The extension is open source under MPL-2.0:
 https://github.com/avihayf/PhoenixBox
@@ -21,15 +22,17 @@ https://github.com/avihayf/PhoenixBox
 
 These three permissions work together and are essential for two core features:
 
-1. **Proxy routing** — The extension uses `browser.proxy.onRequest` (optional `proxy` permission) and `browser.webRequest.onBeforeRequest` to intercept navigation requests and re-open them in the correct container. This must work on any URL the user visits during a security test.
+1. **Proxy routing** — The extension uses `browser.proxy.onRequest` (optional `proxy` permission) and `browser.webRequest.onBeforeRequest` to intercept navigation requests and re-open them in the correct container. This must work on any URL the user visits during a security test. A blocking `webRequest.onAuthRequired` listener answers **proxy** authentication challenges (`isProxy` only) with the credentials the user configured for that proxy; it never answers a website's own authentication.
 
 2. **HTTP header modification** — When the user enables "Highlighter" or a User-Agent override, the extension adds/replaces headers via `webRequest.onBeforeSendHeaders`. This must apply to all URLs because the user may be testing any target site.
 
-The content script injected on `<all_urls>` at `document_start` is minimal (55 lines) and only listens for `runtime.onMessage` from the extension's own background script to display a brief notification toast. It does not read or modify page content.
+The content script is injected on `<all_urls>` at `document_idle`. It reads page content only when the user explicitly runs the endpoint extractor — see **Content Script** below for exactly what it reads and where the results go.
 
 ### `cookies`
 
-Required for Firefox to allow the extension to create and manage tabs tied to specific container cookie stores (`cookieStoreId`). Without this permission Firefox does not permit the extension to open URLs in specific container sessions. The extension does not call `browser.cookies.*` directly; cookie-clearing within a container is handled by the optional `browsingData` permission.
+Required for Firefox to allow the extension to create and manage tabs tied to specific container cookie stores (`cookieStoreId`). Without this permission Firefox does not permit the extension to open URLs in specific container sessions.
+
+The extension also calls `browser.cookies.getAll` and `browser.cookies.remove` for one user-initiated action: **Reset cookies** for a site in the site-assignment editor. It enumerates cookies for that hostname and its parent/sub-domains, scoped to the one container's `storeId`, and removes them. Cookies are never read for any other purpose, stored, or transmitted.
 
 ### `contextualIdentities`
 
@@ -41,11 +44,7 @@ Required to create tabs in specific containers, query which tabs belong to which
 
 ### `storage` + `unlimitedStorage`
 
-All configuration (container assignments, proxy presets, theme preference) is stored locally via `browser.storage.local`. `unlimitedStorage` is requested because users with many containers and site assignments may exceed the default 5 MB quota.
-
-### `activeTab`
-
-Used to determine the current tab's container context for page-action and context-menu actions.
+All configuration (container assignments, proxy presets, theme preference, hidden-tab lists) is stored locally via `browser.storage.local`. `unlimitedStorage` marks that storage as persistent, so Firefox will not evict a user's container assignments and hidden tabs under disk pressure.
 
 ### `contextMenus`
 
@@ -57,7 +56,7 @@ Only requested when the user interacts with the bookmark context menu feature. A
 
 ### Optional: `browsingData`
 
-Only requested when the user clicks "Clear cookies for this site" in the site assignment editor. Scoped to a specific hostname and container.
+Requested at the moment the user clicks **Reset cookies** for a site, or **Clear container storage** (which asks for a second click to confirm). Both are scoped to a single container (`cookieStoreId`); the former also to one site. Clear container storage removes that container's cookies, localStorage, IndexedDB and service workers.
 
 ### Optional: `proxy`
 
@@ -110,7 +109,12 @@ default-src 'self'; script-src 'self'; style-src 'self'; connect-src https://cdn
 
 ## Content Script
 
-The content script (`js/content-script.js`) is 55 lines and does only one thing: it listens for `runtime.onMessage` from the extension's background script and shows a brief slide-down notification toast (e.g., "Successfully assigned site to always open in this container"). It uses `innerText` (not `innerHTML`) and only accepts messages where `sender.id === browser.runtime.id`. It does not read, modify, or exfiltrate any page content.
+The content script (`js/content-script.js`, ~120 lines, `document_idle`) only acts on `runtime.onMessage` from the extension's own background page (`sender.id === browser.runtime.id`). It does two things:
+
+1. **Notification toast** — shows a brief slide-down message (e.g. "Successfully assigned site to always open in this container"). It is built inside a closed shadow root with `createElement`/`textContent` and styled through CSSOM — no stylesheet is injected into pages, and never `innerHTML`.
+2. **Endpoint extraction** — only when the user explicitly clicks **Extract Endpoints** in the page-action popup (the icon in the address bar). It reads that page's HTML source (`document.documentElement.outerHTML`) and the text of its inline `<script>` elements, and returns the quoted URL paths it finds (e.g. `/api/v1/users`). Nothing else is extracted — no form values, cookies, or credentials.
+
+Extraction results are stored only in `browser.storage.local` so the results tab survives a reload, capped at the five most recent scans, and deleted at every browser startup. They are never transmitted anywhere. The content script does not modify page content.
 
 ---
 
@@ -124,28 +128,28 @@ The content script (`js/content-script.js`) is 55 lines and does only one thing:
 
 ### Environment Requirements
 
-- **OS**: macOS, Linux, or Windows
-- **Node.js**: v18 or higher (tested with v18.12.1) — download from https://nodejs.org
-- **Yarn**: v1.22 or higher — install with `npm install -g yarn`
+- **OS**: macOS or Linux (the npm scripts use POSIX shell syntax)
+- **Node.js**: 22.18 or later, below 25 (tested with 22.x and 24.x) — https://nodejs.org
+- **npm**: bundled with Node; dependencies are pinned by `package-lock.json`
 
 ### Steps
 
 ```bash
-# 1. Install dependencies
-yarn install
+# 1. Install the exact locked dependency tree
+npm ci
 
 # 2. Build the extension (outputs zip to web-ext-artifacts/)
-yarn build
+npm run build
 
-# 3. Run linters and unit tests (optional verification)
-yarn test
+# 3. Run type-check, linters and unit tests (optional verification)
+npm test
 ```
 
-The built extension will be in `dist/` and the packaged zip in `web-ext-artifacts/phoenix_box-3.0.0.zip`.
+The built extension will be in `dist/` and the packaged zip in `web-ext-artifacts/phoenixbox-3.1.0.zip`.
 
 ### What the build does
 
-The React popup (`src/popup-ui/`) is compiled by Vite into `dist/popup/`. The build script (`scripts/build-extension.mjs`) then copies all legacy JS, CSS, images, fonts, and locales alongside the Vite output into `dist/`, patches `manifest.json`, and `web-ext build` packages the final XPI.
+The React popup (`src/popup-ui/`) is compiled by Vite into `dist/popup/`. The build script (`scripts/build-extension.mjs`) then copies all legacy JS, CSS, images, fonts, and locales alongside the Vite output into `dist/`, copies `manifest.json`, and `web-ext build` packages the final XPI.
 
 ---
 

@@ -1,7 +1,7 @@
 # PhoenixBox
 
 [![License](https://img.shields.io/badge/License-MPL%202.0-blue.svg)](https://opensource.org/licenses/MPL-2.0)
-[![Version](https://img.shields.io/badge/version-3.0.0-green.svg)](https://github.com/avihayf/PhoenixBox/releases)
+[![Version](https://img.shields.io/badge/version-3.1.0-green.svg)](https://github.com/avihayf/PhoenixBox/releases)
 
 **Run different sessions side by side in Firefox, create any custom containers you want, route the right traffic through Burp and Highlight your traffic, and test faster without session collisions.**
 
@@ -21,7 +21,7 @@ https://github.com/user-attachments/assets/a523d122-7a06-4dc4-a637-e08beb440f68
 
 - **Ready-to-go containers** — Attacker, Victim, Admin, Member ship out of the box. Create as many custom ones as you need.
 - **Proxy routing (global + per-container)** — send everything through Burp, or route only one role through a proxy while keeping the rest clean. Save custom presets and switch with one click.
-- **User-Agent spoofing** — swap browser identity globally or per-container. Pick from a live top-100 list (desktop, mobile, all), paste a custom string, or save presets for quick switching.
+- **User-Agent spoofing** — swap the `User-Agent` request header globally or per-container (HTTP header only; `navigator.userAgent` is unchanged). Pick from a live top-100 list (desktop, mobile, all), paste a custom string, or save presets for quick switching.
 - **Burp Suite highlighting** — the `X-MAC-Container-Color` and `X-MAC-Container-Name` headers let the companion JAR color-code HTTP history by container and label Repeater tabs by container name, so you instantly see which role fired each request.
 - **Site assignments** — lock a domain to a container and it always opens there. No more "wrong session" surprises.
 - **Full session isolation** — cookies, storage, and cache stay walled off between containers. Zero bleed.
@@ -35,20 +35,20 @@ https://github.com/user-attachments/assets/a523d122-7a06-4dc4-a637-e08beb440f68
 
 ### End Users
 
-Works on any Firefox (release, ESR, Developer Edition, or Nightly).
+Works on Firefox 142 or later (release, Developer Edition, or Nightly; ESR once it reaches 142).
 
 **Option A — Firefox Add-ons (recommended):**
 Search for "PhoenixBox" on [addons.mozilla.org](https://addons.mozilla.org) and click **Add to Firefox**.
 
 **Option B — Manual install from GitHub Releases:**
-1. Download `PhoenixBox.xpi` from [GitHub Releases](https://github.com/avihayf/PhoenixBox/releases) and `PhoenixBoxHighlighter.jar` from the [PhoenixBox-Highlighter releases page](https://github.com/avihayf/PhoenixBox-Highlighter/releases/tag/v1.1.0).
+1. Download `PhoenixBox.xpi` from [GitHub Releases](https://github.com/avihayf/PhoenixBox/releases) and `PhoenixBoxHighlighter.jar` from the [PhoenixBox-Highlighter releases page](https://github.com/avihayf/PhoenixBox-Highlighter/releases/latest).
 2. Drag `PhoenixBox.xpi` into Firefox and confirm the installation prompt.
 3. Pin the PhoenixBox toolbar icon if needed.
 
 If you want Burp integration, also install `PhoenixBoxHighlighter.jar` in Burp Suite:
 
 1. Open Burp Suite.
-2. Go to **Extender** → **Extensions** → **Add**.
+2. Go to **Extensions** → **Installed** → **Add**.
 3. Select **Java** as the extension type.
 4. Choose `PhoenixBoxHighlighter.jar`.
 5. Click **Next** and verify that “PhoenixBox” loads successfully.
@@ -96,9 +96,9 @@ PhoenixBox can add `X-MAC-Container-Color` and `X-MAC-Container-Name` headers to
 
 Basic setup:
 
-1. Download and install `PhoenixBoxHighlighter.jar` from the [PhoenixBox-Highlighter releases page](https://github.com/avihayf/PhoenixBox-Highlighter/releases/tag/v1.1.0) into Burp Suite via **Extender → Extensions → Add**.
+1. Download and install `PhoenixBoxHighlighter.jar` from the [PhoenixBox-Highlighter releases page](https://github.com/avihayf/PhoenixBox-Highlighter/releases/latest) into Burp Suite via **Extensions → Installed → Add**.
 2. Configure Firefox to send traffic through Burp.
-3. Enable **Add container color header** in PhoenixBox.
+3. Turn on the **Highlighter** tile in PhoenixBox and confirm you have v1.2.0+ loaded, so container names are sent too.
 4. Browse in different containers and check Burp HTTP history.
 
 The Burp companion extension strips the header before the request reaches the target server.

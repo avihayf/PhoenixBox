@@ -52,6 +52,13 @@ PhoenixBox comes with four pre-configured containers for security testing:
 - **Organize** containers with custom sorting
 - **Icons** - Choose from multiple icon options for easy identification
 
+### Hiding and Moving Containers
+
+**Hide** and **Move tabs to a new window** act on the whole container, across every window:
+
+- **Hide** closes all of the container's web tabs and remembers them; un-hiding restores them all (pinned state kept) into the focused window. Tabs PhoenixBox cannot reopen — `file://`, `view-source:`, reader view — are left open rather than closed and lost. Blank new-tab pages are simply closed.
+- **Move tabs to a new window** gathers the container's tabs from every window, plus any hidden ones, into one new window.
+
 ### Session Isolation
 
 Each container provides complete isolation:
@@ -142,8 +149,8 @@ PhoenixBox includes advanced user-agent spoofing capabilities with real-world da
 
 Spoofing rewrites the `User-Agent` **HTTP request header**, so the server (and
 your proxy) sees the identity you picked. It does not change what JavaScript on
-the page sees — `navigator.userAgent`, `navigator.userAgentData`, and client
-hints still report the real Firefox build. A site that fingerprints in JS can
+the page sees — `navigator.userAgent`, `navigator.appVersion` and
+`navigator.platform` still report the real Firefox build. A site that fingerprints in JS can
 therefore tell the difference. If you need the page-side values changed too,
 use a dedicated fingerprinting tool alongside PhoenixBox.
 
@@ -184,7 +191,9 @@ use a dedicated fingerprinting tool alongside PhoenixBox.
 - **HTTP** - Standard HTTP proxy
 - **HTTPS** - Encrypted HTTPS proxy
 - **SOCKS4** - SOCKS version 4
-- **SOCKS5** - SOCKS version 5 (most common for Burp)
+- **SOCKS5** - SOCKS version 5 (`socks://`, `socks5://` or `socks5h://`)
+
+Proxy URLs take the form `scheme://[user[:password]@]host:port`; the port is always required, IPv6 hosts go in brackets (`http://[::1]:8080`), and special characters in credentials are percent-encoded.
 
 ### Proxy Modes
 
@@ -210,8 +219,10 @@ Configure different proxies for each container:
 - **Host** - IP address or hostname
 - **Port** - Proxy port number
 - **Username** - Optional authentication
-- **Password** - Optional authentication
+- **Password** - Optional authentication. Kept in memory only, never written to disk, so it must be re-entered after a browser restart (the popup says so). SOCKS proxies receive it directly; HTTP/HTTPS proxies receive it when they ask (`407 Proxy Authentication Required`).
 - **DNS over Proxy** - Route DNS queries through proxy
+
+Traffic is routed by the container a request belongs to, including requests with no tab such as service-worker fetches.
 
 ### Proxy Presets
 
@@ -224,8 +235,7 @@ Save and reuse common proxy configurations:
 ### Proxy Status
 
 - **Visual Indicator** - Know when proxy is active
-- **Per-Container Status** - See which containers are proxied
-- **Connection Testing** - Verify proxy connectivity
+- **Per-Container Status** - The container view shows the proxy its traffic actually uses, taking promoted containers into account
 
 ---
 
@@ -252,7 +262,7 @@ These headers:
 - **Auto-stripped** by Burp extension before forwarding to target when the companion Burp extension is installed and active
 - **Visible to the target** if you enable the headers without routing through Burp or if the Burp extension is not stripping them
 
-`X-MAC-Container-Name` needs **PhoenixBox Highlighter v1.2.0 or later**; older JARs do not strip it.
+`X-MAC-Container-Name` needs **PhoenixBox Highlighter v1.2.0 or later**; older JARs do not strip it. PhoenixBox therefore withholds the name header until you confirm in the Highlighter dialog that v1.2.0+ is loaded in Burp — the colour header is sent as soon as the Highlighter is on.
 
 ### Burp Extension Features
 
@@ -266,7 +276,7 @@ The PhoenixBoxHighlighter.jar extension provides:
 ### Setup Process
 
 1. Install PhoenixBoxHighlighter.jar in Burp Suite
-2. Enable "Add container color header" in Firefox extension
+2. Turn on the **Highlighter** tile in the PhoenixBox popup
 3. Configure proxy (127.0.0.1:8080 typically)
 4. Start testing - requests auto-highlight
 

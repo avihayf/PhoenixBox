@@ -1,5 +1,6 @@
 # Privacy Policy for PhoenixBox
 
+**Last Updated:** 2026-09-24 (v3.1.0)
 
 ## Overview
 
@@ -18,7 +19,12 @@ Core extension data stays within your local Firefox browser unless you explicitl
 - User-Agent settings are stored locally
 - No analytics, telemetry, or tracking of any kind
 
-PhoenixBox's content script does not read page content, form data, or credentials. It only displays extension-triggered notification toasts on pages when the extension sends a message to it.
+PhoenixBox's content script does two things, both triggered by the extension itself:
+
+- It displays short notification toasts (for example, when you assign a site to a container).
+- When **you** click **Extract Endpoints** in the address-bar popup, it reads that one page's HTML source and inline scripts and lists the URL paths it finds. It does not read form data, cookies, or credentials. The results are kept only in local extension storage so the results tab survives a reload — at most the five most recent scans, all deleted when the browser restarts — and are never sent anywhere.
+
+It does not read page content at any other time.
 
 PhoenixBox does, however, intentionally interact with the sites you browse as part of its core functionality:
 
@@ -48,7 +54,6 @@ PhoenixBox requires certain browser permissions to function:
 
 - **`contextMenus`**: Required to add context menu options for opening sites in specific containers.
 
-- **`activeTab`**: Required to determine the current tab's container for page-specific actions.
 
 ### Optional Permissions
 
@@ -84,7 +89,7 @@ When you enable the Highlighter feature, the extension adds `X-MAC-Container-Col
 
 This is intentional for security testing workflows. The Burp Suite extension (`PhoenixBoxHighlighter.jar`) is designed to strip both headers before forwarding requests to prevent fingerprinting. If you enable the feature without routing traffic through Burp, or if the Burp extension is not stripping them, the target site can still see them.
 
-`X-MAC-Container-Name` is only stripped by **PhoenixBoxHighlighter v1.2.0 or later**. If you are running an older JAR, the container name will reach the target.
+`X-MAC-Container-Name` is only stripped by **PhoenixBoxHighlighter v1.2.0 or later**, so PhoenixBox does not send it at all until you confirm in the Highlighter dialog that v1.2.0+ is loaded in Burp. Downloading the JAR does not count as confirming. Until then only `X-MAC-Container-Color` is sent. If you confirm while an older JAR is actually loaded, the container name will reach the target.
 
 ## Data Sharing
 

@@ -10,9 +10,9 @@ To enable automatic request highlighting in Burp Suite, you **must** install the
 
 ### Step 1: Install the Burp Suite Extension
 
-1. Download `PhoenixBoxHighlighter.jar` from the [PhoenixBox-Highlighter releases page](https://github.com/avihayf/PhoenixBox-Highlighter/releases/tag/v1.0.0)
+1. Download `PhoenixBoxHighlighter.jar` from the [PhoenixBox-Highlighter releases page](https://github.com/avihayf/PhoenixBox-Highlighter/releases/latest)
 2. Open Burp Suite
-3. Go to **Extender** → **Extensions** → **Add**
+3. Go to **Extensions** → **Installed** → **Add**
 4. Select **"Java"** as the extension type
 5. Click **"Select file"** and choose the downloaded JAR file
 6. Click **"Next"** to load the extension
@@ -21,7 +21,7 @@ To enable automatic request highlighting in Burp Suite, you **must** install the
 ### Step 2: Enable Container Color Headers in Firefox
 
 1. Click the PhoenixBox icon in Firefox toolbar
-2. Toggle **"Add container color header"** to ON
+2. Turn on the **Highlighter** tile, then confirm **"I have v1.2.0+ loaded in Burp"** when asked
 3. All requests from containers will now include the `X-MAC-Container-Color` header
 
 ### Step 3: Verify It Works
@@ -79,7 +79,7 @@ The Burp extension automatically maps container colors to Burp's highlight color
 
 **Solutions**:
 - Ensure you're using Burp Suite with Java support (Community or Professional)
-- Check Burp's **Extender** → **Output** tab for error messages
+- Check Burp's **Extensions** → **Installed** → select the extension → **Output** tab for error messages
 - Verify the JAR file is not corrupted (re-download if needed)
 - Try restarting Burp Suite after loading the extension
 
@@ -88,7 +88,7 @@ The Burp extension automatically maps container colors to Burp's highlight color
 **Problem**: Requests don't include `X-MAC-Container-Color` header
 
 **Solutions**:
-- Verify "Add container color header" is enabled in PhoenixBox popup
+- Verify the **Highlighter** tile is on in the PhoenixBox popup
 - Check Firefox is routing traffic through Burp (proxy settings)
 - Ensure you're opening tabs in a container (not regular tabs)
 - Try disabling and re-enabling the header option
@@ -99,7 +99,7 @@ The Burp extension automatically maps container colors to Burp's highlight color
 
 **Solutions**:
 - Confirm the Burp extension is loaded and active (check Extensions list)
-- Check Burp's **Extender** → **Output** for extension logs
+- Check Burp's **Extensions** → **Installed** → select the extension → **Output** for extension logs
 - Verify the extension has a checkmark (enabled) in the Extensions list
 - Try unloading and reloading the extension
 
@@ -127,7 +127,7 @@ The Burp extension automatically maps container colors to Burp's highlight color
 
 If you enable the Highlighter without routing traffic through Burp, both headers will be sent to the target server. This can reveal that you are using PhoenixBox and may leak role information — `red` for an attacker workflow, and worse, the container's own name, which is often something like `Admin` or `Victim`. A container name discloses considerably more about your test methodology than a colour does. For live targets, only enable this feature when the Burp extension is installed and actively stripping both headers.
 
-**`X-MAC-Container-Name` requires PhoenixBox Highlighter v1.2.0 or later.** Earlier versions of the JAR only know about `X-MAC-Container-Color` and will forward the name header to the target. PhoenixBox shows a one-time notice after an update to remind you; it reappears each time you open the popup until you install the new JAR.
+**`X-MAC-Container-Name` requires PhoenixBox Highlighter v1.2.0 or later.** Earlier versions of the JAR only know about `X-MAC-Container-Color` and will forward the name header to the target. PhoenixBox therefore does not send the name at all until you confirm, in the Highlighter dialog, that v1.2.0+ is loaded in Burp. Downloading the JAR does not count. While the Highlighter is on and unconfirmed, the dialog reappears each time you open the popup.
 
 ## Advanced Usage
 

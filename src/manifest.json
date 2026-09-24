@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "PhoenixBox",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "author": "0xR3dB0mb",
   "incognito": "not_allowed",
   "description": "__MSG_extensionDescription__",
@@ -15,7 +15,6 @@
   "homepage_url": "https://github.com/avihayf/PhoenixBox#readme",
   "permissions": [
     "<all_urls>",
-    "activeTab",
     "cookies",
     "contextMenus",
     "contextualIdentities",
@@ -115,7 +114,7 @@
     }
   },
   "browser_action": {
-    "browser_style": true,
+    "browser_style": false,
     "default_icon": "img/icon-128.png",
     "default_title": "PhoenixBox",
     "default_popup": "popup/index.html",
