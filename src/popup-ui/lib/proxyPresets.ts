@@ -4,7 +4,6 @@ export interface ProxyPreset {
   scheme: string;
   host: string;
   port: number;
-  autoEnablePaintBurp?: boolean;
 }
 
 export const DEFAULT_PROXY_PRESETS: ProxyPreset[] = [

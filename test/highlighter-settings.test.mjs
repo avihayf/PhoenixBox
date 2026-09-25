@@ -6,83 +6,73 @@ import * as settings from "../src/popup-ui/lib/highlighterSettings.ts";
 
 const { expect } = chai;
 const require = createRequire(import.meta.url);
-const backgroundHelpers = require("../src/js/shared/requestHeaderHelpers.js");
+const background = require("../src/js/shared/highlighterSyncHelpers.js");
+
+const TOKEN = "Z".repeat(43);
 
 describe("highlighterSettings (popup)", () => {
-  // The popup and the background page each carry these values, because the
-  // UMD helper cannot be imported into the Vite bundle. Pin them together.
+  // The popup and the background page each carry these, because the UMD
+  // helper cannot be imported into the Vite bundle. Pin them together.
   describe("parity with the background helpers", () => {
-    for (const name of [
-      "HIGHLIGHTER_HEADERS_KEY",
-      "LEGACY_HIGHLIGHTER_HEADERS_KEY",
-      "JAR_ACK_VERSION_KEY",
-      "REQUIRED_JAR_VERSION",
-    ]) {
+    for (const name of ["MARKS_KEY", "PINS_KEY", "PAIRING_KEY", "STATUS_KEY"]) {
       it(`agrees on ${name}`, () => {
-        expect(settings[name]).to.equal(backgroundHelpers[name]);
+        expect(settings[name]).to.equal(background[name]);
       });
     }
 
-    it("agrees on what counts as acknowledged", () => {
-      for (const v of [null, "", "1.1.9", "1.2", "1.2.0", "1.10.0", "2", true]) {
-        expect(settings.isJarAcknowledged(v), String(v))
-          .to.equal(backgroundHelpers.isJarAcknowledged(v));
+    const pairingInputs = [
+      `phx1:127.0.0.1:8079:${TOKEN}`,
+      ` phx1:[::1]:8080:${TOKEN} `,
+      `phx1:0.0.0.0:8081:${TOKEN}`,
+      "phx1:127.0.0.1:8079:short",
+      `phx2:127.0.0.1:8079:${TOKEN}`,
+      "",
+      null,
+    ];
+    it("agrees on what a pairing string means", () => {
+      for (const input of pairingInputs) {
+        expect(settings.parsePairingString(input), String(input))
+          .to.deep.equal(background.parsePairingString(input));
       }
     });
 
-    it("agrees on resolving the toggle from storage", () => {
-      for (const stored of [{}, { highlighterHeadersEnabled: false, addContainerColorHeaderEnabled: true },
-        { addContainerColorHeaderEnabled: true }, { highlighterHeadersEnabled: true }]) {
-        expect(settings.resolveHighlighterHeadersEnabled(stored))
-          .to.equal(backgroundHelpers.resolveHighlighterHeadersEnabled(stored));
+    const addressInputs = ["127.0.0.1:18080", "[::1]:8080", "LOCALHOST:80", "host:0", "::1:80", "", undefined];
+    it("agrees on what an address means", () => {
+      for (const input of addressInputs) {
+        expect(settings.parseAddress(input), String(input)).to.deep.equal(background.parseAddress(input));
       }
     });
-  });
 
-  describe("acknowledgementFor", () => {
-    // The whole safety property: only an explicit confirmation lets the
-    // container name through. Downloading is not installing.
-    it("stores an acknowledgement only for an explicit confirmation", () => {
-      expect(settings.acknowledgementFor("confirm-installed"))
-        .to.equal(settings.REQUIRED_JAR_VERSION);
-      expect(settings.acknowledgementFor("download")).to.equal(null);
-      expect(settings.acknowledgementFor("dismiss")).to.equal(null);
-    });
-
-    it("stores a version that satisfies the requirement", () => {
-      expect(settings.isJarAcknowledged(settings.acknowledgementFor("confirm-installed")))
-        .to.equal(true);
+    it("agrees on which marks are valid", () => {
+      const marks = ["firefox-container-1", "firefox-container-1", "firefox-default", 3];
+      expect(settings.sanitizeMarks(marks)).to.deep.equal(background.sanitizeMarks(marks));
     });
   });
 
-  describe("noticeOnPopupOpen", () => {
-    it("reminds users with the Highlighter on who have not confirmed", () => {
-      expect(settings.noticeOnPopupOpen(true, false)).to.equal("confirm");
-    });
-
-    it("stays quiet once confirmed, or when the Highlighter is off", () => {
-      expect(settings.noticeOnPopupOpen(true, true)).to.equal(null);
-      expect(settings.noticeOnPopupOpen(false, false)).to.equal(null);
+  describe("toggleMark", () => {
+    it("adds and removes one container", () => {
+      expect(settings.toggleMark([], "firefox-container-1")).to.deep.equal(["firefox-container-1"]);
+      expect(settings.toggleMark(["firefox-container-1", "firefox-container-2"], "firefox-container-1"))
+        .to.deep.equal(["firefox-container-2"]);
     });
   });
 
-  describe("noticeOnEnable", () => {
-    it("shows the setup explainer the first time", () => {
-      expect(settings.noticeOnEnable(false, false)).to.equal("setup");
-      expect(settings.noticeOnEnable(false, true)).to.equal("setup");
-    });
-
-    it("asks for confirmation on later enables until confirmed", () => {
-      expect(settings.noticeOnEnable(true, false)).to.equal("confirm");
-      expect(settings.noticeOnEnable(true, true)).to.equal(null);
+  describe("isPaired", () => {
+    it("needs host, integer port and token", () => {
+      expect(settings.isPaired({ host: "127.0.0.1", port: 8079, token: TOKEN })).to.equal(true);
+      expect(settings.isPaired({ host: "127.0.0.1", port: "8079", token: TOKEN })).to.equal(false);
+      expect(settings.isPaired(null)).to.equal(false);
     });
   });
 
-  describe("HIGHLIGHTER_RELEASES_URL", () => {
-    // A pinned asset URL 404ed before the release existed; the releases page
-    // always resolves.
-    it("points at the releases page, not a pinned asset", () => {
-      expect(settings.HIGHLIGHTER_RELEASES_URL).to.match(/\/releases\/latest$/);
+  describe("describeStatus", () => {
+    it("says what the user needs to know", () => {
+      expect(settings.describeStatus(null, false)).to.equal("Not paired with Burp");
+      expect(settings.describeStatus({ state: "error", message: "Can't reach it" }, true)).to.equal("Can't reach it");
+      expect(settings.describeStatus({ state: "connected", jar: "2.0.0", addresses: { a: "127.0.0.1:18080" } }, true))
+        .to.equal("Connected to Highlighter v2.0.0 · 1 listener");
+      expect(settings.describeStatus({ state: "connected", addresses: {} }, true))
+        .to.equal("Connected to Highlighter · 0 listeners");
     });
   });
 });

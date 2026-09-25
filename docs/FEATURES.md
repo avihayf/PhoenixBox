@@ -245,40 +245,27 @@ Save and reuse common proxy configurations:
 
 Seamless integration with Burp Suite for request highlighting and identification.
 
-### Container Headers
+### One Burp Listener per Marked Container
 
-PhoenixBox adds two custom headers to all requests:
+Mark a container with the highlighter button (next to **Promote** in the container list) and the
+companion Burp extension, Phoenix Highlighter v2.0.0+, opens a proxy listener for it. PhoenixBox sends
+that container's Burp traffic to its listener, and Burp knows the container from the listener each
+request arrives on.
 
-```
-X-MAC-Container-Color: red
-X-MAC-Container-Name:  Attacker%20Account
-```
-
-The name is percent-encoded, because container names are arbitrary Unicode while HTTP header values
-are not. The Burp extension decodes it and uses it to label Repeater tabs.
-
-These headers:
-- **Identify** which container sent the request
-- **Auto-stripped** by Burp extension before forwarding to target when the companion Burp extension is installed and active
-- **Visible to the target** if you enable the headers without routing through Burp or if the Burp extension is not stripping them
-
-`X-MAC-Container-Name` needs **PhoenixBox Highlighter v1.2.0 or later**; older JARs do not strip it. PhoenixBox therefore withholds the name header until you confirm in the Highlighter dialog that v1.2.0+ is loaded in Burp — the colour header is sent as soon as the Highlighter is on.
-
-### Burp Extension Features
-
-The PhoenixBoxHighlighter.jar extension provides:
-
-- **Auto-highlighting** - Requests highlighted by container color
-- **Zero configuration** - Works immediately after installation
-- **Stealth mode** - Headers stripped automatically
-- **All colors supported** - Recognizes all 8 container colors
+- **Nothing is added to requests**: no headers, so nothing can reach the target even without the JAR
+- **Auto-highlighting**: requests are coloured by container, and the **Notes** column shows the container name
+- **Automatic addresses**: free ports from 18080 on the Burp preset's IP, skipping anything already in use
+- **Pinning**: a container can be pinned to a specific `IP:port`, including a listener you built in Burp yourself
+- **Send to Repeater (PhoenixBox)**: opens the request in a Repeater tab named after the container
 
 ### Setup Process
 
-1. Install PhoenixBoxHighlighter.jar in Burp Suite
-2. Turn on the **Highlighter** tile in the PhoenixBox popup
-3. Configure proxy (127.0.0.1:8080 typically)
-4. Start testing - requests auto-highlight
+1. Install PhoenixBoxHighlighter.jar (v2.0.0+) in Burp Suite
+2. Copy the pairing string from Burp's **PhoenixBox** tab into the PhoenixBox **Highlighter** tile
+3. Route traffic through Burp (the **Burp Suite** preset, 127.0.0.1:8080 typically)
+4. Mark containers with the highlighter button; their requests are highlighted from then on
+
+See [Burp Suite Setup](BURP_SUITE_SETUP.md) for details.
 
 ### Use Cases
 
@@ -329,12 +316,11 @@ Complete separation between containers prevents:
 
 ### Stealth Mode
 
-Headers stripped before reaching target:
+Burp highlighting never modifies requests:
 
-- **X-MAC-Container-Color** and **X-MAC-Container-Name** removed by Burp extension (v1.2.0+)
-- **No fingerprinting** from custom headers
-- **Clean requests** to target servers
-- **Privacy preserved**
+- **No custom headers**: containers are told apart by the Burp listener they use
+- **No fingerprinting** from highlighting
+- **Clean requests** to target servers, even if the Burp extension is missing
 
 ### Proxy Security
 

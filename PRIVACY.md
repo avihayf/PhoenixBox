@@ -29,7 +29,7 @@ It does not read page content at any other time.
 PhoenixBox does, however, intentionally interact with the sites you browse as part of its core functionality:
 
 - It can modify outbound requests by overriding the `User-Agent` header
-- It can add the `X-MAC-Container-Color` and `X-MAC-Container-Name` headers when Burp highlighting is enabled
+- It can send the traffic of containers you mark for Burp highlighting to a dedicated Burp listener (see Burp Suite Integration below); requests themselves are not modified for this
 - It can route your traffic through user-configured proxies or Mozilla VPN integration
 
 These behaviors are product features for security testing workflows, not telemetry.
@@ -40,9 +40,9 @@ PhoenixBox requires certain browser permissions to function:
 
 ### Core Permissions
 
-- **`<all_urls>`**: Required to inject container color headers for Burp Suite integration and apply per-container proxy settings to any site you visit during security testing.
+- **`<all_urls>`**: Required to apply per-container proxy settings (including routing highlighted containers to their Burp listeners) and User-Agent overrides to any site you visit during security testing.
 
-- **`webRequest` and `webRequestBlocking`**: Required to add custom HTTP headers (`X-MAC-Container-Color`, `X-MAC-Container-Name`) for Burp Suite integration and to override User-Agent strings per container.
+- **`webRequest` and `webRequestBlocking`**: Required to override User-Agent strings per container and to answer proxy authentication challenges.
 
 - **`contextualIdentities`**: Required to create, manage, and isolate browser containers, which is the core functionality of this extension.
 
@@ -68,9 +68,11 @@ The extension may make the following external connections:
 
 1. **User-Agent List Updates**: The extension fetches a pinned, public list of top user agents from `https://cdn.jsdelivr.net` (the microlinkhq/top-user-agents CDN) only when you use the User-Agent override feature. This request is lazy, cached locally for 7 days, and does not transmit browsing history, container configuration, or user identifiers. As with any network request, the CDN operator can see the IP address it comes from and the time it was made; the request is pinned to a fixed revision and is repeated at most once every 7 days.
 
-This is the only external network connection PhoenixBox makes. It is explicitly allowed in the Content Security Policy and can be avoided by not using the User-Agent override feature.
+This is the only connection PhoenixBox makes to a service on the internet. It is explicitly allowed in the Content Security Policy and can be avoided by not using the User-Agent override feature.
 
-2. **Optional Firefox Sync**: If you explicitly enable sync, PhoenixBox stores supported configuration data in `browser.storage.sync`, which is tied to your Mozilla account. Passwords are not synced, and proxy authentication passwords are never written to extension storage.
+2. **Phoenix Highlighter (Burp Suite)**: Only after you pair PhoenixBox with the Highlighter extension in Burp, PhoenixBox sends it the list of containers you marked for highlighting (container ID, name and colour) over HTTP, to the address in the pairing string: your own Burp, normally on `127.0.0.1`. This goes nowhere else. The Content Security Policy allows only the Highlighter's control ports (8079–8099).
+
+3. **Optional Firefox Sync**: If you explicitly enable sync, PhoenixBox stores supported configuration data in `browser.storage.sync`, which is tied to your Mozilla account. Passwords are not synced, and proxy authentication passwords are never written to extension storage.
 
 ## Third-Party Services
 
@@ -82,14 +84,11 @@ If you explicitly enable the Mozilla VPN integration feature and grant the `nati
 
 ### Burp Suite Integration
 
-When you enable the Highlighter feature, the extension adds `X-MAC-Container-Color` and `X-MAC-Container-Name` HTTP headers to your requests. The name is the container's own label (percent-encoded), so it may contain whatever you named that container. These headers are visible to:
+Burp highlighting does not modify your requests. Each container you mark with the Highlighter button gets its own Burp proxy listener, opened by the companion Burp extension (Phoenix Highlighter, v2.0.0 or later). PhoenixBox sends that container's traffic to its listener, and Burp tells which container a request came from by the listener it arrived on. Nothing is added to the request, so nothing can reach the target site even if the Burp extension is missing or unloaded.
 
-- Your configured proxy (e.g., Burp Suite running locally)
-- The target website server (unless stripped by your proxy)
+To set this up, PhoenixBox and the Burp extension are paired once: you copy a pairing string (address and secret token) from Burp into PhoenixBox. PhoenixBox then sends the Burp extension the ID, name and colour of each marked container, so Burp can colour and name its traffic. The token is stored in local extension storage and is never synced.
 
-This is intentional for security testing workflows. The Burp Suite extension (`PhoenixBoxHighlighter.jar`) is designed to strip both headers before forwarding requests to prevent fingerprinting. If you enable the feature without routing traffic through Burp, or if the Burp extension is not stripping them, the target site can still see them.
-
-`X-MAC-Container-Name` is only stripped by **PhoenixBoxHighlighter v1.2.0 or later**, so PhoenixBox does not send it at all until you confirm in the Highlighter dialog that v1.2.0+ is loaded in Burp. Downloading the JAR does not count as confirming. Until then only `X-MAC-Container-Color` is sent. If you confirm while an older JAR is actually loaded, the container name will reach the target.
+Earlier versions of PhoenixBox added `X-MAC-Container-Color` and `X-MAC-Container-Name` headers instead; this version never adds them.
 
 ## Data Sharing
 

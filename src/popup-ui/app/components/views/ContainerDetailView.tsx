@@ -23,6 +23,16 @@ interface ContainerDetailViewProps {
   onClearStorage: () => Promise<boolean>;
   onCloseTab: (tabId: number) => void;
   onSelectProxyPreset?: (preset: ProxyPreset | null) => void;
+  /**
+   * Burp listener, shown only while the container is marked for highlighting.
+   * Resolves to an error message, or null once the pin is saved.
+   */
+  burpListener?: {
+    address?: string;
+    pin?: string;
+    error?: string;
+    onSetPin: (pin: string | null) => Promise<string | null>;
+  };
 }
 
 export function ContainerDetailView({
@@ -41,6 +51,7 @@ export function ContainerDetailView({
   onClearStorage,
   onCloseTab,
   onSelectProxyPreset,
+  burpListener,
 }: ContainerDetailViewProps) {
   const colorHex = getContainerColorHex(containerColor);
 
@@ -175,6 +186,8 @@ export function ContainerDetailView({
           </div>
         )}
 
+        {burpListener && <BurpListenerPin {...burpListener} />}
+
         {/* Open Tabs Section */}
         <div className="p-2.5 border-t border-[var(--ext-border)] flex-1 flex flex-col min-h-0 space-y-1">
           <h2 className="text-xs uppercase tracking-wider mb-2.5 font-bold opacity-80 flex-shrink-0" style={{ color: colorHex }}>
@@ -271,5 +284,56 @@ function ActionButton({ icon, label, onClick, variant = 'default', accentColor, 
       </span>
       <span className="text-sm font-medium leading-none flex-1">{label}</span>
     </button>
+  );
+}
+
+/**
+ * Which Burp listener a highlighted container uses, and an optional pin to a
+ * specific IP:port, e.g. a listener built in Burp with special settings, which
+ * the Highlighter then uses as-is.
+ */
+function BurpListenerPin({ address, pin, error, onSetPin }: NonNullable<ContainerDetailViewProps['burpListener']>) {
+  const [draft, setDraft] = useState(pin || '');
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => { setDraft(pin || ''); }, [pin]);
+
+  const save = async (value: string | null) => {
+    setSaveError(await onSetPin(value));
+  };
+
+  return (
+    <div className="px-2.5 pb-2.5 flex-shrink-0">
+      <div className="p-2 rounded-lg border border-[var(--ext-border)] bg-[var(--ext-bg-secondary)] space-y-1.5">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-[var(--ext-text-muted)] uppercase tracking-wider flex-shrink-0">Burp Listener</span>
+          <span className="flex-1 min-w-0 text-xs font-mono truncate text-right" style={{ color: error ? 'var(--ext-red)' : 'var(--ext-text)' }}>
+            {error ? 'not listening' : address || 'waiting…'}
+          </span>
+        </div>
+        <div className="flex gap-1.5">
+          <input
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') void save(draft.trim() || null); }}
+            placeholder="Automatic · or pin ip:port"
+            aria-label="Pin this container to a Burp listener address"
+            spellCheck={false}
+            className="flex-1 min-w-0 px-2 py-1 text-xs font-mono bg-[var(--ext-bg)] border border-[var(--ext-border)] rounded text-[var(--ext-text)] focus:outline-none focus:border-[var(--ext-accent)]"
+          />
+          <button
+            type="button"
+            onClick={() => void save(draft.trim() || null)}
+            className="px-2 py-1 text-xs border border-[var(--ext-border)] rounded text-[var(--ext-text)] hover:border-[var(--ext-accent)] transition-colors"
+          >
+            {draft.trim() ? 'Pin' : 'Auto'}
+          </button>
+        </div>
+        {(saveError || error) && (
+          <p className="text-[10px] text-[var(--ext-red)] leading-snug">{saveError || error}</p>
+        )}
+      </div>
+    </div>
   );
 }

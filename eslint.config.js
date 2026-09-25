@@ -30,6 +30,7 @@ module.exports = [
         PhoenixBoxReviewHelpers: true,
         PhoenixBoxPageActionHelpers: true,
         PhoenixBoxRequestHeaderHelpers: true,
+        PhoenixBoxHighlighterSyncHelpers: true,
       },
     },
     plugins: {
@@ -83,6 +84,7 @@ module.exports = [
         LOG: true,
         assignManager: true,
         backgroundLogic: true,
+        highlighterSync: true,
         identityState: true,
         messageHandler: true,
         sync: true,
