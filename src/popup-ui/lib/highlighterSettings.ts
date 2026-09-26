@@ -1,98 +1,100 @@
-// The Burp Highlighter toggle, which arms both the container-colour and the
-// container-name request header.
+// Burp highlighting by listener: each container marked with the Highlighter
+// button gets its own Burp proxy listener, opened by the PhoenixBox Highlighter
+// JAR, so Burp knows the container from the port its traffic arrives on.
+// Requests are never modified.
 //
-// The key was renamed once it started gating a second header. Readers fall back
-// to the legacy name so a profile written by an older version keeps its setting
-// regardless of whether the background migration has run yet.
-//
-// Keep in sync with HIGHLIGHTER_HEADERS_KEY in src/js/shared/requestHeaderHelpers.js.
+// The background side lives in src/js/background/highlighterSync.js. Keep the
+// keys and parsers here in sync with src/js/shared/highlighterSyncHelpers.js;
+// test/highlighter-settings.test.mjs pins them together.
 
-export const HIGHLIGHTER_HEADERS_KEY = "highlighterHeadersEnabled";
-export const LEGACY_HIGHLIGHTER_HEADERS_KEY = "addContainerColorHeaderEnabled";
-
-/** Defaults to request in a storage.local.get so both keys come back. */
-export const HIGHLIGHTER_STORAGE_DEFAULTS = {
-  [HIGHLIGHTER_HEADERS_KEY]: undefined as boolean | undefined,
-  [LEGACY_HIGHLIGHTER_HEADERS_KEY]: false,
-};
-
-export function resolveHighlighterHeadersEnabled(
-  stored: Record<string, unknown> | null | undefined
-): boolean {
-  const values = stored || {};
-  if (values[HIGHLIGHTER_HEADERS_KEY] !== undefined) {
-    return !!values[HIGHLIGHTER_HEADERS_KEY];
-  }
-  return !!values[LEGACY_HIGHLIGHTER_HEADERS_KEY];
-}
-
-/**
- * Pick the new value out of a storage.onChanged batch, or undefined when the
- * batch says nothing about this setting. Both names are watched because an
- * un-migrated profile can still be written under the legacy key.
- */
-export function highlighterChangeValue(
-  changes: Record<string, { newValue?: unknown }>
-): boolean | undefined {
-  if (changes[HIGHLIGHTER_HEADERS_KEY]) {
-    return !!changes[HIGHLIGHTER_HEADERS_KEY].newValue;
-  }
-  if (changes[LEGACY_HIGHLIGHTER_HEADERS_KEY]) {
-    return !!changes[LEGACY_HIGHLIGHTER_HEADERS_KEY].newValue;
-  }
-  return undefined;
-}
-
-/* ---------------------------------------------------------------------------
- * JAR acknowledgement — gates the X-MAC-Container-Name header.
- *
- * Keep in sync with JAR_ACK_VERSION_KEY / REQUIRED_JAR_VERSION /
- * isJarAcknowledged in src/js/shared/requestHeaderHelpers.js (a parity test in
- * test/highlighter-settings.test.mjs pins them together).
- * ------------------------------------------------------------------------- */
-
-export const JAR_ACK_VERSION_KEY = "highlighterJarAckVersion";
-export const REQUIRED_JAR_VERSION = "1.2.0";
+export const MARKS_KEY = "highlighterContainerIds";
+export const PINS_KEY = "highlighterPins";
+export const PAIRING_KEY = "highlighterPairing";
+export const STATUS_KEY = "highlighterStatus";
 
 /** Where to get the JAR. The releases page, not a pinned asset: it cannot 404. */
 export const HIGHLIGHTER_RELEASES_URL =
   "https://github.com/avihayf/PhoenixBox-Highlighter/releases/latest";
 
-export function compareVersions(a: unknown, b: unknown): number {
-  const pa = String(a || "").split(".").map((n) => parseInt(n, 10) || 0);
-  const pb = String(b || "").split(".").map((n) => parseInt(n, 10) || 0);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const diff = (pa[i] || 0) - (pb[i] || 0);
-    if (diff !== 0) return diff < 0 ? -1 : 1;
+export interface HighlighterPairing {
+  host: string;
+  port: number;
+  token: string;
+}
+
+/** Written by the background after every sync attempt. */
+export interface HighlighterStatus {
+  state: "unpaired" | "connected" | "error";
+  message?: string;
+  jar?: string | null;
+  /** cookieStoreId -> "ip:port" the container's traffic is going to. */
+  addresses?: Record<string, string>;
+  /** cookieStoreId -> why it has no listener. */
+  errors?: Record<string, string>;
+}
+
+export interface Address {
+  host: string;
+  port: number;
+}
+
+export function parseAddress(value: unknown): Address | null {
+  if (typeof value !== "string") return null;
+  const match = /^(?:\[([0-9a-fA-F:.]+)\]|([^\s:[\]]+)):(\d{1,5})$/.exec(value.trim());
+  if (!match) return null;
+  const port = Number(match[3]);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return null;
+  let host = (match[1] || match[2]).toLowerCase();
+  if (host === "localhost") host = "127.0.0.1";
+  return { host, port };
+}
+
+export function formatAddress(address: Address): string {
+  const host = address.host.includes(":") ? `[${address.host}]` : address.host;
+  return `${host}:${address.port}`;
+}
+
+/** Reads the "phx1:<host>:<port>:<token>" string from Burp's PhoenixBox tab. */
+export function parsePairingString(value: unknown): HighlighterPairing | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("phx1:")) return null;
+
+  const lastColon = trimmed.lastIndexOf(":");
+  const token = trimmed.slice(lastColon + 1);
+  if (!/^[A-Za-z0-9_-]{16,128}$/.test(token)) return null;
+
+  const address = parseAddress(trimmed.slice("phx1:".length, lastColon));
+  if (!address) return null;
+  return { host: address.host, port: address.port, token };
+}
+
+export function sanitizeMarks(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  for (const id of value) {
+    if (typeof id === "string" && /^firefox-container-\d+$/.test(id)) seen.add(id);
   }
-  return 0;
+  return [...seen];
 }
 
-export function isJarAcknowledged(ackVersion: unknown, required = REQUIRED_JAR_VERSION): boolean {
-  if (!ackVersion) return false;
-  return compareVersions(ackVersion, required) >= 0;
+export function toggleMark(marks: string[], cookieStoreId: string): string[] {
+  return marks.includes(cookieStoreId)
+    ? marks.filter((id) => id !== cookieStoreId)
+    : [...marks, cookieStoreId];
 }
 
-export type HighlighterNotice = "setup" | "confirm" | null;
-
-/** What to show when the popup opens. Reminds only people using the feature. */
-export function noticeOnPopupOpen(enabled: boolean, acknowledged: boolean): HighlighterNotice {
-  return enabled && !acknowledged ? "confirm" : null;
+export function isPaired(pairing: unknown): pairing is HighlighterPairing {
+  if (!pairing || typeof pairing !== "object") return false;
+  const p = pairing as Record<string, unknown>;
+  return typeof p.host === "string" && Number.isInteger(p.port) && typeof p.token === "string";
 }
 
-/** What to show when the user switches the Highlighter on. */
-export function noticeOnEnable(setupShownBefore: boolean, acknowledged: boolean): HighlighterNotice {
-  if (!setupShownBefore) return "setup";
-  return acknowledged ? null : "confirm";
-}
-
-export type NoticeAction = "confirm-installed" | "download" | "dismiss";
-
-/**
- * The acknowledgement to store for a modal action, or null to store nothing.
- * Only an explicit confirmation counts: downloading is not installing, and a
- * dismissal must leave the name withheld.
- */
-export function acknowledgementFor(action: NoticeAction): string | null {
-  return action === "confirm-installed" ? REQUIRED_JAR_VERSION : null;
+/** One line for the popup's Highlighter tile and modal. */
+export function describeStatus(status: HighlighterStatus | null | undefined, paired: boolean): string {
+  if (!paired || !status || status.state === "unpaired") return "Not paired with Burp";
+  if (status.state === "error") return status.message || "Can't reach the Highlighter";
+  const count = Object.keys(status.addresses || {}).length;
+  const jar = status.jar ? ` v${status.jar}` : "";
+  return `Connected to Highlighter${jar} · ${count} listener${count === 1 ? "" : "s"}`;
 }

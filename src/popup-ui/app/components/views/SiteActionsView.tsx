@@ -1,4 +1,4 @@
-import { Plus, RotateCcw, ArrowUpDown, Hourglass, Sun, Moon, Info, Search, ChevronRight, ChevronDown, ChevronUp, Palette, Trash2, Edit2, X, ArrowUp, Eye, EyeOff, Globe, Highlighter, UserCog, Download, Settings, Lock, type LucideIcon } from 'lucide-react';
+import { Plus, RotateCcw, ArrowUpDown, Hourglass, Sun, Moon, Info, Search, ChevronRight, ChevronDown, ChevronUp, Palette, Trash2, Edit2, X, ArrowUp, Eye, EyeOff, Globe, Highlighter, UserCog, Settings, Lock, type LucideIcon } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { ContainerIcon } from '../ContainerIcon';
 import { UserAgentModal } from '../modals/UserAgentModal';
@@ -6,23 +6,11 @@ import { ProxyPresetModal } from '../modals/ProxyPresetModal';
 import type { UserAgentData } from '../../../lib/userAgent';
 import { getContainerColorHex } from '../../../lib/containerColors';
 import { type ProxyPreset } from '../../../lib/proxyPresets';
-import { requireWebExt } from '../../../lib/browser';
 import { HueAccentPicker } from '../HueAccentPicker';
 import { LogoAccentPicker } from '../LogoAccentPicker';
 import { accentToHue, type AccentValue, type LogoAccentValue } from '../../../lib/accentColors';
-import {
-  HIGHLIGHTER_STORAGE_DEFAULTS, HIGHLIGHTER_RELEASES_URL, JAR_ACK_VERSION_KEY, REQUIRED_JAR_VERSION,
-  resolveHighlighterHeadersEnabled, isJarAcknowledged, noticeOnPopupOpen, noticeOnEnable,
-  acknowledgementFor, type HighlighterNotice, type NoticeAction,
-} from '../../../lib/highlighterSettings';
-
-/**
- * Module scope, so it lasts exactly as long as one popup opening — Firefox
- * rebuilds the popup document each time it is opened. This view unmounts
- * whenever the user switches views, and a useRef would let the notice pop
- * again every time they came back.
- */
-let updateNoticeShownThisPopup = false;
+import { HighlighterModal } from '../modals/HighlighterModal';
+import type { HighlighterPairing, HighlighterStatus } from '../../../lib/highlighterSettings';
 
 /**
  * Compact on/off toggle tile used for the Proxy / Highlighter / User-Agent controls.
@@ -84,8 +72,14 @@ interface SiteActionsViewProps {
   proxyUrl: string;
   onProxyUrlChange: (url: string) => void;
   proxyError?: string;
-  paintBurp: boolean;
-  onTogglePaintBurp: (enabled: boolean) => Promise<void>;
+
+  // Burp highlighting: one Burp listener per marked container
+  highlighterContainerIds: string[];
+  onToggleHighlighterContainer: (container: Container) => void;
+  highlighterPairing: HighlighterPairing | null;
+  highlighterStatus: HighlighterStatus | null;
+  onPairHighlighter: (pairing: HighlighterPairing) => Promise<void>;
+  onUnpairHighlighter: () => Promise<void>;
 
   // User Agent
   userAgentEnabled: boolean;
@@ -138,8 +132,12 @@ export function SiteActionsView({
   proxyUrl,
   onProxyUrlChange,
   proxyError,
-  paintBurp,
-  onTogglePaintBurp,
+  highlighterContainerIds,
+  onToggleHighlighterContainer,
+  highlighterPairing,
+  highlighterStatus,
+  onPairHighlighter,
+  onUnpairHighlighter,
   userAgentEnabled,
   onToggleUserAgent,
   userAgentType,
@@ -175,48 +173,7 @@ export function SiteActionsView({
   const [showPresetDropdown, setShowPresetDropdown] = useState(false);
   const [showProxyModal, setShowProxyModal] = useState(false);
   const [editingPreset, setEditingPreset] = useState<ProxyPreset | null>(null);
-  // "setup" is the first-time explainer; "confirm" asks the user to confirm a
-  // JAR new enough to strip the container-name header, which stays withheld
-  // until they do. The decisions live in lib/highlighterSettings.ts, tested.
-  const [highlighterModal, setHighlighterModal] = useState<HighlighterNotice>(null);
-
-  const readJarAcknowledged = async (): Promise<boolean> => {
-    const browser = requireWebExt();
-    const stored = await browser.storage.local.get({ [JAR_ACK_VERSION_KEY]: null });
-    return isJarAcknowledged((stored as Record<string, unknown>)[JAR_ACK_VERSION_KEY]);
-  };
-
-  useEffect(() => {
-    if (updateNoticeShownThisPopup) return;
-
-    void (async () => {
-      try {
-        const browser = requireWebExt();
-        const stored = await browser.storage.local.get({ ...HIGHLIGHTER_STORAGE_DEFAULTS });
-        const notice = noticeOnPopupOpen(
-          resolveHighlighterHeadersEnabled(stored as Record<string, unknown>),
-          await readJarAcknowledged()
-        );
-        if (notice) {
-          updateNoticeShownThisPopup = true;
-          setHighlighterModal(notice);
-        }
-      } catch {
-        // The popup is still perfectly usable without the notice.
-      }
-    })();
-  }, []);
-
-  const handleNoticeAction = async (action: NoticeAction) => {
-    setHighlighterModal(null);
-    const ack = acknowledgementFor(action);
-    if (!ack) return;
-    try {
-      await requireWebExt().storage.local.set({ [JAR_ACK_VERSION_KEY]: ack });
-    } catch {
-      // Not stored: the name stays withheld and the user is asked again.
-    }
-  };
+  const [showHighlighterModal, setShowHighlighterModal] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmDeletePresetId, setConfirmDeletePresetId] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -409,23 +366,12 @@ export function SiteActionsView({
                 disabled={!!proxyToggleDisabled}
                 onClick={() => onToggleProxy(!proxyEnabled)}
               />
+              {/* On means paired and talking to the JAR; containers are marked in the list below. */}
               <ControlTile
                 icon={Highlighter}
                 label="Highlighter"
-                active={paintBurp}
-                onClick={async () => {
-                  const enabled = !paintBurp;
-                  await onTogglePaintBurp(enabled);
-                  if (enabled) {
-                    const browser = requireWebExt();
-                    const stored = await browser.storage.local.get({ paintBurpFirstTimeMessageShown: false });
-                    const notice = noticeOnEnable(!!stored.paintBurpFirstTimeMessageShown, await readJarAcknowledged());
-                    if (notice === 'setup') {
-                      await browser.storage.local.set({ paintBurpFirstTimeMessageShown: true });
-                    }
-                    setHighlighterModal(notice);
-                  }
-                }}
+                active={!!highlighterPairing && highlighterStatus?.state === 'connected'}
+                onClick={() => setShowHighlighterModal(true)}
               />
               <ControlTile
                 icon={UserCog}
@@ -466,10 +412,7 @@ export function SiteActionsView({
                               onClick={async () => {
                                 const url = `${preset.scheme}://${preset.host}:${preset.port}`;
                                 onProxyUrlChange(url);
-                                const proxyEnabled = await onToggleProxy(true, url);
-                                if (preset.autoEnablePaintBurp && proxyEnabled) {
-                                  await onTogglePaintBurp(true);
-                                }
+                                await onToggleProxy(true, url);
                                 setShowPresetDropdown(false);
                               }}
                               className="flex-1 px-3 py-2 text-left min-w-0"
@@ -618,6 +561,10 @@ export function SiteActionsView({
                   const cHex = getContainerColorHex(container.color);
                   const isConfirming = confirmDeleteId === container.cookieStoreId;
                   const isPromoted = promotedProxyContainerIds.includes(container.cookieStoreId);
+                  const isHighlighted = highlighterContainerIds.includes(container.cookieStoreId);
+                  const highlighterError = highlighterStatus?.errors?.[container.cookieStoreId];
+                  const highlighterAddress = highlighterStatus?.addresses?.[container.cookieStoreId];
+                  const pinned = isPromoted || isHighlighted;
                   const hasVisibleTabs = container.visibleTabCount > 0;
                   const hasHiddenTabs = container.hiddenTabCount > 0;
                   const hideActionLabel = hasVisibleTabs ? "Hide" : "Show";
@@ -678,7 +625,7 @@ export function SiteActionsView({
                           <button
                             type="button"
                             onClick={() => onSelectContainer(container)}
-                            className="w-full flex items-center gap-2.5 p-2 pr-[10rem] rounded text-left"
+                            className="w-full flex items-center gap-2.5 p-2 pr-[11.5rem] rounded text-left"
                           >
                             <ContainerIcon iconKey={container.displayIcon || container.icon} colorHex={cHex} />
                             <span className="text-sm text-[var(--ext-text)] flex-1 truncate">{container.name}</span>
@@ -698,7 +645,7 @@ export function SiteActionsView({
                             </span>
                             <div
                               className={`flex items-center gap-1 transition-opacity duration-150 ${
-                                isPromoted
+                                pinned
                                   ? 'opacity-100'
                                   : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto'
                               }`}
@@ -715,6 +662,29 @@ export function SiteActionsView({
                               title={isPromoted ? 'Unpromote from proxy' : 'Promote for proxy'}
                             >
                               <ArrowUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); e.currentTarget.blur(); onToggleHighlighterContainer(container); }}
+                              className={`p-1 rounded transition-colors ${
+                                isHighlighted
+                                  ? 'bg-[var(--ext-accent-bg)]'
+                                  : 'hover:bg-[var(--ext-accent-bg)] focus-visible:bg-[var(--ext-accent-bg)]'
+                              }`}
+                              style={{ color: highlighterError ? 'var(--ext-red)' : 'var(--ext-accent)' }}
+                              aria-pressed={isHighlighted}
+                              aria-label={isHighlighted ? `Stop highlighting ${container.name} in Burp` : `Highlight ${container.name} in Burp`}
+                              title={
+                                !isHighlighted
+                                  ? 'Highlight in Burp: give this container its own Burp listener'
+                                  : highlighterError
+                                    ? `Highlighter: ${highlighterError}`
+                                    : highlighterAddress
+                                      ? `Highlighted in Burp via ${highlighterAddress}`
+                                      : 'Highlighted in Burp (waiting for the Highlighter)'
+                              }
+                            >
+                              <Highlighter className="w-3 h-3" />
                             </button>
                             <button
                               type="button"
@@ -770,107 +740,15 @@ export function SiteActionsView({
 
       </div>
 
-      {/* Phoenix Highlighter setup / JAR confirmation modal */}
-      {highlighterModal && (
-        <>
-          {/* Backdrop — dismissing never acknowledges the JAR */}
-          <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 animate-in fade-in duration-200"
-            onClick={() => void handleNoticeAction('dismiss')}
-          />
-
-          {/* Modal */}
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="highlighter-modal-title"
-              className="relative bg-[var(--ext-bg-secondary)] border border-[var(--ext-accent)]/40 rounded-2xl overflow-hidden w-full max-w-[340px] pointer-events-auto animate-in scale-in-95 duration-200"
-              style={{ boxShadow: '0 24px 60px rgba(0,0,0,0.6), 0 0 32px var(--ext-glow-accent)' }}
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => { if (e.key === 'Escape') void handleNoticeAction('dismiss'); }}
-            >
-              {/* Accent top line */}
-              <div
-                className="h-0.5 w-full"
-                style={{ background: 'linear-gradient(90deg, transparent, var(--ext-accent) 30%, var(--ext-accent-light) 50%, var(--ext-accent) 70%, transparent)' }}
-              />
-
-              {/* Header */}
-              <div className="flex items-start gap-3 px-5 pt-5 pb-4 border-b border-[var(--ext-accent)]/15">
-                <div
-                  className="w-10 h-10 flex-none rounded-xl flex items-center justify-center border border-[var(--ext-accent)]/40"
-                  style={{ background: 'var(--ext-accent-bg)', boxShadow: 'inset 0 0 18px var(--ext-glow-accent)' }}
-                >
-                  <Highlighter className="w-5 h-5 text-[var(--ext-accent)]" />
-                </div>
-                <div className="flex-1 min-w-0 pt-0.5">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--ext-text-muted)] mb-1.5">
-                    Burp Integration
-                  </div>
-                  <h2 id="highlighter-modal-title" className="font-medium uppercase tracking-wider text-[var(--ext-text)] brand-title" style={{ fontSize: '15px', lineHeight: 1.2 }}>
-                    {highlighterModal === 'confirm' ? 'Confirm Your Phoenix JAR' : 'Phoenix Highlighter Setup'}
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  aria-label="Close"
-                  autoFocus
-                  onClick={() => void handleNoticeAction('dismiss')}
-                  className="w-8 h-8 flex-none flex items-center justify-center rounded-lg text-[var(--ext-text-muted)] hover:bg-[var(--ext-accent-bg)] hover:text-[var(--ext-accent)] transition-all duration-200"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Content */}
-              <div className="px-5 pt-5 pb-6 space-y-3.5">
-                <p className="text-sm text-[var(--ext-text)] leading-relaxed">
-                  Color-codes your Burp requests by container, and labels Repeater tabs with the container name.
-                </p>
-                <div
-                  className="flex items-start gap-3 p-3.5 rounded-xl border border-[var(--ext-accent)]/25"
-                  style={{ background: 'var(--ext-accent-bg)' }}
-                >
-                  <Info className="w-4 h-4 flex-none mt-0.5 text-[var(--ext-accent)]" />
-                  <p className="text-sm text-[var(--ext-text)] leading-relaxed">
-                    The container name is only sent once you confirm <strong className="text-[var(--ext-accent)] font-semibold">Phoenix Highlighter v{REQUIRED_JAR_VERSION}</strong> or later is loaded in Burp. Older versions do not strip it, so it would reach the target. Downloading alone does not count.
-                  </p>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="px-5 pb-5">
-                <a
-                  href={HIGHLIGHTER_RELEASES_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={() => void handleNoticeAction('download')}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-3 text-sm text-black rounded-xl font-semibold transition-all duration-200"
-                  style={{ background: 'linear-gradient(180deg, var(--ext-accent-light), var(--ext-accent))', boxShadow: '0 0 22px var(--ext-glow-accent)' }}
-                >
-                  <Download className="w-4 h-4" />
-                  Get Phoenix Highlighter
-                </a>
-                <button
-                  type="button"
-                  onClick={() => void handleNoticeAction('confirm-installed')}
-                  className="w-full mt-2 px-3 py-2 text-xs text-[var(--ext-text)] border border-[var(--ext-accent)]/35 rounded-xl hover:bg-[var(--ext-accent-bg)] transition-colors font-medium"
-                >
-                  I have v{REQUIRED_JAR_VERSION}+ loaded in Burp
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleNoticeAction('dismiss')}
-                  className="w-full mt-2 px-3 py-2 text-xs text-[var(--ext-text-muted)] hover:text-[var(--ext-accent)] transition-colors font-medium"
-                >
-                  Not now
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      <HighlighterModal
+        isOpen={showHighlighterModal}
+        onClose={() => setShowHighlighterModal(false)}
+        pairing={highlighterPairing}
+        status={highlighterStatus}
+        containers={containers}
+        onPair={onPairHighlighter}
+        onUnpair={onUnpairHighlighter}
+      />
 
       {/* User Agent Modal */}
       <UserAgentModal

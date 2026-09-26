@@ -320,7 +320,7 @@ window.assignManager = {
       }
 
       if (!result.proxy.mozProxyEnabled) {
-        return result.proxy;
+        return highlighterSync.route(cookieStoreId, result.proxy);
       }
 
       // Let's add the isolation key.
@@ -344,7 +344,8 @@ window.assignManager = {
           proxy.proxyDNS = true;
         }
       }
-      return proxy;
+      // A container marked for highlighting goes to its own Burp listener.
+      return highlighterSync.route(cookieStoreId, proxy);
     }
 
     return { type: "direct" };

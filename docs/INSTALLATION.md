@@ -179,8 +179,8 @@ npm run package
 
 1. **Download the JAR**
    ```
-   Go to: https://github.com/avihayf/PhoenixBox/releases
-   Download: PhoenixBoxHighlighter.jar
+   Go to: https://github.com/avihayf/PhoenixBox-Highlighter/releases/latest
+   Download: PhoenixBoxHighlighter-2.0.0.jar (or later)
    ```
 
 2. **Install in Burp Suite**
@@ -193,12 +193,13 @@ npm run package
 
 3. **Verify Installation**
    - Check Extensions list
-   - "PhoenixBox" should appear with checkmark
-   - Output window shows "PhoenixBox Loaded"
+   - "PhoenixBox Highlighter v2.0.0" should appear with checkmark
+   - Burp has a new **PhoenixBox** tab
 
-4. **Enable in Firefox**
-   - Click PhoenixBox icon in Firefox
-   - Turn on the **Highlighter** tile and confirm v1.2.0+ when asked
+4. **Pair and mark containers in Firefox**
+   - In Burp's **PhoenixBox** tab, copy the pairing string
+   - Click the PhoenixBox icon in Firefox, open the **Highlighter** tile, paste it and click **Pair**
+   - Mark containers with the highlighter button next to **Promote**
 
 ### Requirements
 
@@ -270,15 +271,15 @@ See [BURP_SUITE_SETUP.md](BURP_SUITE_SETUP.md) for detailed setup.
 
 ---
 
-### Headers Not Showing in Burp
+### Requests Not Highlighted in Burp
 
-**Problem**: X-MAC-Container-Color headers visible in Burp
+**Problem**: A marked container's requests aren't coloured in Burp
 
 **Solutions**:
-1. Ensure the **Highlighter** tile is on in the PhoenixBox popup
-2. Verify PhoenixBoxHighlighter.jar is loaded in Burp
-3. Check Burp Output tab for extension errors
-4. Extension should strip headers - if you see them, extension may not be working
+1. Open the PhoenixBox **Highlighter** tile: it should say *Connected*. If not, pair again.
+2. Verify Phoenix Highlighter v2.0.0+ is loaded in Burp and its **PhoenixBox** tab lists the container
+3. Make sure the container's traffic goes through the Burp preset (and is promoted, if you promote containers)
+4. Hover the container's highlighter button for any error, e.g. a pinned address in use
 
 ---
 

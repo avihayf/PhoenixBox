@@ -6,7 +6,7 @@ PhoenixBox is a multi-container browser extension for security testing and penet
 
 - Per-container proxy configuration (HTTP, HTTPS, SOCKS4, SOCKS5)
 - A global proxy toggle for routing all container traffic through Burp Suite
-- `X-MAC-Container-Color` and `X-MAC-Container-Name` HTTP headers that let the companion Burp Suite extension auto-highlight requests by container colour and label Repeater tabs by container name (the name is percent-encoded, since container names are arbitrary Unicode)
+- Burp Suite highlighting: each container the user marks gets its own proxy listener in Burp, opened by the companion Burp extension, so Burp can colour and name requests by the listener they arrive on. Requests are never modified for this (see **Burp Highlighter connection**)
 - Per-container User-Agent overrides using a curated list from a public CDN
 - Optional Mozilla VPN integration via native messaging
 - An on-demand endpoint extractor that lists URL paths found in the current page's source (see **Content Script**)
@@ -24,7 +24,7 @@ These three permissions work together and are essential for two core features:
 
 1. **Proxy routing** — The extension uses `browser.proxy.onRequest` (optional `proxy` permission) and `browser.webRequest.onBeforeRequest` to intercept navigation requests and re-open them in the correct container. This must work on any URL the user visits during a security test. A blocking `webRequest.onAuthRequired` listener answers **proxy** authentication challenges (`isProxy` only) with the credentials the user configured for that proxy; it never answers a website's own authentication.
 
-2. **HTTP header modification** — When the user enables "Highlighter" or a User-Agent override, the extension adds/replaces headers via `webRequest.onBeforeSendHeaders`. This must apply to all URLs because the user may be testing any target site.
+2. **User-Agent override** — When the user enables a User-Agent override, the extension replaces the `User-Agent` header via `webRequest.onBeforeSendHeaders`. This must apply to all URLs because the user may be testing any target site. No other header is added or changed.
 
 The content script is injected on `<all_urls>` at `document_idle`. It reads page content only when the user explicitly runs the endpoint extractor — see **Content Script** below for exactly what it reads and where the results go.
 
@@ -87,7 +87,13 @@ Key security details:
 - The fetch is **lazy** — it only occurs when the user actively enables the User-Agent override feature, not on every startup
 - No browsing data, container configuration, or user identifiers are transmitted
 
-This is the only external connection the extension makes. The CSP explicitly limits `connect-src` to `https://cdn.jsdelivr.net`.
+This is the only connection the extension makes to the internet. The CSP limits `connect-src` to `https://cdn.jsdelivr.net` and the Burp Highlighter's control ports (below).
+
+### Burp Highlighter connection (user-configured, local)
+
+Only after the user pairs PhoenixBox with the companion Burp extension (by pasting a pairing string that Burp shows), the background page makes HTTP `POST` requests to that Burp extension's control server, at the address in the pairing string: the user's own Burp, normally `127.0.0.1:8079`. The body lists the containers the user marked for highlighting (container ID, name, colour), and the reply says which proxy listener each one got. Requests carry the pairing token in an `Authorization` header. Nothing is sent before pairing, and nothing is sent anywhere else.
+
+The Burp extension's control port is 8079–8099 on whichever host Burp runs, which may be a LAN address, so the CSP allows exactly `http://*:8079` … `http://*:8099`.
 
 ### No other external connections
 
@@ -100,10 +106,11 @@ This is the only external connection the extension makes. The CSP explicitly lim
 ## CSP Notes
 
 ```
-default-src 'self'; script-src 'self'; style-src 'self'; connect-src https://cdn.jsdelivr.net; object-src 'none';
+default-src 'self'; script-src 'self'; style-src 'self'; connect-src https://cdn.jsdelivr.net http://*:8079 http://*:8080 … http://*:8099; object-src 'none';
 ```
 
 - `connect-src https://cdn.jsdelivr.net` is the narrowest origin-level scope CSP allows (path restrictions are not supported in CSP `connect-src` directives). The actual URLs are further restricted in code via pinned commit hash.
+- `http://*:8079` … `http://*:8099` (21 explicit ports) is the Burp Highlighter's control server, on whatever host the user's Burp runs. Only the address from the user's pairing string is ever contacted.
 
 ---
 

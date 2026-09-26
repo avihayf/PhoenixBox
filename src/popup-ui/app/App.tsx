@@ -16,8 +16,10 @@ import { type AccentValue, ACCENT_PRESETS, applyCustomHue, clearCustomHue, seria
 import { toProxyType, type Container, type Tab, type AssignedSite } from "../lib/types";
 import * as msg from "../lib/messages";
 import { defaultSecurityIcon } from "../lib/securityProfiles";
-import { HIGHLIGHTER_HEADERS_KEY, HIGHLIGHTER_STORAGE_DEFAULTS,
-  resolveHighlighterHeadersEnabled, highlighterChangeValue } from "../lib/highlighterSettings";
+import { MARKS_KEY as HIGHLIGHTER_MARKS_KEY, PAIRING_KEY as HIGHLIGHTER_PAIRING_KEY,
+  STATUS_KEY as HIGHLIGHTER_STATUS_KEY, PINS_KEY as HIGHLIGHTER_PINS_KEY, sanitizeMarks, toggleMark, isPaired,
+  parseAddress, formatAddress,
+  type HighlighterPairing, type HighlighterStatus } from "../lib/highlighterSettings";
 import { readProxyMap, getProxyForContainer,
   setProxyForContainer as storeSetProxyForContainer } from "../lib/proxyStore";
 
@@ -108,7 +110,10 @@ function App() {
   // keystroke rewound the text).
   const selfWrittenProxyUrlsRef = useRef(new Set<string>());
   const quickHideBusyRef = useRef(new Set<string>());
-  const [paintBurp, setPaintBurp] = useState(false);
+  const [highlighterContainerIds, setHighlighterContainerIds] = useState<string[]>([]);
+  const [highlighterPairing, setHighlighterPairing] = useState<HighlighterPairing | null>(null);
+  const [highlighterStatus, setHighlighterStatus] = useState<HighlighterStatus | null>(null);
+  const [highlighterPins, setHighlighterPins] = useState<Record<string, string>>({});
   const [promotedProxyContainerIds, setPromotedProxyContainerIds] = useState<string[]>([]);
   const [globalUserAgent, setGlobalUserAgent] = useState(false);
   const [userAgentType, setUserAgentType] = useState<'all' | 'desktop' | 'mobile'>('all');
@@ -498,7 +503,10 @@ function App() {
         globalProxyUrl: "",
         globalProxyParsed: null,
         globalProxyCredentialsMissing: false,
-        ...HIGHLIGHTER_STORAGE_DEFAULTS,
+        [HIGHLIGHTER_MARKS_KEY]: [],
+        [HIGHLIGHTER_PAIRING_KEY]: null,
+        [HIGHLIGHTER_STATUS_KEY]: null,
+        [HIGHLIGHTER_PINS_KEY]: {},
         promotedProxyContainerId: "",
         promotedProxyContainerIds: null,
         globalUserAgentEnabled: false,
@@ -543,7 +551,10 @@ function App() {
       }
       setProxyUrl(sanitizedStoredProxyUrl);
 
-      setPaintBurp(resolveHighlighterHeadersEnabled(stored as Record<string, unknown>));
+      setHighlighterContainerIds(sanitizeMarks(stored[HIGHLIGHTER_MARKS_KEY]));
+      setHighlighterPairing(isPaired(stored[HIGHLIGHTER_PAIRING_KEY]) ? stored[HIGHLIGHTER_PAIRING_KEY] as HighlighterPairing : null);
+      setHighlighterStatus((stored[HIGHLIGHTER_STATUS_KEY] as HighlighterStatus | null) || null);
+      setHighlighterPins((stored[HIGHLIGHTER_PINS_KEY] as Record<string, string>) || {});
       if (Array.isArray(stored.promotedProxyContainerIds)) {
         setPromotedProxyContainerIds(
           (stored.promotedProxyContainerIds as unknown[]).map((id) => String(id || "")).filter((id) => id)
@@ -617,9 +628,18 @@ function App() {
             "Proxy password isn't saved. Re-enter the proxy URL with its password to reconnect."
           );
         }
-        const nextHighlighter = highlighterChangeValue(changes);
-        if (nextHighlighter !== undefined) {
-          setPaintBurp(nextHighlighter);
+        if (changes[HIGHLIGHTER_MARKS_KEY]) {
+          setHighlighterContainerIds(sanitizeMarks(changes[HIGHLIGHTER_MARKS_KEY].newValue));
+        }
+        if (changes[HIGHLIGHTER_PAIRING_KEY]) {
+          const next = changes[HIGHLIGHTER_PAIRING_KEY].newValue;
+          setHighlighterPairing(isPaired(next) ? next : null);
+        }
+        if (changes[HIGHLIGHTER_STATUS_KEY]) {
+          setHighlighterStatus(changes[HIGHLIGHTER_STATUS_KEY].newValue || null);
+        }
+        if (changes[HIGHLIGHTER_PINS_KEY]) {
+          setHighlighterPins(changes[HIGHLIGHTER_PINS_KEY].newValue || {});
         }
         if (changes.promotedProxyContainerIds) {
           const next = changes.promotedProxyContainerIds.newValue;
@@ -926,6 +946,23 @@ function App() {
     return (
       <PopupWrapper>
         <ContainerDetailView
+          burpListener={highlighterContainerIds.includes(selectedContainer.cookieStoreId) ? {
+            address: highlighterStatus?.addresses?.[selectedContainer.cookieStoreId],
+            pin: highlighterPins[selectedContainer.cookieStoreId],
+            error: highlighterStatus?.errors?.[selectedContainer.cookieStoreId],
+            onSetPin: async (pin) => {
+              const id = selectedContainer.cookieStoreId;
+              const address = pin === null ? null : parseAddress(pin);
+              if (pin !== null && !address) return "Use ip:port, e.g. 192.168.10.5:8080";
+              const browser = requireWebExt();
+              const stored = await browser.storage.local.get({ [HIGHLIGHTER_PINS_KEY]: {} });
+              const next = { ...(stored[HIGHLIGHTER_PINS_KEY] as Record<string, string>) };
+              if (address) next[id] = formatAddress(address); else delete next[id];
+              setHighlighterPins(next);
+              await browser.storage.local.set({ [HIGHLIGHTER_PINS_KEY]: next });
+              return null;
+            },
+          } : undefined}
           containerName={selectedContainer.name}
           containerColor={selectedContainer.color}
           containerIcon={selectedContainer.displayIcon}
@@ -1205,11 +1242,25 @@ function App() {
           });
         }}
         proxyError={globalProxyError}
-        paintBurp={paintBurp}
-        onTogglePaintBurp={async (enabled) => {
-          setPaintBurp(enabled);
+        highlighterContainerIds={highlighterContainerIds}
+        onToggleHighlighterContainer={async (container) => {
           const browser = requireWebExt();
-          await browser.storage.local.set({ [HIGHLIGHTER_HEADERS_KEY]: enabled });
+          // Read-modify-write from storage, not state: the background also edits
+          // this list when a container is deleted.
+          const stored = await browser.storage.local.get({ [HIGHLIGHTER_MARKS_KEY]: [] });
+          const next = toggleMark(sanitizeMarks(stored[HIGHLIGHTER_MARKS_KEY]), container.cookieStoreId);
+          setHighlighterContainerIds(next);
+          await browser.storage.local.set({ [HIGHLIGHTER_MARKS_KEY]: next });
+        }}
+        highlighterPairing={highlighterPairing}
+        highlighterStatus={highlighterStatus}
+        onPairHighlighter={async (pairing) => {
+          setHighlighterPairing(pairing);
+          await requireWebExt().storage.local.set({ [HIGHLIGHTER_PAIRING_KEY]: pairing });
+        }}
+        onUnpairHighlighter={async () => {
+          setHighlighterPairing(null);
+          await requireWebExt().storage.local.set({ [HIGHLIGHTER_PAIRING_KEY]: null });
         }}
         userAgentEnabled={globalUserAgent}
         onToggleUserAgent={async (enabled) => {
