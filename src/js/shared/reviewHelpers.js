@@ -293,14 +293,23 @@
    * popup's User-Agent list download, for instance). Firefox tags those with
    * cookieStoreId "firefox-default", so without this check they took the
    * global proxy and failed whenever Burp was not running.
+   *
+   * A page load in a tab is never "own", even when the extension started it:
+   * browser.tabs.create({ cookieStoreId, url }) and tabs.update give the
+   * navigation the extension as originUrl, and treating it as own sent the
+   * first load of a reopened site DIRECT, past Burp and the container proxy.
    */
   function isOwnExtensionRequest(requestInfo, extensionBaseUrl) {
     if (!requestInfo || typeof requestInfo !== "object") return false;
     const base = String(extensionBaseUrl || "");
     if (!base) return false;
+    const inTab = typeof requestInfo.tabId === "number" && requestInfo.tabId !== -1;
+    if (inTab && DOCUMENT_REQUEST_TYPES.has(requestInfo.type)) return false;
     return [requestInfo.originUrl, requestInfo.documentUrl]
       .some((url) => String(url || "").startsWith(base));
   }
+
+  const DOCUMENT_REQUEST_TYPES = new Set(["main_frame", "sub_frame"]);
 
   const SHORTCUT_ID = /^open_container_\d$/;
   const CONTAINER_OR_NONE = /^(none|firefox-container-\d+)$/;

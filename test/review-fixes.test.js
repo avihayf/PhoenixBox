@@ -372,6 +372,47 @@ describe("reviewHelpers", () => {
       }, BASE)).to.equal(true);
     });
 
+    it("matches a background fetch that is not tied to any tab", () => {
+      expect(isOwnExtensionRequest({
+        tabId: -1,
+        frameId: 0,
+        type: "xmlhttprequest",
+        originUrl: "moz-extension://abc123/_generated_background_page.html",
+        documentUrl: "moz-extension://abc123/_generated_background_page.html",
+        url: "http://127.0.0.1:8079/v1/sync",
+      }, BASE)).to.equal(true);
+    });
+
+    it("matches a fetch from an extension page open in a tab", () => {
+      expect(isOwnExtensionRequest({
+        tabId: 7,
+        type: "xmlhttprequest",
+        originUrl: "moz-extension://abc123/options.html",
+        documentUrl: "moz-extension://abc123/options.html",
+      }, BASE)).to.equal(true);
+    });
+
+    it("does not match a tab navigation the extension started", () => {
+      // browser.tabs.create({ cookieStoreId, url }) / tabs.update: the page
+      // load carries the extension as its origin but is container browsing.
+      expect(isOwnExtensionRequest({
+        tabId: 12,
+        frameId: 0,
+        type: "main_frame",
+        cookieStoreId: "firefox-container-3",
+        originUrl: "moz-extension://abc123/_generated_background_page.html",
+        url: "https://target.example/",
+      }, BASE)).to.equal(false);
+      expect(isOwnExtensionRequest({
+        tabId: 12,
+        frameId: 4,
+        type: "sub_frame",
+        originUrl: "moz-extension://abc123/confirm-page.html",
+        documentUrl: "moz-extension://abc123/confirm-page.html",
+        url: "https://target.example/frame",
+      }, BASE)).to.equal(false);
+    });
+
     it("does not match website traffic, service workers or other extensions", () => {
       expect(isOwnExtensionRequest({ originUrl: "https://example.com/sw.js" }, BASE)).to.equal(false);
       expect(isOwnExtensionRequest({ originUrl: "moz-extension://other/page.html" }, BASE)).to.equal(false);
