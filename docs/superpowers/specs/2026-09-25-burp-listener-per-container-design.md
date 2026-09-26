@@ -156,3 +156,44 @@ The keys removed in migration are `highlighterHeadersEnabled`, `addContainerColo
   - Requests are highlighted and named, and carry no `X-MAC-*` headers.
   - A dev server on `127.0.0.1:18080` makes the JAR skip to `18081`.
   - Unloading the JAR removes its listeners, and browsing continues via 8080.
+
+## Addendum (2026-09-27): legacy mode and automatic pairing
+
+This supersedes "never modifies a request" above, which now holds only while paired. The goal is compatibility with the **old JAR (v1.x)**; an old PhoenixBox with the new JAR is not supported.
+
+### Two modes
+
+| | PhoenixBox | New JAR |
+|---|---|---|
+| **Paired** (a pairing is stored) | Listeners only; adds **no** header. | Paired while a sync arrived within the lease and none said `release`. Reads and strips **no** `X-MAC-*` header. |
+| **Not paired**, container marked | Adds only `X-MAC-Container-Color` (never the name) on requests through an HTTP(S) proxy (`legacyColorHeaderValue`). | Colours from the header, writes **no** note, and strips it at receive, at send, and in the all-tools backstop. |
+
+"Paired" in PhoenixBox means a pairing is stored, not that Burp is currently reachable. So PhoenixBox never sends the header while paired, even when Burp is down.
+
+Accepted risk: while paired, the new JAR passes `X-MAC-*` headers from other sources through, for example an unpaired second profile or saved Repeater requests.
+
+### Automatic pairing (one Allow in Burp)
+
+Spike, Firefox 153: an extension's background `fetch` sends `Origin: moz-extension://<uuid>` on **POST** but not on GET. So both new endpoints are POSTs that require that Origin; a web page's POST carries its own Origin and is refused.
+
+- `POST /v1/hello` → `{"app":"phoenixbox-highlighter","protocol":1,"jar":…}`. Needs no token.
+- `POST /v1/pair {client, label}` → `202 pending` (Burp shows a non-modal Allow/Deny dialog plus a banner in its tab), then `200 {"status":"approved","token"}`.
+  - Denied: `403`, remembered for 2 minutes.
+  - Another request already waiting: `429`.
+  - Tokens are per client and stored in Burp preferences. An approved client must keep asking from the same Origin.
+- `POST /v1/sync {"protocol":1,"release":true}` leaves paired mode at once. PhoenixBox sends it on Unpair. Revoking a client in Burp does the same, run off the UI thread.
+
+PhoenixBox's side:
+- **When it discovers:** only when containers are marked, or on Connect. Not after an explicit Unpair (`highlighterAutoPairPaused`) until Connect.
+- **Where it probes:** the Burp preset's host. 8079 first, then 8080–8099 in parallel, skipping the preset's own port.
+- **How often:** every 60 s, and every 5 min after 10 misses.
+- **While Burp's prompt waits:** it polls every 2 s, for up to 2 min.
+- **After a 401 on sync (revoked):** it drops the pairing and asks again.
+- **New storage:** `highlighterClientId`, `highlighterConnectRequest`, `highlighterAutoPairPaused`.
+
+The manual pairing string stays as a fallback.
+
+Verified live, Burp Pro 2026.8 and Firefox 153:
+- **Before Allow:** requests went via `:8080` carrying `X-MAC-Container-Color: red`. The site received no `X-MAC` header.
+- **After Allow:** requests went via the container's listener `:18081` with no header.
+- **After Unpair:** requests went via `:8080` with the header, stripped again. No new pairing prompt appeared.

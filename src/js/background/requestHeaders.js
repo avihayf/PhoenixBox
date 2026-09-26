@@ -3,12 +3,13 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /**
- * Rewrites the outgoing User-Agent header: per-container overrides win over
- * the global one.
+ * Rewrites outgoing request headers for two features:
  *
- * Burp highlighting used to add headers here too. It now routes each marked
- * container to its own Burp listener instead (background/highlighterSync.js),
- * so requests are never modified for it.
+ *   - User-Agent spoofing (per-container overrides win over the global one)
+ *   - Burp highlighting's legacy mode: while PhoenixBox is not paired with
+ *     Phoenix Highlighter v2, marked containers carry X-MAC-Container-Color
+ *     for the old v1.x JAR. Paired, highlighting is by listener
+ *     (background/highlighterSync.js) and no header is added.
  *
  * The request's container is served from a tab cache kept in sync with the
  * tabs events, so the common path resolves synchronously with no API
@@ -20,6 +21,7 @@
  */
 
 const H = PhoenixBoxRequestHeaderHelpers;
+const HSH = PhoenixBoxHighlighterSyncHelpers;
 
 const GLOBAL_UA_ENABLED_KEY = "globalUserAgentEnabled";
 const GLOBAL_UA_KEY = "globalUserAgent";
@@ -29,6 +31,13 @@ const requestHeaders = {
   userAgentEnabled: false,
   globalUserAgent: null,
   containerUserAgents: {},
+  // Legacy highlighting: on while not paired and something is marked.
+  legacyHighlighting: false,
+  _paired: false,
+  /** @type {Set<string>} */
+  _marks: new Set(),
+  /** @type {Map<string, string>} cookieStoreId -> Firefox container colour */
+  _containerColors: new Map(),
 
   /** @type {Map<number, string>} tabId -> cookieStoreId */
   _tabCookieStores: new Map(),
@@ -42,13 +51,19 @@ const requestHeaders = {
       [GLOBAL_UA_ENABLED_KEY]: false,
       [GLOBAL_UA_KEY]: null,
       [CONTAINER_UAS_KEY]: {},
+      [HSH.PAIRING_KEY]: null,
+      [HSH.MARKS_KEY]: [],
     });
 
     this.userAgentEnabled = !!stored[GLOBAL_UA_ENABLED_KEY];
     this.globalUserAgent = stored[GLOBAL_UA_KEY];
     this.containerUserAgents = stored[CONTAINER_UAS_KEY] || {};
+    this._paired = !!stored[HSH.PAIRING_KEY];
+    this._marks = new Set(HSH.sanitizeMarks(stored[HSH.MARKS_KEY]));
+    this._updateLegacyHighlighting();
 
     this._watchTabs();
+    this._watchContainerColors();
 
     // Register before priming the caches: a cache miss only costs an async
     // lookup for that request, whereas waiting would let requests made during
@@ -56,7 +71,11 @@ const requestHeaders = {
     this._applyListener();
     this._watchSettings();
 
-    await this._primeTabCache();
+    await Promise.all([this._primeTabCache(), this._primeContainerColors()]);
+  },
+
+  _updateLegacyHighlighting() {
+    this.legacyHighlighting = !this._paired && this._marks.size > 0;
   },
 
   // Registered before the caches are primed so a settings change made during
@@ -74,6 +93,15 @@ const requestHeaders = {
       if (CONTAINER_UAS_KEY in changes) {
         this.containerUserAgents = changes[CONTAINER_UAS_KEY].newValue || {};
       }
+      // Picked up live: pairing stops the colour header on the very next
+      // request, and unpairing starts it.
+      if (HSH.PAIRING_KEY in changes) {
+        this._paired = !!changes[HSH.PAIRING_KEY].newValue;
+      }
+      if (HSH.MARKS_KEY in changes) {
+        this._marks = new Set(HSH.sanitizeMarks(changes[HSH.MARKS_KEY].newValue));
+      }
+      this._updateLegacyHighlighting();
 
       this._applyListener();
     });
@@ -138,6 +166,49 @@ const requestHeaders = {
     }
   },
 
+  async _primeContainerColors() {
+    try {
+      const identities = await browser.contextualIdentities.query({});
+      for (const identity of identities) {
+        this._containerColors.set(identity.cookieStoreId, identity.color);
+      }
+    } catch (e) {
+      LOG.warn("requestHeaders: could not read container colours", e);
+    }
+  },
+
+  _watchContainerColors() {
+    if (!browser.contextualIdentities) return;
+    const upsert = ({ contextualIdentity }) => {
+      if (contextualIdentity) {
+        this._containerColors.set(contextualIdentity.cookieStoreId, contextualIdentity.color);
+      }
+    };
+    browser.contextualIdentities.onCreated.addListener(upsert);
+    browser.contextualIdentities.onUpdated.addListener(upsert);
+    browser.contextualIdentities.onRemoved.addListener(({ contextualIdentity }) => {
+      if (contextualIdentity) this._containerColors.delete(contextualIdentity.cookieStoreId);
+    });
+  },
+
+  /** The old JAR's colour header for this request, or null. */
+  _legacyColorFor(cookieStoreId, details) {
+    return HSH.legacyColorHeaderValue({
+      paired: this._paired,
+      marked: this._marks.has(cookieStoreId),
+      firefoxColor: this._containerColors.get(cookieStoreId),
+      proxyInfo: details && details.proxyInfo,
+    });
+  },
+
+  _buildHeaders(details, cookieStoreId) {
+    return H.buildRequestHeaders(
+      details.requestHeaders,
+      this._userAgentFor(cookieStoreId),
+      this._legacyColorFor(cookieStoreId, details)
+    );
+  },
+
   _isSupportedScheme(url) {
     return H.isSupportedScheme(url);
   },
@@ -163,7 +234,7 @@ const requestHeaders = {
       return this._handleRequestAsync(details);
     }
 
-    return H.buildRequestHeaders(details.requestHeaders, this._userAgentFor(cookieStoreId));
+    return this._buildHeaders(details, cookieStoreId);
   },
 
   async _handleRequestAsync(details) {
@@ -178,7 +249,7 @@ const requestHeaders = {
     if (!cookieStoreId) return {};
     this._tabCookieStores.set(details.tabId, cookieStoreId);
 
-    return H.buildRequestHeaders(details.requestHeaders, this._userAgentFor(cookieStoreId));
+    return this._buildHeaders(details, cookieStoreId);
   },
 };
 

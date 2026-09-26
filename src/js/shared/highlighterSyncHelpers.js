@@ -31,6 +31,19 @@
   const LAST_ADDRESS_KEY = "highlighterLastAddress";
   const PAIRING_KEY = "highlighterPairing";
   const STATUS_KEY = "highlighterStatus";
+  // A random ID for this Firefox profile, so Burp can tell PhoenixBox
+  // installs apart and the user can revoke one without the others.
+  const CLIENT_ID_KEY = "highlighterClientId";
+  // Written by the popup's Connect button: look for the Highlighter now, even
+  // after a denial.
+  const CONNECT_REQUEST_KEY = "highlighterConnectRequest";
+  // Set by Unpair, cleared by Connect: the user chose not to be paired, so
+  // PhoenixBox must not look for Burp and ask again on its own.
+  const AUTO_PAIR_PAUSED_KEY = "highlighterAutoPairPaused";
+
+  /** The Highlighter JAR's control server lives on one of these ports. */
+  const CONTROL_PORT_FIRST = 8079;
+  const CONTROL_PORT_LAST = 8099;
 
   /** Storage keys from the header-based Highlighter, removed on upgrade. */
   const RETIRED_KEYS = [
@@ -225,6 +238,62 @@
     return { jar: typeof response.jar === "string" ? response.jar.slice(0, 32) : null, addresses, errors };
   }
 
+  function isValidClientId(value) {
+    return typeof value === "string" && /^[A-Za-z0-9_-]{16,64}$/.test(value);
+  }
+
+  /** Every port the Highlighter's control server may be on, in the order it tries them. */
+  function controlPorts() {
+    const ports = [];
+    for (let port = CONTROL_PORT_FIRST; port <= CONTROL_PORT_LAST; port++) ports.push(port);
+    return ports;
+  }
+
+  /** Whether a POST /v1/hello reply came from Phoenix Highlighter v2 (not something else on the port). */
+  function isHighlighterHello(reply) {
+    return !!reply && typeof reply === "object" &&
+      reply.app === "phoenixbox-highlighter" && reply.protocol === PROTOCOL;
+  }
+
+  /**
+   * What a POST /v1/pair reply means.
+   *
+   * @param {number} status HTTP status
+   * @param {object|null} body parsed JSON, if any
+   * @returns {{state: "approved", token: string}|{state: "pending"|"denied"|"busy"|"error"}}
+   */
+  function parsePairReply(status, body) {
+    if (status === 200 && body && body.status === "approved" &&
+        typeof body.token === "string" && /^[A-Za-z0-9_-]{16,128}$/.test(body.token)) {
+      return { state: "approved", token: body.token };
+    }
+    if (status === 202) return { state: "pending" };
+    if (status === 403) return { state: "denied" };
+    if (status === 429) return { state: "busy" };
+    return { state: "error" };
+  }
+
+  /**
+   * The X-MAC-Container-Color value for a request, when PhoenixBox is not
+   * paired with Highlighter v2: the old v1.x JAR highlights by this header, and
+   * an unpaired v2 does too. Null when paired (v2 highlights by listener, and
+   * nothing is sent), for unmarked containers, and off HTTP(S) proxies, where
+   * no Burp is there to strip it. The name is never sent: the published v1.x
+   * JARs do not strip it.
+   *
+   * @param {object} state
+   * @param {boolean} state.paired
+   * @param {boolean} state.marked
+   * @param {string|undefined} state.firefoxColor the container's Firefox colour
+   * @param {object|null|undefined} state.proxyInfo `details.proxyInfo`
+   */
+  function legacyColorHeaderValue(state) {
+    if (!state || state.paired || !state.marked) return null;
+    const type = state.proxyInfo && state.proxyInfo.type;
+    if (type !== "http" && type !== "https") return null;
+    return COLOR_MAP[state.firefoxColor] || null;
+  }
+
   /** Whether PhoenixBox chose to send this request to the Burp preset. */
   function isBurpRoute(proxy, burpPreset) {
     if (!proxy || Array.isArray(proxy) || !burpPreset) return false;
@@ -252,6 +321,11 @@
     LAST_ADDRESS_KEY,
     PAIRING_KEY,
     STATUS_KEY,
+    CLIENT_ID_KEY,
+    CONNECT_REQUEST_KEY,
+    AUTO_PAIR_PAUSED_KEY,
+    CONTROL_PORT_FIRST,
+    CONTROL_PORT_LAST,
     RETIRED_KEYS,
     BURP_PRESET_ID,
     DEFAULT_BURP_PRESET,
@@ -267,6 +341,11 @@
     sanitizeMarks,
     buildSyncBody,
     parseSyncResponse,
+    isValidClientId,
+    controlPorts,
+    isHighlighterHello,
+    parsePairReply,
+    legacyColorHeaderValue,
     isBurpRoute,
     highlightedRoute,
   };

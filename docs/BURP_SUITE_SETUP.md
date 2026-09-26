@@ -1,10 +1,19 @@
 # Burp Suite Integration Setup
 
-PhoenixBox colours your Burp Suite traffic by container, and notes which container each request came from, **without modifying any request**. Each container you mark for highlighting gets its own Burp proxy listener, and Burp knows the container from the listener a request arrives on.
+PhoenixBox colours your Burp Suite traffic by container, and notes which container each request came from. It works in one of two modes:
+
+| | Paired with Phoenix Highlighter **v2.0.0+** | Not paired (Highlighter **v1.x**, or unpaired v2) |
+|---|---|---|
+| How Burp knows the container | the Burp listener the request arrives on (one per marked container) | an `X-MAC-Container-Color` header PhoenixBox adds |
+| Requests modified | **no** | the colour header, which the Highlighter strips |
+| Burp shows | the container's colour, and its name in **Notes** | the container's colour only |
+| With no Highlighter loaded | — | **the colour header reaches the site** |
+
+Pairing is automatic: PhoenixBox finds the v2 Highlighter and asks, and you click **Allow** once in Burp.
 
 ## Requirements
 
-- The PhoenixBox Burp extension, **Phoenix Highlighter v2.0.0 or later** (`PhoenixBoxHighlighter-2.0.0.jar`). Earlier JARs worked with request headers, which PhoenixBox no longer sends.
+- The PhoenixBox Burp extension, **Phoenix Highlighter v2.0.0 or later** for the paired mode. v1.x keeps working in the legacy colour-header mode.
 - Firefox traffic going through Burp, normally with PhoenixBox's **Burp Suite** proxy preset (`http://127.0.0.1:8080`).
 
 ## Setup
@@ -16,17 +25,18 @@ PhoenixBox colours your Burp Suite traffic by container, and notes which contain
 3. Set **Extension type** to **Java**, choose the JAR, and click **Next**.
 4. Burp now has a **PhoenixBox** tab.
 
-### 2. Pair PhoenixBox with Burp
+### 2. Mark containers, and allow pairing
 
-1. In Burp's **PhoenixBox** tab, click **Copy** next to the pairing string. It looks like `phx1:127.0.0.1:8079:…`. Treat it like a password.
-2. In the PhoenixBox popup, click the **Highlighter** tile, paste the string and click **Pair**.
-3. The tile turns on once PhoenixBox reaches the Highlighter: *Connected to Highlighter v2.0.0 · 0 listeners*.
+1. Select the **Burp Suite** proxy preset in PhoenixBox.
+2. In the container list, click the highlighter button next to **Promote** on each container you want coloured in Burp.
+3. PhoenixBox finds the Highlighter on your Burp host and asks to pair. Burp shows *"PhoenixBox … wants to pair"*: click **Allow**. The request also appears at the top of Burp's **PhoenixBox** tab.
+4. The Highlighter tile turns on: *Connected to Highlighter v2.0.0 · 1 listener*.
 
-You only pair once. Click **New token** in Burp to revoke a pairing; PhoenixBox then needs the new string.
+Burp asks once per Firefox profile. Burp's **PhoenixBox** tab lists every paired profile with **Revoke**; revoking makes that PhoenixBox fall back to the legacy mode and ask again. **Unpair** in PhoenixBox's Highlighter window stops it asking until you press **Connect**.
 
-### 3. Mark containers
+If PhoenixBox can't find Burp (for example Burp's proxy isn't the Burp Suite preset), use the fallback: copy the **manual pairing string** from Burp's **PhoenixBox** tab into **Highlighter → Pair manually**.
 
-In the PhoenixBox container list, click the highlighter button next to **Promote** on each container you want coloured in Burp. Burp's **PhoenixBox** tab lists each marked container and its listener. Unmarking a container closes its listener.
+Burp's **PhoenixBox** tab lists each marked container and its listener. Unmarking a container closes its listener.
 
 Then browse in a marked container and open **Proxy** → **HTTP history**. Its requests are highlighted in the container's colour, and the **Notes** column shows the container name.
 
@@ -47,7 +57,8 @@ sequenceDiagram
 ```
 
 - PhoenixBox re-sends the full list of marked containers whenever it changes, and every 30 seconds.
-- If Burp hears nothing for two minutes (Firefox closed), it closes the listeners. They come back when Firefox starts again. After Burp or the Highlighter restarts, PhoenixBox reconnects within about 5 seconds and the listeners reappear on the same ports: there's no need to re-mark anything.
+- If Burp hears nothing for two minutes (Firefox closed), it closes the listeners and goes back to legacy mode. They come back when Firefox starts again.
+- After Burp or the Highlighter restarts, PhoenixBox reconnects at its next check-in, within about 30 seconds. The listeners reappear on the same ports: there's no need to re-mark anything.
 - PhoenixBox routes a container to its listener only after Burp confirms the listener is up. Otherwise the container's traffic goes to the preset listener as usual, just not highlighted.
 - **Promote still decides what reaches Burp.** Marking only chooses which listener a container's Burp traffic arrives on. A marked container that isn't routed to Burp doesn't show up there.
 
@@ -89,13 +100,14 @@ Firefox's ninth colour, *toolbar*, has no Burp equivalent: such a container stil
 
 ## Troubleshooting
 
-**The Highlighter tile stays off / "Can't reach the Highlighter"**
-- Is Burp running with Phoenix Highlighter v2.0.0+ loaded? Check **Extensions** → **Installed** and the **PhoenixBox** tab.
-- Pair again with the string currently shown in Burp.
-- If the PhoenixBox tab says the control server isn't running, ports 8079–8099 are all taken on that IP.
+**The Highlighter tile stays off / "No Phoenix Highlighter v2 found"**
+- Is Burp running with Phoenix Highlighter v2.0.0+ loaded? Check **Extensions** → **Installed** and the **PhoenixBox** tab. With v1.x, legacy mode is expected.
+- Is the **Burp Suite** preset the proxy you use? Discovery looks on that preset's host.
+- Press **Connect** in the Highlighter window to look again right away.
+- If the PhoenixBox tab says the control server isn't running, ports 8079–8099 are all taken on that IP. Use **Pair manually** once it's running.
 
-**"Burp rejected the pairing token"**
-- The token was regenerated in Burp. Copy the new pairing string.
+**"Pairing was denied in Burp"**
+- Press **Connect** to ask again, and click **Allow** this time.
 
 **A marked container isn't highlighted**
 - Is its traffic going to Burp at all? The Burp preset must be the proxy in use, and if you promote containers, this one must be promoted.
@@ -105,8 +117,9 @@ Firefox's ninth colour, *toolbar*, has no Burp equivalent: such a container stil
 **A dev server says its port is in use**
 - Burp may be holding it for a container listener. Automatic listeners start at 18080 to avoid common dev ports; pin the container elsewhere, or start the dev server first. The Highlighter skips ports that are already taken.
 
-**Old `X-MAC-Container-*` headers**
-- PhoenixBox no longer adds them. Phoenix Highlighter still strips them if an older PhoenixBox sends them.
+**`X-MAC-Container-Color` reached a site**
+- That happens only while PhoenixBox isn't paired and no Highlighter is loaded in Burp. Load the Highlighter (v2 pairs automatically), or unmark the containers.
+- While paired, the v2 Highlighter doesn't strip `X-MAC-*` headers, since PhoenixBox doesn't send them. Another browser profile using the same Burp without pairing would get its headers through.
 
 ## Source Code
 

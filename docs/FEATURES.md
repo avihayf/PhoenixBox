@@ -252,7 +252,8 @@ companion Burp extension, Phoenix Highlighter v2.0.0+, opens a proxy listener fo
 that container's Burp traffic to its listener, and Burp knows the container from the listener each
 request arrives on.
 
-- **Nothing is added to requests**: no headers, so nothing can reach the target even without the JAR
+- **Nothing is added to requests once paired**: no headers. Without pairing (an older JAR), marked containers send only the legacy colour header, which the JAR strips
+- **Automatic pairing**: PhoenixBox finds the JAR and asks, and you click Allow once in Burp
 - **Auto-highlighting**: requests are coloured by container, and the **Notes** column shows the container name
 - **Automatic addresses**: free ports from 18080 on the Burp preset's IP, skipping anything already in use
 - **Pinning**: a container can be pinned to a specific `IP:port`, including a listener you built in Burp yourself
@@ -261,9 +262,9 @@ request arrives on.
 ### Setup Process
 
 1. Install PhoenixBoxHighlighter.jar (v2.0.0+) in Burp Suite
-2. Copy the pairing string from Burp's **PhoenixBox** tab into the PhoenixBox **Highlighter** tile
-3. Route traffic through Burp (the **Burp Suite** preset, 127.0.0.1:8080 typically)
-4. Mark containers with the highlighter button; their requests are highlighted from then on
+2. Route traffic through Burp (the **Burp Suite** preset, 127.0.0.1:8080 typically)
+3. Mark containers with the highlighter button, and click **Allow** when Burp asks to pair PhoenixBox
+4. Their requests are highlighted from then on
 
 See [Burp Suite Setup](BURP_SUITE_SETUP.md) for details.
 
@@ -316,11 +317,12 @@ Complete separation between containers prevents:
 
 ### Stealth Mode
 
-Burp highlighting never modifies requests:
+When paired with Phoenix Highlighter v2, Burp highlighting doesn't modify requests:
 
 - **No custom headers**: containers are told apart by the Burp listener they use
 - **No fingerprinting** from highlighting
-- **Clean requests** to target servers, even if the Burp extension is missing
+
+Unpaired (an older Highlighter v1.x), marked containers send the `X-MAC-Container-Color` header, which the Highlighter strips; with no Highlighter loaded, it reaches the target.
 
 ### Proxy Security
 

@@ -1,7 +1,9 @@
-// Burp highlighting by listener: each container marked with the Highlighter
-// button gets its own Burp proxy listener, opened by the PhoenixBox Highlighter
-// JAR, so Burp knows the container from the port its traffic arrives on.
-// Requests are never modified.
+// Burp highlighting, two modes:
+//   - Paired with Phoenix Highlighter v2 (automatic, after one Allow in Burp):
+//     each marked container gets its own Burp listener, and requests are never
+//     modified.
+//   - Not paired: marked containers carry the legacy X-MAC-Container-Color
+//     header, which the old v1.x JAR (and an unpaired v2) colour and strip.
 //
 // The background side lives in src/js/background/highlighterSync.js. Keep the
 // keys and parsers here in sync with src/js/shared/highlighterSyncHelpers.js;
@@ -11,6 +13,10 @@ export const MARKS_KEY = "highlighterContainerIds";
 export const PINS_KEY = "highlighterPins";
 export const PAIRING_KEY = "highlighterPairing";
 export const STATUS_KEY = "highlighterStatus";
+/** Written by the Connect button: the background looks for the Highlighter now. */
+export const CONNECT_REQUEST_KEY = "highlighterConnectRequest";
+/** Set by Unpair, cleared by Connect: stops PhoenixBox pairing again on its own. */
+export const AUTO_PAIR_PAUSED_KEY = "highlighterAutoPairPaused";
 
 /** Where to get the JAR. The releases page, not a pinned asset: it cannot 404. */
 export const HIGHLIGHTER_RELEASES_URL =
@@ -24,7 +30,7 @@ export interface HighlighterPairing {
 
 /** Written by the background after every sync attempt. */
 export interface HighlighterStatus {
-  state: "unpaired" | "connected" | "error";
+  state: "unpaired" | "searching" | "awaiting" | "denied" | "legacy" | "connected" | "error";
   message?: string;
   jar?: string | null;
   /** cookieStoreId -> "ip:port" the container's traffic is going to. */
@@ -92,9 +98,29 @@ export function isPaired(pairing: unknown): pairing is HighlighterPairing {
 
 /** One line for the popup's Highlighter tile and modal. */
 export function describeStatus(status: HighlighterStatus | null | undefined, paired: boolean): string {
-  if (!paired || !status || status.state === "unpaired") return "Not paired with Burp";
-  if (status.state === "error") return status.message || "Can't reach the Highlighter";
-  const count = Object.keys(status.addresses || {}).length;
-  const jar = status.jar ? ` v${status.jar}` : "";
-  return `Connected to Highlighter${jar} · ${count} listener${count === 1 ? "" : "s"}`;
+  const state = status?.state;
+  if (paired && state === "connected") {
+    const count = Object.keys(status?.addresses || {}).length;
+    const jar = status?.jar ? ` v${status.jar}` : "";
+    return `Connected to Highlighter${jar} · ${count} listener${count === 1 ? "" : "s"}`;
+  }
+  if (paired) return status?.message || "Can't reach the Highlighter";
+
+  switch (state) {
+  case "searching":
+    return "Looking for Phoenix Highlighter in Burp…";
+  case "awaiting":
+    return status?.message || "Click Allow in Burp to pair PhoenixBox.";
+  case "denied":
+    return "Pairing was denied in Burp. Marked containers use the legacy colour header. Press Connect to ask again.";
+  case "legacy":
+    return status?.message || "No Phoenix Highlighter v2 found. Marked containers use the legacy colour header (works with v1.x).";
+  default:
+    return "Not paired. Mark a container, or press Connect, to find Phoenix Highlighter in Burp.";
+  }
+}
+
+/** Whether PhoenixBox is working without a v2 pairing, with the legacy colour header. */
+export function isLegacyMode(paired: boolean, marks: string[]): boolean {
+  return !paired && marks.length > 0;
 }

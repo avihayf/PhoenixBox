@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, Highlighter, Download, Info, Link2, Unlink } from 'lucide-react';
+import { X, Highlighter, Download, Info, Link2, Unlink, RefreshCw } from 'lucide-react';
 import type { Container } from '../../../lib/types';
 import {
   HIGHLIGHTER_RELEASES_URL, parsePairingString, describeStatus, formatAddress,
@@ -14,13 +14,16 @@ interface HighlighterModalProps {
   containers: Container[];
   onPair: (pairing: HighlighterPairing) => Promise<void>;
   onUnpair: () => Promise<void>;
+  /** Asks the background to look for the Highlighter and request pairing now. */
+  onConnect: () => Promise<void>;
 }
 
 /**
- * Pairing with the PhoenixBox Highlighter JAR, and what it is doing. Containers
- * are marked for highlighting from the container list, not here.
+ * Pairing with the PhoenixBox Highlighter JAR, and what it is doing. Pairing is
+ * automatic (one Allow in Burp); pasting a pairing string is the fallback.
+ * Containers are marked for highlighting from the container list, not here.
  */
-export function HighlighterModal({ isOpen, onClose, pairing, status, containers, onPair, onUnpair }: HighlighterModalProps) {
+export function HighlighterModal({ isOpen, onClose, pairing, status, containers, onPair, onUnpair, onConnect }: HighlighterModalProps) {
   const [pairingInput, setPairingInput] = useState('');
   const [error, setError] = useState('');
 
@@ -98,7 +101,10 @@ export function HighlighterModal({ isOpen, onClose, pairing, status, containers,
 
           <div className="px-5 pt-4 pb-5 space-y-3.5">
             <p className="text-sm text-[var(--ext-text)] leading-relaxed">
-              Mark containers with the <Highlighter className="inline w-3.5 h-3.5 -mt-0.5 text-[var(--ext-accent)]" /> button in the container list. Each marked container gets its own Burp listener, so Burp colours its traffic and notes the container name. Requests are never modified.
+              Mark containers with the <Highlighter className="inline w-3.5 h-3.5 -mt-0.5 text-[var(--ext-accent)]" /> button in the container list. PhoenixBox finds Phoenix Highlighter in Burp and asks to pair; click <strong>Allow</strong> in Burp once. Paired, each marked container gets its own Burp listener and requests are never modified.
+            </p>
+            <p className="text-xs text-[var(--ext-text-muted)] leading-relaxed">
+              Not paired (an older Highlighter v1.x, or none), marked containers send the <code>X-MAC-Container-Color</code> header instead. Burp colours it and strips it; with no Highlighter loaded, it reaches the site.
             </p>
 
             <div
@@ -137,11 +143,25 @@ export function HighlighterModal({ isOpen, onClose, pairing, status, containers,
                   Unpair
                 </button>
               </div>
-            ) : null}
+            ) : (
+              <button
+                type="button"
+                onClick={() => void onConnect()}
+                disabled={status?.state === 'searching' || status?.state === 'awaiting'}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-xs bg-[var(--ext-accent)] text-black rounded-xl hover:bg-[var(--ext-accent-light)] transition-colors font-semibold disabled:opacity-60"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                {status?.state === 'awaiting' ? 'Waiting for Allow in Burp…' : 'Connect to Burp'}
+              </button>
+            )}
 
-            <div>
+            <details className="group">
+              <summary className="text-xs text-[var(--ext-text-muted)] cursor-pointer select-none hover:text-[var(--ext-accent)]">
+                Pair manually
+              </summary>
+              <div className="mt-2">
               <label htmlFor="highlighter-pairing" className="text-xs text-[var(--ext-text-muted)] mb-1.5 block uppercase tracking-wider">
-                {pairing ? 'Pair again' : 'Pairing string'}
+                Pairing string
               </label>
               <div className="flex gap-1.5">
                 <input
@@ -166,10 +186,11 @@ export function HighlighterModal({ isOpen, onClose, pairing, status, containers,
                 </button>
               </div>
               <p className="mt-1.5 text-[10px] text-[var(--ext-text-muted)] leading-snug">
-                In Burp, open the PhoenixBox tab and copy the pairing string.
+                Only if Connect can't find Burp: copy the manual pairing string from Burp's PhoenixBox tab.
               </p>
               {error && <p className="mt-1.5 text-[10px] text-[var(--ext-red)]">{error}</p>}
-            </div>
+              </div>
+            </details>
 
             <a
               href={HIGHLIGHTER_RELEASES_URL}

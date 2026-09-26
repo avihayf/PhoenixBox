@@ -72,6 +72,10 @@ describe("requestHeaderHelpers", () => {
       })).to.equal(true);
     });
 
+    it("attaches for legacy highlighting alone", () => {
+      expect(shouldListen({ legacyHighlighting: true })).to.equal(true);
+    });
+
     it("tolerates a missing state object", () => {
       expect(shouldListen(undefined)).to.equal(false);
     });
@@ -172,13 +176,34 @@ describe("requestHeaderHelpers", () => {
       ]);
     });
 
-    // Burp highlighting routes by listener now; nothing may add or touch its
-    // old headers, which would reach the target if Burp did not strip them.
-    it("never adds the retired Highlighter headers", () => {
+    it("adds nothing for highlighting without a legacy colour", () => {
       const result = buildRequestHeaders(headers(), "spoof-UA");
       const names = result.requestHeaders.map((h) => h.name.toLowerCase());
       expect(names).to.not.include("x-mac-container-color");
       expect(names).to.not.include("x-mac-container-name");
+    });
+
+    it("adds the legacy colour header, and never the name", () => {
+      const result = buildRequestHeaders(headers(), null, "red");
+      expect(result.requestHeaders).to.deep.equal([
+        ...headers(),
+        { name: "X-MAC-Container-Color", value: "red" },
+      ]);
+    });
+
+    it("replaces a colour header the page set itself", () => {
+      const result = buildRequestHeaders([{ name: "x-mac-container-color", value: "spoofed" }], null, "blue");
+      expect(result.requestHeaders).to.deep.equal([{ name: "X-MAC-Container-Color", value: "blue" }]);
+    });
+
+    it("applies the user agent and legacy colour together", () => {
+      const result = buildRequestHeaders(headers(), "spoof-UA", "cyan");
+      expect(result.requestHeaders).to.deep.equal([
+        { name: "Accept", value: "*/*" },
+        { name: "Accept-Language", value: "en" },
+        { name: "User-Agent", value: "spoof-UA" },
+        { name: "X-MAC-Container-Color", value: "cyan" },
+      ]);
     });
 
     it("does not mutate the caller's header array", () => {

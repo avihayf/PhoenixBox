@@ -7,6 +7,11 @@
  * highlighting, and tells the proxy handler which Burp listener each marked
  * container's traffic should go to.
  *
+ * Pairing is automatic: while unpaired and something is marked (or the user
+ * presses Connect), PhoenixBox looks for Highlighter v2 on the Burp preset's
+ * host and asks to pair; the user clicks Allow once in Burp. Until then,
+ * marked containers use the legacy colour header (background/requestHeaders.js).
+ *
  * Every sync sends the full list of marks, so a lost request or a restart on
  * either side is repaired by the next one; a 30 s heartbeat also keeps the
  * JAR's lease alive. Only listeners the JAR reports as up are ever routed to.
@@ -26,6 +31,15 @@ const REQUEST_TIMEOUT_MS = 5_000;
 // How long a request from a just-marked container waits for its listener
 // before going to the preset unhighlighted.
 const FIRST_REQUEST_WAIT_MS = 500;
+// Discovery: each probe gets this long; a miss is retried every minute, and
+// every five after ten misses (an old JAR, or none, is not going to change).
+const HELLO_TIMEOUT_MS = 1_000;
+const DISCOVERY_RETRY_MS = 60_000;
+const DISCOVERY_SLOW_RETRY_MS = 300_000;
+const DISCOVERY_SLOW_AFTER = 10;
+// While Burp shows the pairing prompt, ask again this often, for this long.
+const PAIR_POLL_MS = 2_000;
+const PAIR_WAIT_MS = 120_000;
 
 const highlighterSync = {
   /** @type {Set<string>} */
@@ -42,6 +56,14 @@ const highlighterSync = {
 
   _timer: null,
   _lastStatus: null,
+  // Auto-pairing. Not persisted: after a restart PhoenixBox simply looks again.
+  /** @type {{host: string, port: number, since: number}|null} waiting for Allow in Burp */
+  _pendingPair: null,
+  _denied: false,
+  _autoPairPaused: false,
+  _connectRequested: false,
+  _discoveryMisses: 0,
+  _nextDiscoveryAt: 0,
   _inFlight: false,
   _again: false,
   /** Resolves when the next sync finishes; null when none is scheduled. */
@@ -56,8 +78,10 @@ const highlighterSync = {
       [HS.PINS_KEY]: {},
       [HS.LAST_ADDRESS_KEY]: {},
       [HS.PAIRING_KEY]: null,
+      [HS.AUTO_PAIR_PAUSED_KEY]: false,
       customProxyPresets: [],
     });
+    this._autoPairPaused = !!stored[HS.AUTO_PAIR_PAUSED_KEY];
     this.marks = new Set(HS.sanitizeMarks(stored[HS.MARKS_KEY]));
     this.pins = stored[HS.PINS_KEY] || {};
     this.lastAddresses = stored[HS.LAST_ADDRESS_KEY] || {};
@@ -130,7 +154,7 @@ const highlighterSync = {
   async _syncOnce() {
     if (!this.pairing) {
       this.addresses = new Map();
-      await this._writeStatus({ state: "unpaired" });
+      await this._autoPair();
       return;
     }
 
@@ -164,12 +188,18 @@ const highlighterSync = {
       return "unreachable";
     }
 
+    if (response.status === 401) {
+      // Revoked in Burp. Drop the pairing: marked containers go back to the
+      // legacy colour header, and PhoenixBox asks to pair again.
+      this.addresses = new Map();
+      this._nextDiscoveryAt = 0;
+      await browser.storage.local.set({ [HS.PAIRING_KEY]: null });
+      return;
+    }
+
     if (!response.ok) {
       this.addresses = new Map();
-      const message = response.status === 401
-        ? "Burp rejected the pairing token. Copy the pairing string from Burp's PhoenixBox tab again."
-        : `The Highlighter refused the sync (HTTP ${response.status}).`;
-      await this._writeStatus({ state: "error", message });
+      await this._writeStatus({ state: "error", message: `The Highlighter refused the sync (HTTP ${response.status}).` });
       return;
     }
 
@@ -194,15 +224,150 @@ const highlighterSync = {
   },
 
   /**
-   * On unpairing, tells the JAR to close every listener now rather than when
-   * its lease runs out. Best effort: the lease still closes them if this fails.
+   * Looks for Highlighter v2 and asks to pair. Probes Burp only when there is
+   * a reason: something is marked, or the user pressed Connect.
+   */
+  async _autoPair() {
+    const asked = this._connectRequested;
+    this._connectRequested = false;
+
+    if ((this.marks.size === 0 || this._autoPairPaused) && !asked && !this._pendingPair) {
+      await this._writeStatus({ state: "unpaired" });
+      return;
+    }
+    if (this._denied && !asked) {
+      await this._writeStatus({ state: "denied" });
+      return;
+    }
+    this._denied = false;
+    if (!this._pendingPair && !asked && Date.now() < this._nextDiscoveryAt) {
+      return; // keep the last status until the next attempt
+    }
+
+    let target = this._pendingPair;
+    if (!target) {
+      await this._writeStatus({ state: "searching" });
+      const found = await this._discover();
+      if (!found) {
+        this._discoveryMisses++;
+        this._nextDiscoveryAt = Date.now() +
+          (this._discoveryMisses >= DISCOVERY_SLOW_AFTER ? DISCOVERY_SLOW_RETRY_MS : DISCOVERY_RETRY_MS);
+        await this._writeStatus({ state: "legacy" });
+        return;
+      }
+      this._discoveryMisses = 0;
+      target = { ...found, since: Date.now() };
+    }
+
+    const reply = await this._requestPairing(target);
+    switch (reply.state) {
+    case "approved":
+      this._pendingPair = null;
+      // The storage watcher picks this up, and the first sync follows.
+      await browser.storage.local.set({
+        [HS.PAIRING_KEY]: { host: target.host, port: target.port, token: reply.token },
+      });
+      return;
+    case "pending":
+      if (Date.now() - target.since > PAIR_WAIT_MS) {
+        this._pendingPair = null;
+        this._nextDiscoveryAt = Date.now() + DISCOVERY_RETRY_MS;
+        await this._writeStatus({ state: "legacy", message: "No answer in Burp. Press Connect to ask again." });
+        return;
+      }
+      this._pendingPair = target;
+      await this._writeStatus({ state: "awaiting" });
+      this.schedule(PAIR_POLL_MS);
+      return;
+    case "denied":
+      this._pendingPair = null;
+      this._denied = true;
+      await this._writeStatus({ state: "denied" });
+      return;
+    case "busy":
+      this._pendingPair = null;
+      this._nextDiscoveryAt = Date.now() + PAIR_POLL_MS * 5;
+      await this._writeStatus({ state: "awaiting", message: "Burp is asking about another PhoenixBox first." });
+      return;
+    default:
+      this._pendingPair = null;
+      this._nextDiscoveryAt = Date.now() + DISCOVERY_RETRY_MS;
+      await this._writeStatus({ state: "legacy" });
+    }
+  },
+
+  /**
+   * Finds Highlighter v2's control server on the Burp preset's host: the
+   * default port first, then the rest of its range at once. Burp's own proxy
+   * port is skipped, so the probe never lands in its proxy.
+   */
+  async _discover() {
+    const host = this.burpPreset.host;
+    const hello = async (port) => {
+      try {
+        const response = await fetch(`http://${HS.formatAddress({ host, port })}/v1/hello`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+          cache: "no-store",
+          credentials: "omit",
+          signal: AbortSignal.timeout(HELLO_TIMEOUT_MS),
+        });
+        return response.ok && HS.isHighlighterHello(await response.json().catch(() => null)) ? { host, port } : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const ports = HS.controlPorts().filter((port) => port !== this.burpPreset.port);
+    const first = await hello(ports[0]);
+    if (first) return first;
+    const rest = await Promise.all(ports.slice(1).map(hello));
+    return rest.find(Boolean) || null;
+  },
+
+  async _requestPairing(target) {
+    try {
+      const response = await fetch(`http://${HS.formatAddress(target)}/v1/pair`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client: await this._clientId(),
+          label: `PhoenixBox ${browser.runtime.getManifest().version} (Firefox)`,
+        }),
+        cache: "no-store",
+        credentials: "omit",
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      return HS.parsePairReply(response.status, await response.json().catch(() => null));
+    } catch {
+      return { state: "error" };
+    }
+  },
+
+  /** A random ID for this profile, created once, so Burp can tell PhoenixBox installs apart. */
+  async _clientId() {
+    const stored = await browser.storage.local.get({ [HS.CLIENT_ID_KEY]: null });
+    if (HS.isValidClientId(stored[HS.CLIENT_ID_KEY])) return stored[HS.CLIENT_ID_KEY];
+
+    const bytes = crypto.getRandomValues(new Uint8Array(24));
+    const id = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    await browser.storage.local.set({ [HS.CLIENT_ID_KEY]: id });
+    return id;
+  },
+
+  /**
+   * On unpairing, tells the JAR to close every listener and leave paired mode
+   * now, rather than when its lease runs out: PhoenixBox is about to send the
+   * legacy colour header, which the JAR only strips while unpaired. Best
+   * effort: the lease still ends it if this fails.
    */
   async _closeListeners(pairing) {
     const endpoint = HS.controlEndpoint(pairing, this.burpPreset);
     await fetch(`http://${endpoint}/v1/sync`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${pairing.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(HS.buildSyncBody({ burpPreset: this.burpPreset, marks: [], identities: new Map() })),
+      body: JSON.stringify({ protocol: HS.PROTOCOL, release: true }),
       cache: "no-store",
       credentials: "omit",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -251,6 +416,8 @@ const highlighterSync = {
 
       if (HS.MARKS_KEY in changes) {
         this.marks = new Set(HS.sanitizeMarks(changes[HS.MARKS_KEY].newValue));
+        // Marking while unpaired is a reason to look for the Highlighter now.
+        if (!this.pairing) this._nextDiscoveryAt = 0;
         // An unmarked container stops being routed to its listener at once,
         // before the JAR has even been told to close it.
         for (const id of [...this.addresses.keys()]) {
@@ -269,6 +436,15 @@ const highlighterSync = {
         if (previous && !this.pairing) {
           this._closeListeners(previous).catch(() => {});
         }
+        resync = true;
+      }
+      if (HS.AUTO_PAIR_PAUSED_KEY in changes) {
+        this._autoPairPaused = !!changes[HS.AUTO_PAIR_PAUSED_KEY].newValue;
+      }
+      if (HS.CONNECT_REQUEST_KEY in changes) {
+        this._connectRequested = true;
+        this._denied = false;
+        this._pendingPair = null;
         resync = true;
       }
       if ("customProxyPresets" in changes) {

@@ -197,8 +197,8 @@ npm run package
    - Burp has a new **PhoenixBox** tab
 
 4. **Pair and mark containers in Firefox**
-   - In Burp's **PhoenixBox** tab, copy the pairing string
-   - Click the PhoenixBox icon in Firefox, open the **Highlighter** tile, paste it and click **Pair**
+   - Select the **Burp Suite** proxy preset in PhoenixBox, then mark a container with the highlighter button
+   - Burp asks whether to pair PhoenixBox: click **Allow**. No copy-paste; it asks once per Firefox profile
    - Mark containers with the highlighter button next to **Promote**
 
 ### Requirements

@@ -92,13 +92,15 @@ Popular workflows:
 
 ## Burp Suite Integration
 
-Mark a container with the highlighter button (next to Promote in the container list) and it gets its own Burp proxy listener. PhoenixBox sends that container's traffic to its listener, so Burp knows the container from the listener a request arrives on: the companion JAR colours it in HTTP history and writes the container name into Notes. **Requests are never modified**, so nothing can leak to the target even if the JAR isn't loaded.
+Mark a container with the highlighter button (next to Promote in the container list). PhoenixBox finds the companion JAR in Burp and asks to pair, and you click **Allow** once in Burp.
+- **Paired (JAR v2.0.0+):** each marked container gets its own Burp proxy listener. The JAR colours that container's traffic in HTTP history and writes its name into Notes, and **requests are not modified**.
+- **Not paired (JAR v1.x):** marked containers send the legacy `X-MAC-Container-Color` header, which the JAR colours and strips. If no JAR is loaded at all, the header reaches the site.
 
 Basic setup:
 
 1. Install `PhoenixBoxHighlighter.jar` **v2.0.0 or later** from the [PhoenixBox-Highlighter releases page](https://github.com/avihayf/PhoenixBox-Highlighter/releases/latest) in Burp Suite via **Extensions → Installed → Add**.
-2. In Burp's **PhoenixBox** tab, copy the pairing string. In PhoenixBox, open the **Highlighter** tile and paste it.
-3. Send traffic through Burp (the **Burp Suite** proxy preset), then mark containers with the highlighter button.
+2. Send traffic through Burp (the **Burp Suite** proxy preset), then mark containers with the highlighter button.
+3. Click **Allow** when Burp asks to pair PhoenixBox. It asks once per Firefox profile, and there's no string to copy.
 4. Browse in those containers and check Burp HTTP history.
 
 Listeners use free ports from 18080 on the Burp preset's IP, skipping anything already in use. Unmarking a container closes its listener. See [Burp Suite Setup](docs/BURP_SUITE_SETUP.md) for pinning a container to a specific address.

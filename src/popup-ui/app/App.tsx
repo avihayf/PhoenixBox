@@ -17,7 +17,8 @@ import { toProxyType, type Container, type Tab, type AssignedSite } from "../lib
 import * as msg from "../lib/messages";
 import { defaultSecurityIcon } from "../lib/securityProfiles";
 import { MARKS_KEY as HIGHLIGHTER_MARKS_KEY, PAIRING_KEY as HIGHLIGHTER_PAIRING_KEY,
-  STATUS_KEY as HIGHLIGHTER_STATUS_KEY, PINS_KEY as HIGHLIGHTER_PINS_KEY, sanitizeMarks, toggleMark, isPaired,
+  STATUS_KEY as HIGHLIGHTER_STATUS_KEY, PINS_KEY as HIGHLIGHTER_PINS_KEY,
+  CONNECT_REQUEST_KEY as HIGHLIGHTER_CONNECT_KEY, AUTO_PAIR_PAUSED_KEY as HIGHLIGHTER_AUTO_PAIR_PAUSED_KEY, sanitizeMarks, toggleMark, isPaired,
   parseAddress, formatAddress,
   type HighlighterPairing, type HighlighterStatus } from "../lib/highlighterSettings";
 import { readProxyMap, getProxyForContainer,
@@ -1260,7 +1261,18 @@ function App() {
         }}
         onUnpairHighlighter={async () => {
           setHighlighterPairing(null);
-          await requireWebExt().storage.local.set({ [HIGHLIGHTER_PAIRING_KEY]: null });
+          // Unpairing on purpose: don't find Burp and ask again until Connect.
+          await requireWebExt().storage.local.set({
+            [HIGHLIGHTER_PAIRING_KEY]: null,
+            [HIGHLIGHTER_AUTO_PAIR_PAUSED_KEY]: true,
+          });
+        }}
+        onConnectHighlighter={async () => {
+          // The background watches the request key and looks for the Highlighter now.
+          await requireWebExt().storage.local.set({
+            [HIGHLIGHTER_AUTO_PAIR_PAUSED_KEY]: false,
+            [HIGHLIGHTER_CONNECT_KEY]: Date.now(),
+          });
         }}
         userAgentEnabled={globalUserAgent}
         onToggleUserAgent={async (enabled) => {

@@ -14,7 +14,7 @@ describe("highlighterSettings (popup)", () => {
   // The popup and the background page each carry these, because the UMD
   // helper cannot be imported into the Vite bundle. Pin them together.
   describe("parity with the background helpers", () => {
-    for (const name of ["MARKS_KEY", "PINS_KEY", "PAIRING_KEY", "STATUS_KEY"]) {
+    for (const name of ["MARKS_KEY", "PINS_KEY", "PAIRING_KEY", "STATUS_KEY", "CONNECT_REQUEST_KEY", "AUTO_PAIR_PAUSED_KEY"]) {
       it(`agrees on ${name}`, () => {
         expect(settings[name]).to.equal(background[name]);
       });
@@ -66,13 +66,28 @@ describe("highlighterSettings (popup)", () => {
   });
 
   describe("describeStatus", () => {
-    it("says what the user needs to know", () => {
-      expect(settings.describeStatus(null, false)).to.equal("Not paired with Burp");
+    it("says what the user needs to know when paired", () => {
       expect(settings.describeStatus({ state: "error", message: "Can't reach it" }, true)).to.equal("Can't reach it");
       expect(settings.describeStatus({ state: "connected", jar: "2.0.0", addresses: { a: "127.0.0.1:18080" } }, true))
         .to.equal("Connected to Highlighter v2.0.0 · 1 listener");
       expect(settings.describeStatus({ state: "connected", addresses: {} }, true))
         .to.equal("Connected to Highlighter · 0 listeners");
+    });
+
+    it("explains each unpaired state, including legacy mode", () => {
+      expect(settings.describeStatus(null, false)).to.match(/Not paired/);
+      expect(settings.describeStatus({ state: "searching" }, false)).to.match(/Looking for/);
+      expect(settings.describeStatus({ state: "awaiting" }, false)).to.match(/Allow in Burp/);
+      expect(settings.describeStatus({ state: "denied" }, false)).to.match(/denied/);
+      expect(settings.describeStatus({ state: "legacy" }, false)).to.match(/legacy colour header/);
+    });
+  });
+
+  describe("isLegacyMode", () => {
+    it("is on only while unpaired with something marked", () => {
+      expect(settings.isLegacyMode(false, ["firefox-container-1"])).to.equal(true);
+      expect(settings.isLegacyMode(true, ["firefox-container-1"])).to.equal(false);
+      expect(settings.isLegacyMode(false, [])).to.equal(false);
     });
   });
 });

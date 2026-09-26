@@ -6,7 +6,7 @@ PhoenixBox is a multi-container browser extension for security testing and penet
 
 - Per-container proxy configuration (HTTP, HTTPS, SOCKS4, SOCKS5)
 - A global proxy toggle for routing all container traffic through Burp Suite
-- Burp Suite highlighting: each container the user marks gets its own proxy listener in Burp, opened by the companion Burp extension, so Burp can colour and name requests by the listener they arrive on. Requests are never modified for this (see **Burp Highlighter connection**)
+- Burp Suite highlighting: when paired with the companion Burp extension, each container the user marks gets its own proxy listener in Burp, so Burp colours and names requests by the listener they arrive on, and requests are not modified. When not paired (an older Burp extension), marked containers carry an `X-MAC-Container-Color` header instead (see **Burp Highlighter connection**)
 - Per-container User-Agent overrides using a curated list from a public CDN
 - Optional Mozilla VPN integration via native messaging
 - An on-demand endpoint extractor that lists URL paths found in the current page's source (see **Content Script**)
@@ -24,7 +24,11 @@ These three permissions work together and are essential for two core features:
 
 1. **Proxy routing** — The extension uses `browser.proxy.onRequest` (optional `proxy` permission) and `browser.webRequest.onBeforeRequest` to intercept navigation requests and re-open them in the correct container. This must work on any URL the user visits during a security test. A blocking `webRequest.onAuthRequired` listener answers **proxy** authentication challenges (`isProxy` only) with the credentials the user configured for that proxy; it never answers a website's own authentication.
 
-2. **User-Agent override** — When the user enables a User-Agent override, the extension replaces the `User-Agent` header via `webRequest.onBeforeSendHeaders`. This must apply to all URLs because the user may be testing any target site. No other header is added or changed.
+2. **Header modification** — via `webRequest.onBeforeSendHeaders`, and only when the user asks for it:
+   - a **User-Agent override** replaces the `User-Agent` header;
+   - **legacy Burp highlighting** (containers marked, but not paired with the new Burp extension) adds `X-MAC-Container-Color`, holding just the container's colour, to marked containers' requests that go through an HTTP proxy. The Burp extension strips it.
+
+   This must apply to all URLs because the user may be testing any target site. No other header is added or changed.
 
 The content script is injected on `<all_urls>` at `document_idle`. It reads page content only when the user explicitly runs the endpoint extractor — see **Content Script** below for exactly what it reads and where the results go.
 
@@ -91,7 +95,12 @@ This is the only connection the extension makes to the internet. The CSP limits 
 
 ### Burp Highlighter connection (user-configured, local)
 
-Only after the user pairs PhoenixBox with the companion Burp extension (by pasting a pairing string that Burp shows), the background page makes HTTP `POST` requests to that Burp extension's control server, at the address in the pairing string: the user's own Burp, normally `127.0.0.1:8079`. The body lists the containers the user marked for highlighting (container ID, name, colour), and the reply says which proxy listener each one got. Requests carry the pairing token in an `Authorization` header. Nothing is sent before pairing, and nothing is sent anywhere else.
+Only when the user has marked containers for highlighting, or pressed Connect, the background page looks for the companion Burp extension on the host of the user's own Burp proxy preset (normally `127.0.0.1`).
+- **Discovery:** `POST /v1/hello` to ports 8079–8099.
+- **Pairing:** `POST /v1/pair` with a random per-profile client ID. The user must approve it in Burp, which then returns a token.
+- **Syncing:** `POST /v1/sync` with the token in an `Authorization` header. The body lists the marked containers (ID, name, colour), and the reply says which proxy listener each got.
+
+Nothing is sent anywhere other than the user's Burp host.
 
 The Burp extension's control port is 8079–8099 on whichever host Burp runs, which may be a LAN address, so the CSP allows exactly `http://*:8079` … `http://*:8099`.
 

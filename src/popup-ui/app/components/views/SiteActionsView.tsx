@@ -80,6 +80,7 @@ interface SiteActionsViewProps {
   highlighterStatus: HighlighterStatus | null;
   onPairHighlighter: (pairing: HighlighterPairing) => Promise<void>;
   onUnpairHighlighter: () => Promise<void>;
+  onConnectHighlighter: () => Promise<void>;
 
   // User Agent
   userAgentEnabled: boolean;
@@ -138,6 +139,7 @@ export function SiteActionsView({
   highlighterStatus,
   onPairHighlighter,
   onUnpairHighlighter,
+  onConnectHighlighter,
   userAgentEnabled,
   onToggleUserAgent,
   userAgentType,
@@ -677,11 +679,13 @@ export function SiteActionsView({
                               title={
                                 !isHighlighted
                                   ? 'Highlight in Burp: give this container its own Burp listener'
-                                  : highlighterError
-                                    ? `Highlighter: ${highlighterError}`
-                                    : highlighterAddress
-                                      ? `Highlighted in Burp via ${highlighterAddress}`
-                                      : 'Highlighted in Burp (waiting for the Highlighter)'
+                                  : !highlighterPairing
+                                    ? 'Highlighted in Burp with the legacy colour header (not paired with Highlighter v2)'
+                                    : highlighterError
+                                      ? `Highlighter: ${highlighterError}`
+                                      : highlighterAddress
+                                        ? `Highlighted in Burp via ${highlighterAddress}`
+                                        : 'Highlighted in Burp (waiting for the Highlighter)'
                               }
                             >
                               <Highlighter className="w-3 h-3" />
@@ -748,6 +752,7 @@ export function SiteActionsView({
         containers={containers}
         onPair={onPairHighlighter}
         onUnpair={onUnpairHighlighter}
+        onConnect={onConnectHighlighter}
       />
 
       {/* User Agent Modal */}

@@ -16,6 +16,11 @@ const {
   parseSyncResponse,
   isBurpRoute,
   highlightedRoute,
+  legacyColorHeaderValue,
+  parsePairReply,
+  isHighlighterHello,
+  controlPorts,
+  isValidClientId,
 } = require("../src/js/shared/highlighterSyncHelpers");
 
 const TOKEN = "A".repeat(43);
@@ -205,6 +210,73 @@ describe("highlighterSyncHelpers", () => {
         { type: "http", host: "127.0.0.1", port: 18080, username: "u", password: "p", failoverTimeout: 1 },
         withCredentials,
       ]);
+    });
+  });
+
+  // Not paired with Highlighter v2: marked containers carry the old JAR's colour header.
+  describe("legacyColorHeaderValue", () => {
+    const http = { type: "http", host: "127.0.0.1", port: 8080 };
+    const base = { paired: false, marked: true, firefoxColor: "turquoise", proxyInfo: http };
+
+    it("sends the mapped colour for a marked container going through an HTTP proxy", () => {
+      expect(legacyColorHeaderValue(base)).to.equal("cyan");
+      expect(legacyColorHeaderValue({ ...base, proxyInfo: { ...http, type: "https" } })).to.equal("cyan");
+    });
+
+    it("sends nothing once paired: v2 highlights by listener", () => {
+      expect(legacyColorHeaderValue({ ...base, paired: true })).to.equal(null);
+    });
+
+    it("sends nothing for unmarked containers", () => {
+      expect(legacyColorHeaderValue({ ...base, marked: false })).to.equal(null);
+    });
+
+    it("sends nothing off an HTTP proxy, where no Burp would strip it", () => {
+      for (const proxyInfo of [null, undefined, { type: "direct" }, { type: "socks", host: "10.0.0.1", port: 1080 }]) {
+        expect(legacyColorHeaderValue({ ...base, proxyInfo }), JSON.stringify(proxyInfo)).to.equal(null);
+      }
+    });
+
+    it("sends nothing for a colour Burp has no highlight for", () => {
+      expect(legacyColorHeaderValue({ ...base, firefoxColor: "toolbar" })).to.equal(null);
+      expect(legacyColorHeaderValue({ ...base, firefoxColor: undefined })).to.equal(null);
+    });
+
+    it("fails closed without state", () => {
+      expect(legacyColorHeaderValue(undefined)).to.equal(null);
+    });
+  });
+
+  describe("automatic pairing", () => {
+    it("recognises only Highlighter v2's hello", () => {
+      expect(isHighlighterHello({ app: "phoenixbox-highlighter", protocol: 1, jar: "2.0.0" })).to.equal(true);
+      expect(isHighlighterHello({ app: "something-else", protocol: 1 })).to.equal(false);
+      expect(isHighlighterHello({ app: "phoenixbox-highlighter", protocol: 2 })).to.equal(false);
+      expect(isHighlighterHello(null)).to.equal(false);
+    });
+
+    it("reads every pairing reply", () => {
+      const token = "T".repeat(43);
+      expect(parsePairReply(200, { status: "approved", token })).to.deep.equal({ state: "approved", token });
+      expect(parsePairReply(200, { status: "approved", token: "bad token!" })).to.deep.equal({ state: "error" });
+      expect(parsePairReply(202, { status: "pending" })).to.deep.equal({ state: "pending" });
+      expect(parsePairReply(403, null)).to.deep.equal({ state: "denied" });
+      expect(parsePairReply(429, null)).to.deep.equal({ state: "busy" });
+      expect(parsePairReply(500, null)).to.deep.equal({ state: "error" });
+    });
+
+    it("probes exactly the control server's port range", () => {
+      const ports = controlPorts();
+      expect(ports[0]).to.equal(8079);
+      expect(ports[ports.length - 1]).to.equal(8099);
+      expect(ports).to.have.length(21);
+    });
+
+    it("accepts only well-formed client IDs", () => {
+      expect(isValidClientId("abcDEF123_-abcDEF123_-")).to.equal(true);
+      for (const bad of ["short", "has spaces in it here", "x".repeat(65), null, 5]) {
+        expect(isValidClientId(bad), String(bad)).to.equal(false);
+      }
     });
   });
 });

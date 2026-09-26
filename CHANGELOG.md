@@ -5,8 +5,9 @@ All notable changes to PhoenixBox are recorded here.
 ## 3.1.0
 
 ### Burp Suite integration
-- **Highlighting no longer touches your requests.** Mark a container with the new highlighter button (next to Promote) and it gets its own Burp proxy listener; Burp colours its traffic and notes the container name by the listener it arrives on. The `X-MAC-Container-Color` header is gone, so nothing can reach the target even if the Burp extension isn't loaded. Requires **Phoenix Highlighter v2.0.0 or later**.
-- **Pair once.** Copy the pairing string from Burp's new PhoenixBox tab into the Highlighter tile. The tile now shows whether PhoenixBox is connected and why a container has no listener.
+- **Highlighting no longer touches your requests** with **Phoenix Highlighter v2.0.0 or later**. Mark a container with the new highlighter button (next to Promote) and it gets its own Burp proxy listener; Burp colours its traffic and notes the container name by the listener it arrives on.
+- **Automatic pairing.** PhoenixBox finds the Highlighter in Burp and asks to pair; click **Allow** once in Burp. A manual pairing string remains as a fallback. The Highlighter tile shows the connection state and why a container has no listener.
+- **Still works with Phoenix Highlighter v1.x.** Not paired, marked containers send only the `X-MAC-Container-Color` header, as before, and the name is never sent. The Highlighter strips it; with none loaded, it reaches the site.
 - Listeners use free ports from 18080 on the Burp preset's IP and never take a port another program holds. A container keeps its port, and can be pinned to an exact address, including a listener you built in Burp.
 - The global Highlighter switch, the JAR-version confirmation and the preset's "Turn on the Highlighter" option are gone. Highlighting is off until you mark containers.
 
