@@ -37,6 +37,7 @@ const highlighterSync = {
   addresses: new Map(),
 
   _timer: null,
+  _lastStatus: null,
   _inFlight: false,
   _again: false,
   /** Resolves when the next sync finishes; null when none is scheduled. */
@@ -179,7 +180,6 @@ const highlighterSync = {
     await this._writeStatus({
       state: "connected",
       jar: parsed.jar,
-      at: Date.now(),
       addresses: assigned,
       errors: parsed.errors,
     });
@@ -218,7 +218,14 @@ const highlighterSync = {
     }
   },
 
+  /**
+   * Only writes when something changed: the heartbeat would otherwise write to
+   * disk, and wake every open popup, every 30 seconds for nothing.
+   */
   async _writeStatus(status) {
+    const serialized = JSON.stringify(status);
+    if (serialized === this._lastStatus) return;
+    this._lastStatus = serialized;
     await browser.storage.local.set({ [HS.STATUS_KEY]: status });
   },
 

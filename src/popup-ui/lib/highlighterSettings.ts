@@ -27,7 +27,6 @@ export interface HighlighterStatus {
   state: "unpaired" | "connected" | "error";
   message?: string;
   jar?: string | null;
-  at?: number;
   /** cookieStoreId -> "ip:port" the container's traffic is going to. */
   addresses?: Record<string, string>;
   /** cookieStoreId -> why it has no listener. */
