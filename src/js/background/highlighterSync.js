@@ -17,6 +17,10 @@
 const HS = PhoenixBoxHighlighterSyncHelpers;
 
 const HEARTBEAT_MS = 30_000;
+// While the Highlighter can't be reached (Burp restarting, the JAR being
+// reloaded), retry this often, so listeners come back within seconds rather
+// than at the next heartbeat.
+const RETRY_MS = 5_000;
 const DEBOUNCE_MS = 300;
 const REQUEST_TIMEOUT_MS = 5_000;
 // How long a request from a just-marked container waits for its listener
@@ -105,8 +109,9 @@ const highlighterSync = {
     this._nextSync = null;
     this._resolveNextSync = null;
 
+    let unreachable = false;
     try {
-      await this._syncOnce();
+      unreachable = (await this._syncOnce()) === "unreachable";
     } catch (e) {
       LOG.warn("highlighterSync: sync failed", e);
     } finally {
@@ -115,10 +120,13 @@ const highlighterSync = {
       if (this._again) {
         this._again = false;
         this.schedule(0);
+      } else if (unreachable && this.pairing) {
+        this.schedule(RETRY_MS);
       }
     }
   },
 
+  /** @returns {Promise<"unreachable"|undefined>} "unreachable" when the JAR could not be contacted at all. */
   async _syncOnce() {
     if (!this.pairing) {
       this.addresses = new Map();
@@ -153,7 +161,7 @@ const highlighterSync = {
       // routing to listeners that may be gone.
       this.addresses = new Map();
       await this._writeStatus({ state: "error", message: `Can't reach the Highlighter at ${endpoint}. Is Burp running with the JAR loaded?` });
-      return;
+      return "unreachable";
     }
 
     if (!response.ok) {

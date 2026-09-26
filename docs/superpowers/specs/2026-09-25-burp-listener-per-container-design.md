@@ -53,7 +53,8 @@ An address is **unusable** when it:
 4. is already given to another container in this sync,
 5. fails the probe on Burp's machine:
    - a **connect test**: anything answering means taken, which catches dev servers on `0.0.0.0`,
-   - then a **strict bind test** with `setReuseAddress(false)`: without it, macOS lets `127.0.0.1:P` bind over another process's `*:P` and steal its traffic.
+   - then a **bind test** with address reuse on, as Burp binds, to tell a usable address from one not on this machine. The connect test is what protects a `*:P` dev server, since it answers on `127.0.0.1` too.
+   - Reuse must be on: a reuse-off bind fails while a just-closed listener's connections sit in TIME_WAIT, which stopped containers getting their old port back after a reload (found live 2026-09-26).
    - Addresses the JAR itself already listens on skip the probe, since they're ours.
 
 Order for each container:
