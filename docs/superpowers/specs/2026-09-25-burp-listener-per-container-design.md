@@ -71,7 +71,7 @@ Containers are processed in a stable order: those keeping their current address 
   - `loopback_only` → `127.0.0.1`
   - `specific_address` → that IP
   - `all_interfaces` → `0.0.0.0`
-- **Port:** 8079, or the next free port up to 8099. The chosen port is remembered in Burp preferences.
+- **Port:** 8079, or the next port up to 8099 when something else answers on it. Always tried from 8079, so the pairing string survives reloads; the bind uses address reuse, since connections left in TIME_WAIT by earlier syncs would otherwise push it off 8079.
 - **Pairing string:** `phx1:<host>:<port>:<token>`. The token is 32 random bytes, base64url, stored in Burp user preferences. The JAR tab can regenerate it.
 
 Every request must:
