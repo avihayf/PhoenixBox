@@ -180,7 +180,7 @@ Spike, Firefox 153: an extension's background `fetch` sends `Origin: moz-extensi
 - `POST /v1/pair {client, label}` → `202 pending` (an Allow/Deny banner at the top of Burp's PhoenixBox tab, showing the label, Origin and client ID), then `200 {"status":"approved","token"}`.
   - Denied: `403`, remembered for 2 minutes.
   - Another request already waiting: `429`.
-  - Tokens are per client and stored in Burp preferences. An approved client must keep asking from the same Origin.
+  - **One pairing at a time:** approving a new client replaces the previous one, whose token stops working, because two PhoenixBoxes would each sync their full state and overwrite each other's listeners. The token is stored in Burp preferences. The approved client must keep asking from the same Origin.
 - `POST /v1/sync {"protocol":1,"release":true}` leaves paired mode at once. PhoenixBox sends it on Unpair. Revoking a client in Burp does the same, run off the UI thread.
 
 PhoenixBox's side:
