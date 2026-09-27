@@ -177,7 +177,7 @@ Accepted risk: while paired, the new JAR passes `X-MAC-*` headers from other sou
 Spike, Firefox 153: an extension's background `fetch` sends `Origin: moz-extension://<uuid>` on **POST** but not on GET. So both new endpoints are POSTs that require that Origin; a web page's POST carries its own Origin and is refused.
 
 - `POST /v1/hello` → `{"app":"phoenixbox-highlighter","protocol":1,"jar":…}`. Needs no token.
-- `POST /v1/pair {client, label}` → `202 pending` (Burp shows a non-modal Allow/Deny dialog plus a banner in its tab), then `200 {"status":"approved","token"}`.
+- `POST /v1/pair {client, label}` → `202 pending` (an Allow/Deny banner at the top of Burp's PhoenixBox tab, showing the label, Origin and client ID), then `200 {"status":"approved","token"}`.
   - Denied: `403`, remembered for 2 minutes.
   - Another request already waiting: `429`.
   - Tokens are per client and stored in Burp preferences. An approved client must keep asking from the same Origin.

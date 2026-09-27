@@ -110,7 +110,7 @@ export function describeStatus(status: HighlighterStatus | null | undefined, pai
   case "searching":
     return "Looking for Phoenix Highlighter in Burp…";
   case "awaiting":
-    return status?.message || "Click Allow in Burp to pair PhoenixBox.";
+    return status?.message || "Click Allow in Burp's PhoenixBox tab to pair PhoenixBox.";
   case "denied":
     return "Pairing was denied in Burp. Marked containers use the legacy colour header. Press Connect to ask again.";
   case "legacy":

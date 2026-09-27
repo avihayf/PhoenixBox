@@ -29,7 +29,7 @@ Pairing is automatic: PhoenixBox finds the v2 Highlighter and asks, and you clic
 
 1. Select the **Burp Suite** proxy preset in PhoenixBox.
 2. In the container list, click the highlighter button next to **Promote** on each container you want coloured in Burp.
-3. PhoenixBox finds the Highlighter on your Burp host and asks to pair. Burp shows *"PhoenixBox … wants to pair"*: click **Allow**. The request also appears at the top of Burp's **PhoenixBox** tab.
+3. PhoenixBox finds the Highlighter on your Burp host and asks to pair. Open Burp's **PhoenixBox** tab: the request is at the top, with the requesting extension's origin. Click **Allow**.
 4. The Highlighter tile turns on: *Connected to Highlighter v2.0.0 · 1 listener*.
 
 Burp asks once per Firefox profile. Burp's **PhoenixBox** tab lists every paired profile with **Revoke**; revoking makes that PhoenixBox fall back to the legacy mode and ask again. **Unpair** in PhoenixBox's Highlighter window stops it asking until you press **Connect**.
