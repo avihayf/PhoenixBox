@@ -114,12 +114,12 @@ Response `200`:
 ```
 
 - The request is the **full desired state**. The JAR reconciles to it and imports only if its set of listeners changed.
-- **Lease:** with no successful sync for 120 s, the JAR removes its listeners and forgets the assignments.
+- **Lease:** with no successful sync for 30 s, the JAR removes its listeners and forgets the assignments. It was 120 s until 2026-09-28; it was shortened so that quitting Firefox doesn't leave listeners open. PhoenixBox also sends `release` when its last window closes.
 - PhoenixBox syncs:
   - on mark/unmark, pin change, container rename, recolour or delete,
   - on a preset change and on pairing,
   - at startup,
-  - every 30 s.
+  - every 10 s, except while no browser window is open.
   - Changes are debounced by 300 ms.
 
 ## JAR lifecycle

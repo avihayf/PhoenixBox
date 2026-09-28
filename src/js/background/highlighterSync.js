@@ -13,7 +13,7 @@
  * marked containers use the legacy colour header (background/requestHeaders.js).
  *
  * Every sync sends the full list of marks, so a lost request or a restart on
- * either side is repaired by the next one; a 30 s heartbeat also keeps the
+ * either side is repaired by the next one; a 10 s heartbeat also keeps the
  * JAR's lease alive. Only listeners the JAR reports as up are ever routed to.
  *
  * Decisions live in shared/highlighterSyncHelpers.js, which is unit tested.
@@ -21,7 +21,9 @@
 
 const HS = PhoenixBoxHighlighterSyncHelpers;
 
-const HEARTBEAT_MS = 30_000;
+// Also the JAR's liveness signal: it closes the listeners after 30 s without
+// one, so a Firefox that quits or crashes leaves nothing open for long.
+const HEARTBEAT_MS = 10_000;
 // While the Highlighter can't be reached (Burp restarting, the JAR being
 // reloaded), retry this often, so listeners come back within seconds rather
 // than at the next heartbeat.
@@ -56,6 +58,9 @@ const highlighterSync = {
 
   _timer: null,
   _lastStatus: null,
+  // True while no browser window is open: nothing is syncing, and Burp has
+  // been told to close the listeners.
+  _noWindows: false,
   // Auto-pairing. Not persisted: after a restart PhoenixBox simply looks again.
   /** @type {{host: string, port: number, since: number}|null} waiting for Allow in Burp */
   _pendingPair: null,
@@ -92,7 +97,10 @@ const highlighterSync = {
     this._watchContainers();
     await this._loadIdentities();
 
-    setInterval(() => this.schedule(0), HEARTBEAT_MS);
+    this._watchWindows();
+    setInterval(() => {
+      if (!this._noWindows) this.schedule(0);
+    }, HEARTBEAT_MS);
     this.schedule(0);
   },
 
@@ -152,6 +160,9 @@ const highlighterSync = {
 
   /** @returns {Promise<"unreachable"|undefined>} "unreachable" when the JAR could not be contacted at all. */
   async _syncOnce() {
+    // Every window is closed: keep Burp's listeners closed until one opens.
+    if (this._noWindows) return;
+
     if (!this.pairing) {
       this.addresses = new Map();
       await this._autoPair();
@@ -393,7 +404,7 @@ const highlighterSync = {
 
   /**
    * Only writes when something changed: the heartbeat would otherwise write to
-   * disk, and wake every open popup, every 30 seconds for nothing.
+   * disk, and wake every open popup, every 10 seconds for nothing.
    */
   async _writeStatus(status) {
     const serialized = JSON.stringify(status);
@@ -458,6 +469,34 @@ const highlighterSync = {
 
       if (resync) this.schedule();
     });
+  },
+
+  /**
+   * Closing the last browser window closes Burp's container listeners at
+   * once, leaving only the user's own. Opening a window brings them back.
+   * Quitting or crashing may give no chance to say so; the JAR's 30 s lease
+   * covers that.
+   */
+  _watchWindows() {
+    if (!browser.windows) return;
+    browser.windows.onRemoved.addListener(() => {
+      this._releaseIfNoWindows().catch((e) => LOG.warn("highlighterSync: release on last window failed", e));
+    });
+    browser.windows.onCreated.addListener((window) => {
+      if (this._noWindows && (!window || window.type === "normal")) {
+        this._noWindows = false;
+        this.schedule(0);
+      }
+    });
+  },
+
+  async _releaseIfNoWindows() {
+    const windows = await browser.windows.getAll({ windowTypes: ["normal"] });
+    if (windows.length > 0 || this._noWindows) return;
+
+    this._noWindows = true;
+    this.addresses = new Map();
+    if (this.pairing) await this._closeListeners(this.pairing);
   },
 
   _watchContainers() {

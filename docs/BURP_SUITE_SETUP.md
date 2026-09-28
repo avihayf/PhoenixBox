@@ -56,9 +56,9 @@ sequenceDiagram
     Jar->>Target: The request, unchanged
 ```
 
-- PhoenixBox re-sends the full list of marked containers whenever it changes, and every 30 seconds.
-- If Burp hears nothing for two minutes (Firefox closed), it closes the listeners and goes back to legacy mode. They come back when Firefox starts again.
-- After Burp or the Highlighter restarts, PhoenixBox reconnects at its next check-in, within about 30 seconds. The listeners reappear on the same ports: there's no need to re-mark anything.
+- PhoenixBox re-sends the full list of marked containers whenever it changes, and every 10 seconds.
+- **Closing Firefox's last window closes the container listeners at once**, leaving only your own (e.g. `127.0.0.1:8080`). They come back when you open a window. If Firefox quits or crashes before it can say so, Burp closes them after 30 seconds without a check-in, and goes back to legacy mode.
+- After Burp or the Highlighter restarts, PhoenixBox reconnects at its next check-in, within about 10 seconds. The listeners reappear on the same ports: there's no need to re-mark anything.
 - PhoenixBox routes a container to its listener only after Burp confirms the listener is up. Otherwise the container's traffic goes to the preset listener as usual, just not highlighted.
 - **Promote still decides what reaches Burp.** Marking only chooses which listener a container's Burp traffic arrives on. A marked container that isn't routed to Burp doesn't show up there.
 
