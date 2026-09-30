@@ -7,7 +7,7 @@
  *
  *   - User-Agent spoofing (per-container overrides win over the global one)
  *   - Burp highlighting's legacy mode: while PhoenixBox is not paired with
- *     Phoenix Highlighter v2, marked containers carry X-MAC-Container-Color
+ *     Phoenix Highlighter v2 and the Highlighter is on, containers carry X-MAC-Container-Color
  *     for the old v1.x JAR. Paired, highlighting is by listener
  *     (background/highlighterSync.js) and no header is added.
  *
@@ -31,11 +31,10 @@ const requestHeaders = {
   userAgentEnabled: false,
   globalUserAgent: null,
   containerUserAgents: {},
-  // Legacy highlighting: on while not paired and something is marked.
+  // Legacy highlighting: on while the Highlighter is on but not paired.
   legacyHighlighting: false,
   _paired: false,
-  /** @type {Set<string>} */
-  _marks: new Set(),
+  _enabled: false,
   /** @type {Map<string, string>} cookieStoreId -> Firefox container colour */
   _containerColors: new Map(),
 
@@ -52,14 +51,14 @@ const requestHeaders = {
       [GLOBAL_UA_KEY]: null,
       [CONTAINER_UAS_KEY]: {},
       [HSH.PAIRING_KEY]: null,
-      [HSH.MARKS_KEY]: [],
+      [HSH.ENABLED_KEY]: false,
     });
 
     this.userAgentEnabled = !!stored[GLOBAL_UA_ENABLED_KEY];
     this.globalUserAgent = stored[GLOBAL_UA_KEY];
     this.containerUserAgents = stored[CONTAINER_UAS_KEY] || {};
     this._paired = !!stored[HSH.PAIRING_KEY];
-    this._marks = new Set(HSH.sanitizeMarks(stored[HSH.MARKS_KEY]));
+    this._enabled = stored[HSH.ENABLED_KEY] === true;
     this._updateLegacyHighlighting();
 
     this._watchTabs();
@@ -75,7 +74,7 @@ const requestHeaders = {
   },
 
   _updateLegacyHighlighting() {
-    this.legacyHighlighting = !this._paired && this._marks.size > 0;
+    this.legacyHighlighting = this._enabled && !this._paired;
   },
 
   // Registered before the caches are primed so a settings change made during
@@ -98,8 +97,8 @@ const requestHeaders = {
       if (HSH.PAIRING_KEY in changes) {
         this._paired = !!changes[HSH.PAIRING_KEY].newValue;
       }
-      if (HSH.MARKS_KEY in changes) {
-        this._marks = new Set(HSH.sanitizeMarks(changes[HSH.MARKS_KEY].newValue));
+      if (HSH.ENABLED_KEY in changes) {
+        this._enabled = changes[HSH.ENABLED_KEY].newValue === true;
       }
       this._updateLegacyHighlighting();
 
@@ -195,7 +194,8 @@ const requestHeaders = {
   _legacyColorFor(cookieStoreId, details) {
     return HSH.legacyColorHeaderValue({
       paired: this._paired,
-      marked: this._marks.has(cookieStoreId),
+      enabled: this._enabled,
+      cookieStoreId,
       firefoxColor: this._containerColors.get(cookieStoreId),
       proxyInfo: details && details.proxyInfo,
     });

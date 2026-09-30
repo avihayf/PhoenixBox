@@ -23,8 +23,8 @@
    * @property {boolean} userAgentEnabled
    * @property {string|null} globalUserAgent
    * @property {Object<string,string>} containerUserAgents
-   * @property {boolean} [legacyHighlighting] not paired with Highlighter v2
-   *   and at least one container marked, so the old JAR's colour header is due.
+   * @property {boolean} [legacyHighlighting] the Highlighter is on but not
+   *   paired with Highlighter v2, so the old JAR's colour header is due.
    *
    * Field names deliberately match the properties on the requestHeaders
    * module, so it can pass `this` straight through. Building a fresh object

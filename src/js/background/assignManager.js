@@ -344,7 +344,7 @@ window.assignManager = {
           proxy.proxyDNS = true;
         }
       }
-      // A container marked for highlighting goes to its own Burp listener.
+      // While highlighting, a container goes to its own Burp listener.
       return highlighterSync.route(cookieStoreId, proxy);
     }
 

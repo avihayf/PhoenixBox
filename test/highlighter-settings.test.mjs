@@ -14,7 +14,7 @@ describe("highlighterSettings (popup)", () => {
   // The popup and the background page each carry these, because the UMD
   // helper cannot be imported into the Vite bundle. Pin them together.
   describe("parity with the background helpers", () => {
-    for (const name of ["MARKS_KEY", "PINS_KEY", "PAIRING_KEY", "STATUS_KEY", "CONNECT_REQUEST_KEY", "AUTO_PAIR_PAUSED_KEY"]) {
+    for (const name of ["ENABLED_KEY", "PINS_KEY", "PAIRING_KEY", "STATUS_KEY", "CONNECT_REQUEST_KEY", "AUTO_PAIR_PAUSED_KEY"]) {
       it(`agrees on ${name}`, () => {
         expect(settings[name]).to.equal(background[name]);
       });
@@ -42,19 +42,6 @@ describe("highlighterSettings (popup)", () => {
         expect(settings.parseAddress(input), String(input)).to.deep.equal(background.parseAddress(input));
       }
     });
-
-    it("agrees on which marks are valid", () => {
-      const marks = ["firefox-container-1", "firefox-container-1", "firefox-default", 3];
-      expect(settings.sanitizeMarks(marks)).to.deep.equal(background.sanitizeMarks(marks));
-    });
-  });
-
-  describe("toggleMark", () => {
-    it("adds and removes one container", () => {
-      expect(settings.toggleMark([], "firefox-container-1")).to.deep.equal(["firefox-container-1"]);
-      expect(settings.toggleMark(["firefox-container-1", "firefox-container-2"], "firefox-container-1"))
-        .to.deep.equal(["firefox-container-2"]);
-    });
   });
 
   describe("isPaired", () => {
@@ -74,6 +61,12 @@ describe("highlighterSettings (popup)", () => {
         .to.equal("Connected to Highlighter · 0 listeners");
     });
 
+    it("says it is off, whatever the last status was", () => {
+      const connected = { state: "connected", addresses: { a: "127.0.0.1:18080" } };
+      expect(settings.describeStatus(connected, true, false)).to.match(/^Off\./);
+      expect(settings.describeStatus(null, false, false)).to.match(/^Off\..*Connect/);
+    });
+
     it("explains each unpaired state, including legacy mode", () => {
       expect(settings.describeStatus(null, false)).to.match(/Not paired/);
       expect(settings.describeStatus({ state: "searching" }, false)).to.match(/Looking for/);
@@ -84,10 +77,10 @@ describe("highlighterSettings (popup)", () => {
   });
 
   describe("isLegacyMode", () => {
-    it("is on only while unpaired with something marked", () => {
-      expect(settings.isLegacyMode(false, ["firefox-container-1"])).to.equal(true);
-      expect(settings.isLegacyMode(true, ["firefox-container-1"])).to.equal(false);
-      expect(settings.isLegacyMode(false, [])).to.equal(false);
+    it("is on only while switched on and unpaired", () => {
+      expect(settings.isLegacyMode(false, true)).to.equal(true);
+      expect(settings.isLegacyMode(true, true)).to.equal(false);
+      expect(settings.isLegacyMode(false, false)).to.equal(false);
     });
   });
 });

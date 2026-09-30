@@ -5,13 +5,14 @@
 /**
  * Pure decision logic for Burp highlighting by listener.
  *
- * Each container marked for highlighting gets its own Burp proxy listener,
- * opened by the PhoenixBox Highlighter JAR. Traffic from that container is
+ * While the Highlighter is on, each container with an open tab gets its own
+ * Burp proxy listener, opened by the PhoenixBox Highlighter JAR. Traffic from that container is
  * routed to its listener, so Burp knows the container from the port a request
  * arrives on. Nothing is ever added to the request itself.
  *
  * The protocol with the JAR is specified in
- * docs/superpowers/specs/2026-09-25-burp-listener-per-container-design.md.
+ * docs/superpowers/specs/2026-09-25-burp-listener-per-container-design.md;
+ * which containers get a listener, in 2026-09-29-highlighter-follows-open-tabs-design.md.
  * Everything here is free of browser APIs so it can be unit tested.
  */
 (function(root, factory) {
@@ -26,6 +27,9 @@
   const PROTOCOL = 1;
 
   // Keep in sync with src/popup-ui/lib/highlighterSettings.ts.
+  // The Highlighter tile's on/off switch.
+  const ENABLED_KEY = "highlighterEnabled";
+  // Retired: containers used to be marked one by one. Read once, to migrate.
   const MARKS_KEY = "highlighterContainerIds";
   const PINS_KEY = "highlighterPins";
   const LAST_ADDRESS_KEY = "highlighterLastAddress";
@@ -45,8 +49,16 @@
   const CONTROL_PORT_FIRST = 8079;
   const CONTROL_PORT_LAST = 8099;
 
-  /** Storage keys from the header-based Highlighter, removed on upgrade. */
+  /**
+   * How long a container keeps its listener after its last tab closes. Each
+   * change to the listener set makes Burp recreate all of its listeners, the
+   * user's own included, so a quick reopen (Ctrl+Shift+T) must not cause two.
+   */
+  const GRACE_MS = 30_000;
+
+  /** Storage keys from earlier Highlighters, removed on upgrade (after initialEnabled has read them). */
   const RETIRED_KEYS = [
+    MARKS_KEY,
     "highlighterHeadersEnabled",
     "addContainerColorHeaderEnabled",
     "highlighterJarAckVersion",
@@ -157,24 +169,124 @@
       : trimmed;
   }
 
-  function sanitizeMarks(value) {
-    if (!Array.isArray(value)) return [];
-    const seen = new Set();
-    for (const id of value) {
-      if (typeof id === "string" && /^firefox-container-\d+$/.test(id)) seen.add(id);
+  /** Only real containers get a listener; the default and private stores never do. */
+  function isHighlightable(cookieStoreId) {
+    return typeof cookieStoreId === "string" && /^firefox-container-\d+$/.test(cookieStoreId);
+  }
+
+  /**
+   * The switch's starting value. Once set it stands; before that, it starts on
+   * for anyone who was already highlighting: 3.0's colour header toggle, or
+   * containers marked by an earlier build of this one.
+   */
+  function initialEnabled(stored) {
+    if (!stored || typeof stored !== "object") return false;
+    if (typeof stored[ENABLED_KEY] === "boolean") return stored[ENABLED_KEY];
+    if (stored.addContainerColorHeaderEnabled === true) return true;
+    const marks = stored[MARKS_KEY];
+    return Array.isArray(marks) && marks.some(isHighlightable);
+  }
+
+  /**
+   * Which containers have open tabs, and when each one's last tab closed.
+   * Mutated by the functions below; `now` is passed in so tests
+   * control time.
+   *
+   * @returns {{tabs: Map<number, string>, closedAt: Map<string, number>}}
+   */
+  function createTabTracker() {
+    return { tabs: new Map(), closedAt: new Map() };
+  }
+
+  function hasTabs(tracker, cookieStoreId) {
+    for (const id of tracker.tabs.values()) {
+      if (id === cookieStoreId) return true;
     }
-    return [...seen];
+    return false;
+  }
+
+  function inGrace(tracker, cookieStoreId, now, graceMs) {
+    const closed = tracker.closedAt.get(cookieStoreId);
+    return closed !== undefined && now - closed < graceMs;
+  }
+
+  /**
+   * Records an open tab.
+   *
+   * @returns {boolean} true when its container had no listener yet, so the
+   *   JAR must be told now. A tab reopened during the grace returns false:
+   *   the listener is still up.
+   */
+  function trackTab(tracker, tabId, cookieStoreId, now, graceMs) {
+    if (!isHighlightable(cookieStoreId)) return false;
+    const opened = !hasTabs(tracker, cookieStoreId) && !inGrace(tracker, cookieStoreId, now, graceMs);
+    tracker.tabs.set(tabId, cookieStoreId);
+    tracker.closedAt.delete(cookieStoreId);
+    return opened;
+  }
+
+  /**
+   * Forgets a closed tab.
+   *
+   * @returns {string|null} the container, when this was its last tab and its
+   *   grace has started.
+   */
+  function untrackTab(tracker, tabId, now) {
+    const cookieStoreId = tracker.tabs.get(tabId);
+    if (cookieStoreId === undefined) return null;
+    tracker.tabs.delete(tabId);
+    if (hasTabs(tracker, cookieStoreId)) return null;
+    tracker.closedAt.set(cookieStoreId, now);
+    return cookieStoreId;
+  }
+
+  /** Firefox swapped a tab for another (e.g. prerendering); the container is the same. */
+  function replaceTab(tracker, addedTabId, removedTabId) {
+    const cookieStoreId = tracker.tabs.get(removedTabId);
+    if (cookieStoreId === undefined) return;
+    tracker.tabs.delete(removedTabId);
+    tracker.tabs.set(addedTabId, cookieStoreId);
+  }
+
+  /** A deleted container: gone at once, no grace. */
+  function forgetContainer(tracker, cookieStoreId) {
+    for (const [tabId, id] of [...tracker.tabs]) {
+      if (id === cookieStoreId) tracker.tabs.delete(tabId);
+    }
+    tracker.closedAt.delete(cookieStoreId);
+  }
+
+  /**
+   * The containers that should have a listener now: those with an open tab,
+   * and those still in their grace. Ended graces are dropped as a side effect.
+   */
+  function activeContainers(tracker, now, graceMs) {
+    const active = new Set(tracker.tabs.values());
+    for (const [id, closed] of [...tracker.closedAt]) {
+      if (now - closed < graceMs) active.add(id);
+      else tracker.closedAt.delete(id);
+    }
+    return [...active];
+  }
+
+  /** When the earliest grace ends, or null when none is running. */
+  function nextGraceExpiry(tracker, graceMs) {
+    let earliest = null;
+    for (const closed of tracker.closedAt.values()) {
+      if (earliest === null || closed < earliest) earliest = closed;
+    }
+    return earliest === null ? null : earliest + graceMs;
   }
 
   /**
    * The full desired state for POST /v1/sync.
    *
-   * Marks for containers that no longer exist are left out rather than sent
-   * with an empty name, so a deleted container's listener closes.
+   * Containers that no longer exist are left out rather than sent with an
+   * empty name, so a deleted container's listener closes.
    *
    * @param {object} state
    * @param {{host: string, port: number}} state.burpPreset
-   * @param {string[]} state.marks
+   * @param {string[]} state.open the containers that should have a listener
    * @param {Map<string, {name?: string, color?: string}>} state.identities
    * @param {Object<string, string>} [state.pins] cookieStoreId -> "ip:port"
    * @param {Object<string, string>} [state.lastAddresses] cookieStoreId -> "ip:port"
@@ -184,7 +296,8 @@
     const lastAddresses = state.lastAddresses || {};
     const containers = [];
 
-    for (const id of sanitizeMarks(state.marks)) {
+    for (const id of new Set(state.open || [])) {
+      if (!isHighlightable(id)) continue;
       const identity = state.identities && state.identities.get(id);
       if (!identity) continue;
 
@@ -274,21 +387,22 @@
   }
 
   /**
-   * The X-MAC-Container-Color value for a request, when PhoenixBox is not
-   * paired with Highlighter v2: the old v1.x JAR highlights by this header, and
-   * an unpaired v2 does too. Null when paired (v2 highlights by listener, and
-   * nothing is sent), for unmarked containers, and off HTTP(S) proxies, where
-   * no Burp is there to strip it. The name is never sent: the published v1.x
-   * JARs do not strip it.
+   * The X-MAC-Container-Color value for a request, when the Highlighter is on
+   * but PhoenixBox is not paired with Highlighter v2: the old v1.x JAR
+   * highlights by this header, and an unpaired v2 does too. Null when off, when
+   * paired (v2 highlights by listener, and nothing is sent), outside a
+   * container, and off HTTP(S) proxies, where no Burp is there to strip it.
+   * The name is never sent: the published v1.x JARs do not strip it.
    *
    * @param {object} state
    * @param {boolean} state.paired
-   * @param {boolean} state.marked
+   * @param {boolean} state.enabled the Highlighter switch
+   * @param {string|undefined} state.cookieStoreId
    * @param {string|undefined} state.firefoxColor the container's Firefox colour
    * @param {object|null|undefined} state.proxyInfo `details.proxyInfo`
    */
   function legacyColorHeaderValue(state) {
-    if (!state || state.paired || !state.marked) return null;
+    if (!state || state.paired || !state.enabled || !isHighlightable(state.cookieStoreId)) return null;
     const type = state.proxyInfo && state.proxyInfo.type;
     if (type !== "http" && type !== "https") return null;
     return COLOR_MAP[state.firefoxColor] || null;
@@ -303,7 +417,7 @@
   }
 
   /**
-   * The proxy list for a highlighted container: its own listener first, the
+   * The proxy list for an open container while highlighting: its own listener first, the
    * preset as a failover. PhoenixBox only uses an address the JAR confirmed,
    * so the failover is a backstop for a listener that dies between syncs.
    */
@@ -316,6 +430,7 @@
 
   return {
     PROTOCOL,
+    ENABLED_KEY,
     MARKS_KEY,
     PINS_KEY,
     LAST_ADDRESS_KEY,
@@ -326,6 +441,7 @@
     AUTO_PAIR_PAUSED_KEY,
     CONTROL_PORT_FIRST,
     CONTROL_PORT_LAST,
+    GRACE_MS,
     RETIRED_KEYS,
     BURP_PRESET_ID,
     DEFAULT_BURP_PRESET,
@@ -338,7 +454,15 @@
     controlEndpoint,
     burpPresetFrom,
     capName,
-    sanitizeMarks,
+    isHighlightable,
+    initialEnabled,
+    createTabTracker,
+    trackTab,
+    untrackTab,
+    replaceTab,
+    forgetContainer,
+    activeContainers,
+    nextGraceExpiry,
     buildSyncBody,
     parseSyncResponse,
     isValidClientId,

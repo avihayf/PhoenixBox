@@ -73,9 +73,10 @@ interface SiteActionsViewProps {
   onProxyUrlChange: (url: string) => void;
   proxyError?: string;
 
-  // Burp highlighting: one Burp listener per marked container
-  highlighterContainerIds: string[];
-  onToggleHighlighterContainer: (container: Container) => void;
+  // Burp highlighting: one Burp listener per open container
+  /** The Highlighter tile's switch: on, every container with an open tab gets its own Burp listener. */
+  highlighterEnabled: boolean;
+  onToggleHighlighter: (enabled: boolean) => Promise<void>;
   highlighterPairing: HighlighterPairing | null;
   highlighterStatus: HighlighterStatus | null;
   onPairHighlighter: (pairing: HighlighterPairing) => Promise<void>;
@@ -133,8 +134,8 @@ export function SiteActionsView({
   proxyUrl,
   onProxyUrlChange,
   proxyError,
-  highlighterContainerIds,
-  onToggleHighlighterContainer,
+  highlighterEnabled,
+  onToggleHighlighter,
   highlighterPairing,
   highlighterStatus,
   onPairHighlighter,
@@ -368,12 +369,18 @@ export function SiteActionsView({
                 disabled={!!proxyToggleDisabled}
                 onClick={() => onToggleProxy(!proxyEnabled)}
               />
-              {/* On means paired and talking to the JAR; containers are marked in the list below. */}
+              {/* On: every container with an open tab gets its own Burp listener. The gear pairs with Burp. */}
               <ControlTile
                 icon={Highlighter}
                 label="Highlighter"
-                active={!!highlighterPairing && highlighterStatus?.state === 'connected'}
-                onClick={() => setShowHighlighterModal(true)}
+                active={highlighterEnabled}
+                onClick={() => {
+                  const next = !highlighterEnabled;
+                  void onToggleHighlighter(next);
+                  // Show the "click Allow in Burp" step the first time it is needed.
+                  if (next && !highlighterPairing) setShowHighlighterModal(true);
+                }}
+                onConfigure={() => setShowHighlighterModal(true)}
               />
               <ControlTile
                 icon={UserCog}
@@ -563,10 +570,7 @@ export function SiteActionsView({
                   const cHex = getContainerColorHex(container.color);
                   const isConfirming = confirmDeleteId === container.cookieStoreId;
                   const isPromoted = promotedProxyContainerIds.includes(container.cookieStoreId);
-                  const isHighlighted = highlighterContainerIds.includes(container.cookieStoreId);
-                  const highlighterError = highlighterStatus?.errors?.[container.cookieStoreId];
-                  const highlighterAddress = highlighterStatus?.addresses?.[container.cookieStoreId];
-                  const pinned = isPromoted || isHighlighted;
+                  const pinned = isPromoted;
                   const hasVisibleTabs = container.visibleTabCount > 0;
                   const hasHiddenTabs = container.hiddenTabCount > 0;
                   const hideActionLabel = hasVisibleTabs ? "Hide" : "Show";
@@ -627,7 +631,7 @@ export function SiteActionsView({
                           <button
                             type="button"
                             onClick={() => onSelectContainer(container)}
-                            className="w-full flex items-center gap-2.5 p-2 pr-[11.5rem] rounded text-left"
+                            className="w-full flex items-center gap-2.5 p-2 pr-[10rem] rounded text-left"
                           >
                             <ContainerIcon iconKey={container.displayIcon || container.icon} colorHex={cHex} />
                             <span className="text-sm text-[var(--ext-text)] flex-1 truncate">{container.name}</span>
@@ -664,31 +668,6 @@ export function SiteActionsView({
                               title={isPromoted ? 'Unpromote from proxy' : 'Promote for proxy'}
                             >
                               <ArrowUp className="w-3 h-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); e.currentTarget.blur(); onToggleHighlighterContainer(container); }}
-                              className={`p-1 rounded transition-colors ${
-                                isHighlighted
-                                  ? 'bg-[var(--ext-accent-bg)]'
-                                  : 'hover:bg-[var(--ext-accent-bg)] focus-visible:bg-[var(--ext-accent-bg)]'
-                              }`}
-                              style={{ color: highlighterError ? 'var(--ext-red)' : 'var(--ext-accent)' }}
-                              aria-pressed={isHighlighted}
-                              aria-label={isHighlighted ? `Stop highlighting ${container.name} in Burp` : `Highlight ${container.name} in Burp`}
-                              title={
-                                !isHighlighted
-                                  ? 'Highlight in Burp: give this container its own Burp listener'
-                                  : !highlighterPairing
-                                    ? 'Highlighted in Burp with the legacy colour header (not paired with Highlighter v2)'
-                                    : highlighterError
-                                      ? `Highlighter: ${highlighterError}`
-                                      : highlighterAddress
-                                        ? `Highlighted in Burp via ${highlighterAddress}`
-                                        : 'Highlighted in Burp (waiting for the Highlighter)'
-                              }
-                            >
-                              <Highlighter className="w-3 h-3" />
                             </button>
                             <button
                               type="button"
@@ -747,6 +726,7 @@ export function SiteActionsView({
       <HighlighterModal
         isOpen={showHighlighterModal}
         onClose={() => setShowHighlighterModal(false)}
+        enabled={highlighterEnabled}
         pairing={highlighterPairing}
         status={highlighterStatus}
         containers={containers}

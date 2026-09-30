@@ -24,11 +24,13 @@ interface ContainerDetailViewProps {
   onCloseTab: (tabId: number) => void;
   onSelectProxyPreset?: (preset: ProxyPreset | null) => void;
   /**
-   * Burp listener, shown only while the container is marked for highlighting.
-   * Resolves to an error message, or null once the pin is saved.
+   * Burp listener, shown only while the Highlighter is on. `onSetPin`
+   * resolves to an error message, or null once the pin is saved.
    */
   burpListener?: {
     address?: string;
+    /** Shown in place of the address while there is none, e.g. "opens with a tab". */
+    idleLabel: string;
     pin?: string;
     error?: string;
     onSetPin: (pin: string | null) => Promise<string | null>;
@@ -288,11 +290,11 @@ function ActionButton({ icon, label, onClick, variant = 'default', accentColor, 
 }
 
 /**
- * Which Burp listener a highlighted container uses, and an optional pin to a
+ * Which Burp listener the container uses while the Highlighter is on, and an optional pin to a
  * specific IP:port, e.g. a listener built in Burp with special settings, which
  * the Highlighter then uses as-is.
  */
-function BurpListenerPin({ address, pin, error, onSetPin }: NonNullable<ContainerDetailViewProps['burpListener']>) {
+function BurpListenerPin({ address, idleLabel, pin, error, onSetPin }: NonNullable<ContainerDetailViewProps['burpListener']>) {
   const [draft, setDraft] = useState(pin || '');
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -308,7 +310,7 @@ function BurpListenerPin({ address, pin, error, onSetPin }: NonNullable<Containe
         <div className="flex items-center gap-2">
           <span className="text-xs text-[var(--ext-text-muted)] uppercase tracking-wider flex-shrink-0">Burp Listener</span>
           <span className="flex-1 min-w-0 text-xs font-mono truncate text-right" style={{ color: error ? 'var(--ext-red)' : 'var(--ext-text)' }}>
-            {error ? 'not listening' : address || 'waiting…'}
+            {error ? 'not listening' : address || idleLabel}
           </span>
         </div>
         <div className="flex gap-1.5">

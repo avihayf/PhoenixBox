@@ -16,9 +16,9 @@ import { type AccentValue, ACCENT_PRESETS, applyCustomHue, clearCustomHue, seria
 import { toProxyType, type Container, type Tab, type AssignedSite } from "../lib/types";
 import * as msg from "../lib/messages";
 import { defaultSecurityIcon } from "../lib/securityProfiles";
-import { MARKS_KEY as HIGHLIGHTER_MARKS_KEY, PAIRING_KEY as HIGHLIGHTER_PAIRING_KEY,
+import { ENABLED_KEY as HIGHLIGHTER_ENABLED_KEY, PAIRING_KEY as HIGHLIGHTER_PAIRING_KEY,
   STATUS_KEY as HIGHLIGHTER_STATUS_KEY, PINS_KEY as HIGHLIGHTER_PINS_KEY,
-  CONNECT_REQUEST_KEY as HIGHLIGHTER_CONNECT_KEY, AUTO_PAIR_PAUSED_KEY as HIGHLIGHTER_AUTO_PAIR_PAUSED_KEY, sanitizeMarks, toggleMark, isPaired,
+  CONNECT_REQUEST_KEY as HIGHLIGHTER_CONNECT_KEY, AUTO_PAIR_PAUSED_KEY as HIGHLIGHTER_AUTO_PAIR_PAUSED_KEY, isPaired,
   parseAddress, formatAddress,
   type HighlighterPairing, type HighlighterStatus } from "../lib/highlighterSettings";
 import { readProxyMap, getProxyForContainer,
@@ -111,7 +111,7 @@ function App() {
   // keystroke rewound the text).
   const selfWrittenProxyUrlsRef = useRef(new Set<string>());
   const quickHideBusyRef = useRef(new Set<string>());
-  const [highlighterContainerIds, setHighlighterContainerIds] = useState<string[]>([]);
+  const [highlighterEnabled, setHighlighterEnabled] = useState(false);
   const [highlighterPairing, setHighlighterPairing] = useState<HighlighterPairing | null>(null);
   const [highlighterStatus, setHighlighterStatus] = useState<HighlighterStatus | null>(null);
   const [highlighterPins, setHighlighterPins] = useState<Record<string, string>>({});
@@ -504,7 +504,7 @@ function App() {
         globalProxyUrl: "",
         globalProxyParsed: null,
         globalProxyCredentialsMissing: false,
-        [HIGHLIGHTER_MARKS_KEY]: [],
+        [HIGHLIGHTER_ENABLED_KEY]: false,
         [HIGHLIGHTER_PAIRING_KEY]: null,
         [HIGHLIGHTER_STATUS_KEY]: null,
         [HIGHLIGHTER_PINS_KEY]: {},
@@ -552,7 +552,7 @@ function App() {
       }
       setProxyUrl(sanitizedStoredProxyUrl);
 
-      setHighlighterContainerIds(sanitizeMarks(stored[HIGHLIGHTER_MARKS_KEY]));
+      setHighlighterEnabled(stored[HIGHLIGHTER_ENABLED_KEY] === true);
       setHighlighterPairing(isPaired(stored[HIGHLIGHTER_PAIRING_KEY]) ? stored[HIGHLIGHTER_PAIRING_KEY] as HighlighterPairing : null);
       setHighlighterStatus((stored[HIGHLIGHTER_STATUS_KEY] as HighlighterStatus | null) || null);
       setHighlighterPins((stored[HIGHLIGHTER_PINS_KEY] as Record<string, string>) || {});
@@ -629,8 +629,8 @@ function App() {
             "Proxy password isn't saved. Re-enter the proxy URL with its password to reconnect."
           );
         }
-        if (changes[HIGHLIGHTER_MARKS_KEY]) {
-          setHighlighterContainerIds(sanitizeMarks(changes[HIGHLIGHTER_MARKS_KEY].newValue));
+        if (changes[HIGHLIGHTER_ENABLED_KEY]) {
+          setHighlighterEnabled(changes[HIGHLIGHTER_ENABLED_KEY].newValue === true);
         }
         if (changes[HIGHLIGHTER_PAIRING_KEY]) {
           const next = changes[HIGHLIGHTER_PAIRING_KEY].newValue;
@@ -947,8 +947,9 @@ function App() {
     return (
       <PopupWrapper>
         <ContainerDetailView
-          burpListener={highlighterContainerIds.includes(selectedContainer.cookieStoreId) ? {
+          burpListener={highlighterEnabled ? {
             address: highlighterStatus?.addresses?.[selectedContainer.cookieStoreId],
+            idleLabel: !highlighterPairing ? 'not paired' : selectedContainer.tabCount > 0 ? 'waiting…' : 'opens with a tab',
             pin: highlighterPins[selectedContainer.cookieStoreId],
             error: highlighterStatus?.errors?.[selectedContainer.cookieStoreId],
             onSetPin: async (pin) => {
@@ -1243,15 +1244,10 @@ function App() {
           });
         }}
         proxyError={globalProxyError}
-        highlighterContainerIds={highlighterContainerIds}
-        onToggleHighlighterContainer={async (container) => {
-          const browser = requireWebExt();
-          // Read-modify-write from storage, not state: the background also edits
-          // this list when a container is deleted.
-          const stored = await browser.storage.local.get({ [HIGHLIGHTER_MARKS_KEY]: [] });
-          const next = toggleMark(sanitizeMarks(stored[HIGHLIGHTER_MARKS_KEY]), container.cookieStoreId);
-          setHighlighterContainerIds(next);
-          await browser.storage.local.set({ [HIGHLIGHTER_MARKS_KEY]: next });
+        highlighterEnabled={highlighterEnabled}
+        onToggleHighlighter={async (enabled) => {
+          setHighlighterEnabled(enabled);
+          await requireWebExt().storage.local.set({ [HIGHLIGHTER_ENABLED_KEY]: enabled });
         }}
         highlighterPairing={highlighterPairing}
         highlighterStatus={highlighterStatus}

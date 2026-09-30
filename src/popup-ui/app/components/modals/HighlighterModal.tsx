@@ -9,6 +9,8 @@ import {
 interface HighlighterModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** The Highlighter tile's switch. */
+  enabled: boolean;
   pairing: HighlighterPairing | null;
   status: HighlighterStatus | null;
   containers: Container[];
@@ -21,9 +23,9 @@ interface HighlighterModalProps {
 /**
  * Pairing with the PhoenixBox Highlighter JAR, and what it is doing. Pairing is
  * automatic (one Allow in Burp); pasting a pairing string is the fallback.
- * Containers are marked for highlighting from the container list, not here.
+ * The Highlighter tile itself turns highlighting on and off.
  */
-export function HighlighterModal({ isOpen, onClose, pairing, status, containers, onPair, onUnpair, onConnect }: HighlighterModalProps) {
+export function HighlighterModal({ isOpen, onClose, enabled, pairing, status, containers, onPair, onUnpair, onConnect }: HighlighterModalProps) {
   const [pairingInput, setPairingInput] = useState('');
   const [error, setError] = useState('');
 
@@ -47,7 +49,7 @@ export function HighlighterModal({ isOpen, onClose, pairing, status, containers,
     setPairingInput('');
   };
 
-  const connected = !!pairing && status?.state === 'connected';
+  const connected = enabled && !!pairing && status?.state === 'connected';
   const nameOf = (id: string) => containers.find((c) => c.cookieStoreId === id)?.name || id;
   const problems = Object.entries(status?.errors || {});
 
@@ -101,10 +103,10 @@ export function HighlighterModal({ isOpen, onClose, pairing, status, containers,
 
           <div className="px-5 pt-4 pb-5 space-y-3.5">
             <p className="text-sm text-[var(--ext-text)] leading-relaxed">
-              Mark containers with the <Highlighter className="inline w-3.5 h-3.5 -mt-0.5 text-[var(--ext-accent)]" /> button in the container list. PhoenixBox finds Phoenix Highlighter in Burp and asks to pair; click <strong>Allow</strong> in Burp once. Paired, each marked container gets its own Burp listener and requests are never modified.
+              Turn the Highlighter tile on. PhoenixBox finds Phoenix Highlighter in Burp and asks to pair; click <strong>Allow</strong> in Burp once. Paired, every container with an open tab gets its own Burp listener, closed 30 seconds after its last tab, and requests are never modified.
             </p>
             <p className="text-xs text-[var(--ext-text-muted)] leading-relaxed">
-              Not paired (an older Highlighter v1.x, or none), marked containers send the <code>X-MAC-Container-Color</code> header instead. Burp colours it and strips it; with no Highlighter loaded, it reaches the site.
+              Not paired (an older Highlighter v1.x, or none), containers send the <code>X-MAC-Container-Color</code> header instead. Burp colours it and strips it; with no Highlighter loaded, it reaches the site.
             </p>
 
             <div
@@ -116,7 +118,7 @@ export function HighlighterModal({ isOpen, onClose, pairing, status, containers,
               role="status"
             >
               <Info className="w-4 h-4 flex-none mt-0.5" style={{ color: status?.state === 'error' ? 'var(--ext-red)' : 'var(--ext-accent)' }} />
-              <p className="text-xs text-[var(--ext-text)] leading-relaxed">{describeStatus(status, !!pairing)}</p>
+              <p className="text-xs text-[var(--ext-text)] leading-relaxed">{describeStatus(status, !!pairing, enabled)}</p>
             </div>
 
             {problems.length > 0 && (

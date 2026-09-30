@@ -11,7 +11,19 @@ const {
   controlEndpoint,
   burpPresetFrom,
   capName,
-  sanitizeMarks,
+  ENABLED_KEY,
+  MARKS_KEY,
+  RETIRED_KEYS,
+  GRACE_MS,
+  initialEnabled,
+  isHighlightable,
+  createTabTracker,
+  trackTab,
+  untrackTab,
+  replaceTab,
+  forgetContainer,
+  activeContainers,
+  nextGraceExpiry,
   buildSyncBody,
   parseSyncResponse,
   isBurpRoute,
@@ -105,11 +117,129 @@ describe("highlighterSyncHelpers", () => {
     });
   });
 
-  describe("sanitizeMarks", () => {
-    it("keeps container ids once and drops everything else", () => {
-      expect(sanitizeMarks(["firefox-container-1", "firefox-container-1", "firefox-default", 7, "x"]))
-        .to.deep.equal(["firefox-container-1"]);
-      expect(sanitizeMarks(null)).to.deep.equal([]);
+  describe("initialEnabled", () => {
+    it("keeps a switch the user has already set", () => {
+      expect(initialEnabled({ [ENABLED_KEY]: true })).to.equal(true);
+      expect(initialEnabled({ [ENABLED_KEY]: false, addContainerColorHeaderEnabled: true })).to.equal(false);
+    });
+
+    it("turns on for 3.0's colour header toggle", () => {
+      expect(initialEnabled({ addContainerColorHeaderEnabled: true })).to.equal(true);
+    });
+
+    it("turns on when containers were marked", () => {
+      expect(initialEnabled({ [MARKS_KEY]: ["firefox-container-1"] })).to.equal(true);
+      expect(initialEnabled({ [MARKS_KEY]: ["firefox-default", 7] })).to.equal(false);
+    });
+
+    it("starts off with nothing to go on", () => {
+      expect(initialEnabled({})).to.equal(false);
+      expect(initialEnabled(null)).to.equal(false);
+    });
+
+    it("retires the marks and 3.0's toggle", () => {
+      expect(RETIRED_KEYS).to.include(MARKS_KEY);
+      expect(RETIRED_KEYS).to.include("addContainerColorHeaderEnabled");
+    });
+  });
+
+  describe("isHighlightable", () => {
+    it("is true only for real containers", () => {
+      expect(isHighlightable("firefox-container-12")).to.equal(true);
+      for (const id of ["firefox-default", "firefox-private", "firefox-container-", "x", undefined, 3]) {
+        expect(isHighlightable(id), String(id)).to.equal(false);
+      }
+    });
+  });
+
+  // Which containers have a listener: those with an open tab, and those whose
+  // last tab closed less than the grace ago.
+  describe("tab tracker", () => {
+    const A = "firefox-container-1";
+    const B = "firefox-container-2";
+    const G = GRACE_MS;
+
+    it("uses a 30 s grace", () => {
+      expect(GRACE_MS).to.equal(30_000);
+    });
+
+    it("counts several tabs of one container once, and says when it opens", () => {
+      const t = createTabTracker();
+      expect(trackTab(t, 1, A, 0, G)).to.equal(true);
+      expect(trackTab(t, 2, A, 0, G)).to.equal(false);
+      expect(trackTab(t, 2, A, 0, G)).to.equal(false); // seen twice (startup query, then onCreated)
+      expect(activeContainers(t, 0, G)).to.deep.equal([A]);
+    });
+
+    it("ignores default and private tabs", () => {
+      const t = createTabTracker();
+      expect(trackTab(t, 1, "firefox-default", 0, G)).to.equal(false);
+      expect(trackTab(t, 2, "firefox-private", 0, G)).to.equal(false);
+      expect(activeContainers(t, 0, G)).to.deep.equal([]);
+      expect(untrackTab(t, 1, 0)).to.equal(null);
+    });
+
+    it("keeps a container while any of its tabs is open", () => {
+      const t = createTabTracker();
+      trackTab(t, 1, A, 0, G);
+      trackTab(t, 2, A, 0, G);
+      expect(untrackTab(t, 1, 5)).to.equal(null);
+      expect(activeContainers(t, 5, G)).to.deep.equal([A]);
+      expect(nextGraceExpiry(t, G)).to.equal(null);
+    });
+
+    it("keeps a container through the grace after its last tab, then drops it", () => {
+      const t = createTabTracker();
+      trackTab(t, 1, A, 0, G);
+      expect(untrackTab(t, 1, 1000)).to.equal(A);
+      expect(activeContainers(t, 1000 + G - 1, G)).to.deep.equal([A]);
+      expect(nextGraceExpiry(t, G)).to.equal(1000 + G);
+      expect(activeContainers(t, 1000 + G, G)).to.deep.equal([]);
+    });
+
+    it("reuses the listener when a tab reopens during the grace", () => {
+      const t = createTabTracker();
+      trackTab(t, 1, A, 0, G);
+      untrackTab(t, 1, 1000);
+      expect(trackTab(t, 7, A, 5000, G)).to.equal(false); // no sync needed: the listener is still up
+      expect(nextGraceExpiry(t, G)).to.equal(null);
+      expect(activeContainers(t, 1000 + G * 2, G)).to.deep.equal([A]);
+    });
+
+    it("opens again after the grace ran out", () => {
+      const t = createTabTracker();
+      trackTab(t, 1, A, 0, G);
+      untrackTab(t, 1, 1000);
+      expect(trackTab(t, 7, A, 1000 + G, G)).to.equal(true);
+    });
+
+    it("wakes for the earliest grace to end, and forgets ended ones", () => {
+      const t = createTabTracker();
+      trackTab(t, 1, A, 0, G);
+      trackTab(t, 2, B, 0, G);
+      untrackTab(t, 2, 500);
+      untrackTab(t, 1, 900);
+      expect(nextGraceExpiry(t, G)).to.equal(500 + G);
+      activeContainers(t, 500 + G, G);
+      expect(nextGraceExpiry(t, G)).to.equal(900 + G);
+    });
+
+    it("keeps the container when Firefox replaces a tab", () => {
+      const t = createTabTracker();
+      trackTab(t, 1, A, 0, G);
+      replaceTab(t, 9, 1);
+      expect(untrackTab(t, 1, 5)).to.equal(null);
+      expect(activeContainers(t, 5, G)).to.deep.equal([A]);
+      expect(untrackTab(t, 9, 6)).to.equal(A);
+    });
+
+    it("drops a deleted container at once, with no grace", () => {
+      const t = createTabTracker();
+      trackTab(t, 1, A, 0, G);
+      untrackTab(t, 1, 10);
+      forgetContainer(t, A);
+      expect(activeContainers(t, 11, G)).to.deep.equal([]);
+      expect(nextGraceExpiry(t, G)).to.equal(null);
     });
   });
 
@@ -122,7 +252,7 @@ describe("highlighterSyncHelpers", () => {
     it("sends the full desired state with mapped colours", () => {
       const body = buildSyncBody({
         burpPreset: BURP,
-        marks: ["firefox-container-1", "firefox-container-2"],
+        open: ["firefox-container-1", "firefox-container-2"],
         identities,
         pins: { "firefox-container-2": "192.168.10.5:8080" },
         lastAddresses: { "firefox-container-1": "127.0.0.1:18080" },
@@ -139,15 +269,15 @@ describe("highlighterSyncHelpers", () => {
       });
     });
 
-    it("leaves out marks for containers that no longer exist", () => {
-      const body = buildSyncBody({ burpPreset: BURP, marks: ["firefox-container-9"], identities });
+    it("leaves out containers that no longer exist, and anything that isn't one", () => {
+      const body = buildSyncBody({ burpPreset: BURP, open: ["firefox-container-9", "firefox-default"], identities });
       expect(body.containers).to.deep.equal([]);
     });
 
     it("drops a malformed pin or remembered address instead of sending it", () => {
       const body = buildSyncBody({
         burpPreset: BURP,
-        marks: ["firefox-container-1"],
+        open: ["firefox-container-1"],
         identities,
         pins: { "firefox-container-1": "not an address" },
         lastAddresses: { "firefox-container-1": "nope" },
@@ -204,7 +334,7 @@ describe("highlighterSyncHelpers", () => {
       expect(isBurpRoute(null, BURP)).to.equal(false);
     });
 
-    it("sends a marked container to its own listener with the preset as failover", () => {
+    it("sends an open container to its own listener with the preset as failover", () => {
       const withCredentials = { ...burpProxy, username: "u", password: "p" };
       expect(highlightedRoute(withCredentials, { host: "127.0.0.1", port: 18080 })).to.deep.equal([
         { type: "http", host: "127.0.0.1", port: 18080, username: "u", password: "p", failoverTimeout: 1 },
@@ -213,12 +343,12 @@ describe("highlighterSyncHelpers", () => {
     });
   });
 
-  // Not paired with Highlighter v2: marked containers carry the old JAR's colour header.
+  // On but not paired with Highlighter v2: every container carries the old JAR's colour header.
   describe("legacyColorHeaderValue", () => {
     const http = { type: "http", host: "127.0.0.1", port: 8080 };
-    const base = { paired: false, marked: true, firefoxColor: "turquoise", proxyInfo: http };
+    const base = { paired: false, enabled: true, cookieStoreId: "firefox-container-4", firefoxColor: "turquoise", proxyInfo: http };
 
-    it("sends the mapped colour for a marked container going through an HTTP proxy", () => {
+    it("sends the mapped colour for any container going through an HTTP proxy", () => {
       expect(legacyColorHeaderValue(base)).to.equal("cyan");
       expect(legacyColorHeaderValue({ ...base, proxyInfo: { ...http, type: "https" } })).to.equal("cyan");
     });
@@ -227,8 +357,12 @@ describe("highlighterSyncHelpers", () => {
       expect(legacyColorHeaderValue({ ...base, paired: true })).to.equal(null);
     });
 
-    it("sends nothing for unmarked containers", () => {
-      expect(legacyColorHeaderValue({ ...base, marked: false })).to.equal(null);
+    it("sends nothing while the Highlighter is off", () => {
+      expect(legacyColorHeaderValue({ ...base, enabled: false })).to.equal(null);
+    });
+
+    it("sends nothing outside a container", () => {
+      expect(legacyColorHeaderValue({ ...base, cookieStoreId: "firefox-default" })).to.equal(null);
     });
 
     it("sends nothing off an HTTP proxy, where no Burp would strip it", () => {

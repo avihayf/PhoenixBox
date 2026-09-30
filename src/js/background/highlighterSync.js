@@ -3,18 +3,22 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /**
- * Keeps the PhoenixBox Highlighter JAR in step with the containers marked for
- * highlighting, and tells the proxy handler which Burp listener each marked
- * container's traffic should go to.
+ * While the Highlighter switch is on, keeps the PhoenixBox Highlighter JAR in
+ * step with the containers that have open tabs, and tells the proxy handler
+ * which Burp listener each one's traffic should go to. Several tabs of one
+ * container share a listener; after its last tab closes, a container keeps
+ * its listener for a 30 s grace, so a quick reopen does not make Burp
+ * recreate its listeners twice.
  *
- * Pairing is automatic: while unpaired and something is marked (or the user
+ * Pairing is automatic: while unpaired and switched on (or when the user
  * presses Connect), PhoenixBox looks for Highlighter v2 on the Burp preset's
  * host and asks to pair; the user clicks Allow once in Burp. Until then,
- * marked containers use the legacy colour header (background/requestHeaders.js).
+ * containers use the legacy colour header (background/requestHeaders.js).
  *
- * Every sync sends the full list of marks, so a lost request or a restart on
- * either side is repaired by the next one; a 10 s heartbeat also keeps the
- * JAR's lease alive. Only listeners the JAR reports as up are ever routed to.
+ * Every sync sends the full set of open containers, so a lost request or a
+ * restart on either side is repaired by the next one; a 10 s heartbeat also
+ * keeps the JAR's lease alive. Only listeners the JAR reports as up are ever
+ * routed to.
  *
  * Decisions live in shared/highlighterSyncHelpers.js, which is unit tested.
  */
@@ -29,10 +33,14 @@ const HEARTBEAT_MS = 10_000;
 // than at the next heartbeat.
 const RETRY_MS = 5_000;
 const DEBOUNCE_MS = 300;
+// A container's first tab: sync almost at once, since its first request is
+// waiting, but still coalesce a burst (a restored session, a new window).
+const OPEN_DEBOUNCE_MS = 50;
 const REQUEST_TIMEOUT_MS = 5_000;
-// How long a request from a just-marked container waits for its listener
-// before going to the preset unhighlighted.
-const FIRST_REQUEST_WAIT_MS = 500;
+// How long a request from a just-opened container waits for its listener
+// before going to the preset unhighlighted: Burp has to recreate its
+// listeners first.
+const FIRST_REQUEST_WAIT_MS = 1_500;
 // Discovery: each probe gets this long; a miss is retried every minute, and
 // every five after ten misses (an old JAR, or none, is not going to change).
 const HELLO_TIMEOUT_MS = 1_000;
@@ -44,8 +52,10 @@ const PAIR_POLL_MS = 2_000;
 const PAIR_WAIT_MS = 120_000;
 
 const highlighterSync = {
-  /** @type {Set<string>} */
-  marks: new Set(),
+  /** The Highlighter tile's switch. */
+  enabled: false,
+  /** Open tabs per container, and graces; see HS.createTabTracker. */
+  tracker: HS.createTabTracker(),
   pins: {},
   lastAddresses: {},
   /** @type {{host: string, port: number, token: string}|null} */
@@ -57,10 +67,8 @@ const highlighterSync = {
   addresses: new Map(),
 
   _timer: null,
+  _graceTimer: null,
   _lastStatus: null,
-  // True while no browser window is open: nothing is syncing, and Burp has
-  // been told to close the listeners.
-  _noWindows: false,
   // Auto-pairing. Not persisted: after a restart PhoenixBox simply looks again.
   /** @type {{host: string, port: number, since: number}|null} waiting for Allow in Burp */
   _pendingPair: null,
@@ -74,12 +82,22 @@ const highlighterSync = {
   /** Resolves when the next sync finishes; null when none is scheduled. */
   _nextSync: null,
   _resolveNextSync: null,
+  /** Resolves when the sync in flight finishes; null when none is. */
+  _currentSync: null,
+  /**
+   * Containers whose first tab just opened and whose listener the next sync
+   * asks for. Only their requests wait for it: waiting on every sync would
+   * stall all browsing while the Highlighter can't be reached.
+   * @type {Set<string>}
+   */
+  _justOpened: new Set(),
 
   async init() {
-    await browser.storage.local.remove(HS.RETIRED_KEYS);
-
     const stored = await browser.storage.local.get({
+      [HS.ENABLED_KEY]: null,
+      // Read once, for the migration, before the retired keys go.
       [HS.MARKS_KEY]: [],
+      addContainerColorHeaderEnabled: false,
       [HS.PINS_KEY]: {},
       [HS.LAST_ADDRESS_KEY]: {},
       [HS.PAIRING_KEY]: null,
@@ -87,7 +105,11 @@ const highlighterSync = {
       customProxyPresets: [],
     });
     this._autoPairPaused = !!stored[HS.AUTO_PAIR_PAUSED_KEY];
-    this.marks = new Set(HS.sanitizeMarks(stored[HS.MARKS_KEY]));
+    this.enabled = HS.initialEnabled(stored);
+    if (stored[HS.ENABLED_KEY] !== this.enabled) {
+      await browser.storage.local.set({ [HS.ENABLED_KEY]: this.enabled });
+    }
+    await browser.storage.local.remove(HS.RETIRED_KEYS);
     this.pins = stored[HS.PINS_KEY] || {};
     this.lastAddresses = stored[HS.LAST_ADDRESS_KEY] || {};
     this.pairing = this._readPairing(stored[HS.PAIRING_KEY]);
@@ -95,34 +117,37 @@ const highlighterSync = {
 
     this._watchSettings();
     this._watchContainers();
-    await this._loadIdentities();
+    // Watch before listing, so a tab opened meanwhile is not missed.
+    this._watchTabs();
+    await Promise.all([this._loadIdentities(), this._loadTabs()]);
 
-    this._watchWindows();
     setInterval(() => {
-      if (!this._noWindows) this.schedule(0);
+      if (this.enabled || this._pendingPair) this.schedule(0);
     }, HEARTBEAT_MS);
     this.schedule(0);
   },
 
   /**
-   * The proxy for a request PhoenixBox has already routed. A marked container
-   * going to the Burp preset is sent to its own listener instead, with the
-   * preset as failover; everything else is returned unchanged.
+   * The proxy for a request PhoenixBox has already routed. A container going
+   * to the Burp preset is sent to its own listener instead, with the preset
+   * as failover; everything else is returned unchanged.
    */
   async route(cookieStoreId, proxy) {
-    if (!this.pairing || !this.marks.has(cookieStoreId) || !HS.isBurpRoute(proxy, this.burpPreset)) {
+    if (!this.enabled || !this.pairing || !HS.isHighlightable(cookieStoreId) ||
+        !HS.isBurpRoute(proxy, this.burpPreset)) {
       return proxy;
     }
 
     let address = this.addresses.get(cookieStoreId);
-    if (!address && this._nextSync) {
-      await Promise.race([this._nextSync, new Promise((resolve) => setTimeout(resolve, FIRST_REQUEST_WAIT_MS))]);
+    const pending = this._nextSync || this._currentSync;
+    if (!address && pending && this._justOpened.has(cookieStoreId)) {
+      await Promise.race([pending, new Promise((resolve) => setTimeout(resolve, FIRST_REQUEST_WAIT_MS))]);
       address = this.addresses.get(cookieStoreId);
     }
     return address ? HS.highlightedRoute(proxy, address) : proxy;
   },
 
-  /** Coalesces bursts of changes (e.g. marking several containers) into one sync. */
+  /** Coalesces bursts of changes (e.g. a restored session's tabs) into one sync. */
   schedule(delay = DEBOUNCE_MS) {
     if (!this._nextSync) {
       this._nextSync = new Promise((resolve) => { this._resolveNextSync = resolve; });
@@ -138,8 +163,11 @@ const highlighterSync = {
     }
     this._inFlight = true;
     const resolve = this._resolveNextSync;
+    this._currentSync = this._nextSync;
     this._nextSync = null;
     this._resolveNextSync = null;
+    // Answered by this sync, whatever its outcome; later requests don't wait.
+    const opening = [...this._justOpened];
 
     let unreachable = false;
     try {
@@ -148,6 +176,8 @@ const highlighterSync = {
       LOG.warn("highlighterSync: sync failed", e);
     } finally {
       this._inFlight = false;
+      for (const id of opening) this._justOpened.delete(id);
+      this._currentSync = null;
       if (resolve) resolve();
       if (this._again) {
         this._again = false;
@@ -160,19 +190,21 @@ const highlighterSync = {
 
   /** @returns {Promise<"unreachable"|undefined>} "unreachable" when the JAR could not be contacted at all. */
   async _syncOnce() {
-    // Every window is closed: keep Burp's listeners closed until one opens.
-    if (this._noWindows) return;
-
     if (!this.pairing) {
       this.addresses = new Map();
       await this._autoPair();
+      return;
+    }
+    // Switched off: the listeners were released when it was turned off.
+    if (!this.enabled) {
+      await this._writeStatus({ state: "off" });
       return;
     }
 
     const endpoint = HS.controlEndpoint(this.pairing, this.burpPreset);
     const body = HS.buildSyncBody({
       burpPreset: this.burpPreset,
-      marks: [...this.marks],
+      open: this._active(),
       identities: this.identities,
       pins: this.pins,
       lastAddresses: this.lastAddresses,
@@ -200,7 +232,7 @@ const highlighterSync = {
     }
 
     if (response.status === 401) {
-      // Revoked in Burp. Drop the pairing: marked containers go back to the
+      // Revoked in Burp. Drop the pairing: containers go back to the
       // legacy colour header, and PhoenixBox asks to pair again.
       this.addresses = new Map();
       this._nextDiscoveryAt = 0;
@@ -221,6 +253,8 @@ const highlighterSync = {
       return;
     }
 
+    // Turned off while this sync was in flight: route nothing to them.
+    if (!this.enabled) return;
     this.addresses = parsed.addresses;
     await this._rememberAddresses(parsed.addresses);
 
@@ -236,13 +270,13 @@ const highlighterSync = {
 
   /**
    * Looks for Highlighter v2 and asks to pair. Probes Burp only when there is
-   * a reason: something is marked, or the user pressed Connect.
+   * a reason: the switch is on, or the user pressed Connect.
    */
   async _autoPair() {
     const asked = this._connectRequested;
     this._connectRequested = false;
 
-    if ((this.marks.size === 0 || this._autoPairPaused) && !asked && !this._pendingPair) {
+    if ((!this.enabled || this._autoPairPaused) && !asked && !this._pendingPair) {
       await this._writeStatus({ state: "unpaired" });
       return;
     }
@@ -368,10 +402,10 @@ const highlighterSync = {
   },
 
   /**
-   * On unpairing, tells the JAR to close every listener and leave paired mode
-   * now, rather than when its lease runs out: PhoenixBox is about to send the
-   * legacy colour header, which the JAR only strips while unpaired. Best
-   * effort: the lease still ends it if this fails.
+   * On unpairing or switching off, tells the JAR to close every listener and
+   * leave paired mode now, rather than when its lease runs out: unpaired,
+   * PhoenixBox is about to send the legacy colour header, which the JAR only
+   * strips while unpaired. Best effort: the lease still ends it if this fails.
    */
   async _closeListeners(pairing) {
     const endpoint = HS.controlEndpoint(pairing, this.burpPreset);
@@ -425,16 +459,25 @@ const highlighterSync = {
       if (areaName !== "local") return;
       let resync = false;
 
-      if (HS.MARKS_KEY in changes) {
-        this.marks = new Set(HS.sanitizeMarks(changes[HS.MARKS_KEY].newValue));
-        // Marking while unpaired is a reason to look for the Highlighter now.
-        if (!this.pairing) this._nextDiscoveryAt = 0;
-        // An unmarked container stops being routed to its listener at once,
-        // before the JAR has even been told to close it.
-        for (const id of [...this.addresses.keys()]) {
-          if (!this.marks.has(id)) this.addresses.delete(id);
+      if (HS.ENABLED_KEY in changes) {
+        const enabled = changes[HS.ENABLED_KEY].newValue === true;
+        if (enabled !== this.enabled) {
+          this.enabled = enabled;
+          if (enabled) {
+            // Switching on while unpaired is a reason to look for the Highlighter now.
+            if (!this.pairing) this._nextDiscoveryAt = 0;
+          } else {
+            // Nothing is routed to a listener from now on, graces included,
+            // and Burp closes them at once rather than at the lease's end.
+            this.addresses = new Map();
+            this.tracker.closedAt.clear();
+            this._armGraceTimer();
+            if (this.pairing) {
+              this._closeListeners(this.pairing).catch(() => {});
+            }
+          }
+          resync = true;
         }
-        resync = true;
       }
       if (HS.PINS_KEY in changes) {
         this.pins = changes[HS.PINS_KEY].newValue || {};
@@ -472,31 +515,64 @@ const highlighterSync = {
   },
 
   /**
-   * Closing the last browser window closes Burp's container listeners at
-   * once, leaving only the user's own. Opening a window brings them back.
-   * Quitting or crashing may give no chance to say so; the JAR's 30 s lease
-   * covers that.
+   * Tracks which containers have open tabs. Tabs keep being tracked while the
+   * switch is off, so turning it on opens the right listeners at once. Closing
+   * the last window is no different from closing every tab: each container
+   * gets its grace. A quit or a crash is covered by the JAR's 30 s lease.
    */
-  _watchWindows() {
-    if (!browser.windows) return;
-    browser.windows.onRemoved.addListener(() => {
-      this._releaseIfNoWindows().catch((e) => LOG.warn("highlighterSync: release on last window failed", e));
-    });
-    browser.windows.onCreated.addListener((window) => {
-      if (this._noWindows && (!window || window.type === "normal")) {
-        this._noWindows = false;
-        this.schedule(0);
+  _watchTabs() {
+    browser.tabs.onCreated.addListener((tab) => {
+      if (!tab) return;
+      if (HS.trackTab(this.tracker, tab.id, tab.cookieStoreId, Date.now(), HS.GRACE_MS) && this.enabled) {
+        this._justOpened.add(tab.cookieStoreId);
+        this.schedule(OPEN_DEBOUNCE_MS);
       }
+      // A tab reopened during its container's grace ends it: no sync needed.
+      this._armGraceTimer();
     });
+    browser.tabs.onRemoved.addListener((tabId) => {
+      if (HS.untrackTab(this.tracker, tabId, Date.now())) this._armGraceTimer();
+    });
+    if (browser.tabs.onReplaced) {
+      browser.tabs.onReplaced.addListener((addedTabId, removedTabId) => {
+        HS.replaceTab(this.tracker, addedTabId, removedTabId);
+      });
+    }
   },
 
-  async _releaseIfNoWindows() {
-    const windows = await browser.windows.getAll({ windowTypes: ["normal"] });
-    if (windows.length > 0 || this._noWindows) return;
+  async _loadTabs() {
+    try {
+      const now = Date.now();
+      for (const tab of await browser.tabs.query({})) {
+        HS.trackTab(this.tracker, tab.id, tab.cookieStoreId, now, HS.GRACE_MS);
+      }
+    } catch (e) {
+      LOG.warn("highlighterSync: could not read tabs", e);
+    }
+  },
 
-    this._noWindows = true;
-    this.addresses = new Map();
-    if (this.pairing) await this._closeListeners(this.pairing);
+  /** The containers that should have a listener now. */
+  _active() {
+    return HS.activeContainers(this.tracker, Date.now(), HS.GRACE_MS);
+  },
+
+  /**
+   * Wakes when the earliest grace ends, so the JAR closes that listener
+   * within a moment of it, not at the next heartbeat.
+   */
+  _armGraceTimer() {
+    clearTimeout(this._graceTimer);
+    this._graceTimer = null;
+    const at = HS.nextGraceExpiry(this.tracker, HS.GRACE_MS);
+    if (at === null) return;
+    this._graceTimer = setTimeout(() => {
+      const active = new Set(this._active()); // drops the ended graces
+      for (const id of [...this.addresses.keys()]) {
+        if (!active.has(id)) this.addresses.delete(id);
+      }
+      this._armGraceTimer();
+      if (this.enabled) this.schedule(0);
+    }, Math.max(0, at - Date.now()));
   },
 
   _watchContainers() {
@@ -510,7 +586,7 @@ const highlighterSync = {
         color: contextualIdentity.color,
       });
       const changed = !previous || previous.name !== contextualIdentity.name || previous.color !== contextualIdentity.color;
-      if (changed && this.marks.has(contextualIdentity.cookieStoreId)) this.schedule();
+      if (changed && this.enabled && this._active().includes(contextualIdentity.cookieStoreId)) this.schedule();
     };
 
     browser.contextualIdentities.onCreated.addListener(upsert);
@@ -519,27 +595,25 @@ const highlighterSync = {
       if (!contextualIdentity) return;
       const id = contextualIdentity.cookieStoreId;
       this.identities.delete(id);
+      // Gone at once, no grace: its tabs are closing and it cannot come back.
+      HS.forgetContainer(this.tracker, id);
+      this.addresses.delete(id);
+      this._armGraceTimer();
+      if (this.enabled) this.schedule();
       this._forget(id).catch((e) => LOG.warn("highlighterSync: could not forget a deleted container", e));
     });
   },
 
-  /** A deleted container loses its mark, pin and remembered address. */
+  /** A deleted container loses its pin and remembered address. */
   async _forget(id) {
-    const stored = await browser.storage.local.get({
-      [HS.MARKS_KEY]: [], [HS.PINS_KEY]: {}, [HS.LAST_ADDRESS_KEY]: {},
-    });
-    const marks = HS.sanitizeMarks(stored[HS.MARKS_KEY]);
+    const stored = await browser.storage.local.get({ [HS.PINS_KEY]: {}, [HS.LAST_ADDRESS_KEY]: {} });
     const pins = { ...stored[HS.PINS_KEY] };
     const last = { ...stored[HS.LAST_ADDRESS_KEY] };
-    if (!marks.includes(id) && !(id in pins) && !(id in last)) return;
+    if (!(id in pins) && !(id in last)) return;
 
     delete pins[id];
     delete last[id];
-    await browser.storage.local.set({
-      [HS.MARKS_KEY]: marks.filter((m) => m !== id),
-      [HS.PINS_KEY]: pins,
-      [HS.LAST_ADDRESS_KEY]: last,
-    });
+    await browser.storage.local.set({ [HS.PINS_KEY]: pins, [HS.LAST_ADDRESS_KEY]: last });
   },
 
   async _loadIdentities() {
