@@ -196,10 +196,10 @@ npm run package
    - "PhoenixBox Highlighter v2.0.0" should appear with checkmark
    - Burp has a new **PhoenixBox** tab
 
-4. **Pair and mark containers in Firefox**
-   - Select the **Burp Suite** proxy preset in PhoenixBox, then mark a container with the highlighter button
+4. **Turn on the Highlighter and pair in Firefox**
+   - Select the **Burp Suite** proxy preset in PhoenixBox, then turn on the **Highlighter** tile
    - Burp asks whether to pair PhoenixBox: click **Allow**. No copy-paste; it asks once per Firefox profile
-   - Mark containers with the highlighter button next to **Promote**
+   - Every container with an open tab now gets its own Burp listener
 
 ### Requirements
 
@@ -273,13 +273,13 @@ See [BURP_SUITE_SETUP.md](BURP_SUITE_SETUP.md) for detailed setup.
 
 ### Requests Not Highlighted in Burp
 
-**Problem**: A marked container's requests aren't coloured in Burp
+**Problem**: A container's requests aren't coloured in Burp
 
 **Solutions**:
-1. Open the PhoenixBox **Highlighter** tile: it should say *Connected*. If not, pair again.
+1. The **Highlighter** tile must be on; its gear should say *Connected*. If not, pair again.
 2. Verify Phoenix Highlighter v2.0.0+ is loaded in Burp and its **PhoenixBox** tab lists the container
 3. Make sure the container's traffic goes through the Burp preset (and is promoted, if you promote containers)
-4. Hover the container's highlighter button for any error, e.g. a pinned address in use
+4. Open the container: **Burp Listener** shows any error, e.g. a pinned address in use
 
 ---
 

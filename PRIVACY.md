@@ -29,7 +29,7 @@ It does not read page content at any other time.
 PhoenixBox does, however, intentionally interact with the sites you browse as part of its core functionality:
 
 - It can modify outbound requests by overriding the `User-Agent` header
-- It can send the traffic of containers you mark for Burp highlighting to a dedicated Burp listener (see Burp Suite Integration below); requests themselves are not modified for this
+- While Burp highlighting is on, it can send each container's traffic to a dedicated Burp listener (see Burp Suite Integration below); requests themselves are not modified for this
 - It can route your traffic through user-configured proxies or Mozilla VPN integration
 
 These behaviors are product features for security testing workflows, not telemetry.
@@ -40,7 +40,7 @@ PhoenixBox requires certain browser permissions to function:
 
 ### Core Permissions
 
-- **`<all_urls>`**: Required to apply per-container proxy settings (including routing highlighted containers to their Burp listeners) and User-Agent overrides to any site you visit during security testing.
+- **`<all_urls>`**: Required to apply per-container proxy settings (including routing containers to their Burp listeners) and User-Agent overrides to any site you visit during security testing.
 
 - **`webRequest` and `webRequestBlocking`**: Required to override User-Agent strings per container, to add the legacy `X-MAC-Container-Color` header for Burp highlighting when PhoenixBox is not paired (see Burp Suite Integration), and to answer proxy authentication challenges.
 
@@ -70,7 +70,7 @@ The extension may make the following external connections:
 
 This is the only connection PhoenixBox makes to a service on the internet. It is explicitly allowed in the Content Security Policy and can be avoided by not using the User-Agent override feature.
 
-2. **Phoenix Highlighter (Burp Suite)**: when containers are marked for highlighting, or you press Connect, PhoenixBox looks for the Highlighter extension on your Burp proxy's host, over HTTP on ports 8079–8099, and asks to pair. Once you approve it in Burp, PhoenixBox sends it the list of containers you marked (container ID, name and colour). This goes only to your own Burp, normally on `127.0.0.1`, and nowhere else. The Content Security Policy allows only the Highlighter's control ports (8079–8099).
+2. **Phoenix Highlighter (Burp Suite)**: when you turn Burp highlighting on, or press Connect, PhoenixBox looks for the Highlighter extension on your Burp proxy's host, over HTTP on ports 8079–8099, and asks to pair. Once you approve it in Burp, PhoenixBox sends it the list of containers that have open tabs (container ID, name and colour). This goes only to your own Burp, normally on `127.0.0.1`, and nowhere else. The Content Security Policy allows only the Highlighter's control ports (8079–8099).
 
 3. **Optional Firefox Sync**: If you explicitly enable sync, PhoenixBox stores supported configuration data in `browser.storage.sync`, which is tied to your Mozilla account. Passwords are not synced, and proxy authentication passwords are never written to extension storage.
 
@@ -84,12 +84,12 @@ If you explicitly enable the Mozilla VPN integration feature and grant the `nati
 
 ### Burp Suite Integration
 
-Burp highlighting works in one of two modes, for the containers you mark with the Highlighter button:
+Burp highlighting is off until you turn on the Highlighter tile. It then works in one of two modes:
 
-- **Paired with Phoenix Highlighter v2.0.0 or later:** requests are not modified. Each marked container gets its own Burp proxy listener, opened by the Burp extension, and PhoenixBox sends that container's traffic to it. Burp tells which container a request came from by the listener it arrived on.
-- **Not paired** (an older Highlighter v1.x, or none): PhoenixBox adds an `X-MAC-Container-Color` header, holding just the container's colour, to marked containers' requests that go through an HTTP proxy. The Burp extension colours those requests and strips the header. **If no Highlighter is loaded in Burp, the header reaches the site.** The container's name is never sent.
+- **Paired with Phoenix Highlighter v2.0.0 or later:** requests are not modified. Each container with an open tab gets its own Burp proxy listener, opened by the Burp extension, and PhoenixBox sends that container's traffic to it. Burp tells which container a request came from by the listener it arrived on.
+- **Not paired** (an older Highlighter v1.x, or none): PhoenixBox adds an `X-MAC-Container-Color` header, holding just the container's colour, to containers' requests that go through an HTTP proxy. The Burp extension colours those requests and strips the header. **If no Highlighter is loaded in Burp, the header reaches the site.** The container's name is never sent.
 
-Pairing is automatic: when containers are marked, or you press Connect, PhoenixBox looks for the Burp extension on your Burp proxy's host (ports 8079–8099) and asks to pair, and you approve it once in Burp. Burp then gives PhoenixBox a secret token. PhoenixBox sends the Burp extension the ID, name and colour of each marked container, so Burp can colour and name its traffic. The token and a random ID for this Firefox profile are stored in local extension storage and are never synced.
+Pairing is automatic: when highlighting is on, or you press Connect, PhoenixBox looks for the Burp extension on your Burp proxy's host (ports 8079–8099) and asks to pair, and you approve it once in Burp. Burp then gives PhoenixBox a secret token. PhoenixBox sends the Burp extension the ID, name and colour of each open container, so Burp can colour and name its traffic. The token and a random ID for this Firefox profile are stored in local extension storage and are never synced.
 
 ## Data Sharing
 

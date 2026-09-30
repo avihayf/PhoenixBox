@@ -1,5 +1,7 @@
 # Header-free Burp highlighting: one Burp listener per marked container
 
+> **Amended 2026-09-29** by `2026-09-29-highlighter-follows-open-tabs-design.md`: containers are no longer marked. With the Highlighter switch on, every container with an open tab has a listener, kept for 30 s after its last tab. The protocol below is unchanged; "marked containers" now means "open containers".
+
 Status: approved 2026-09-25. Spans this repo and `PhoenixBox-Highlighter` (the Burp JAR).
 
 ## Why

@@ -4,7 +4,7 @@ PhoenixBox colours your Burp Suite traffic by container, and notes which contain
 
 | | Paired with Phoenix Highlighter **v2.0.0+** | Not paired (Highlighter **v1.x**, or unpaired v2) |
 |---|---|---|
-| How Burp knows the container | the Burp listener the request arrives on (one per marked container) | an `X-MAC-Container-Color` header PhoenixBox adds |
+| How Burp knows the container | the Burp listener the request arrives on (one per container with an open tab) | an `X-MAC-Container-Color` header PhoenixBox adds |
 | Requests modified | **no** | the colour header, which the Highlighter strips |
 | Burp shows | the container's colour, and its name in **Notes** | the container's colour only |
 | With no Highlighter loaded | — | **the colour header reaches the site** |
@@ -25,20 +25,20 @@ Pairing is automatic: PhoenixBox finds the v2 Highlighter and asks, and you clic
 3. Set **Extension type** to **Java**, choose the JAR, and click **Next**.
 4. Burp now has a **PhoenixBox** tab.
 
-### 2. Mark containers, and allow pairing
+### 2. Turn on the Highlighter, and allow pairing
 
 1. Select the **Burp Suite** proxy preset in PhoenixBox.
-2. In the container list, click the highlighter button next to **Promote** on each container you want coloured in Burp.
+2. Turn on the **Highlighter** tile in the Burp / Proxy section. Its gear opens the pairing window.
 3. PhoenixBox finds the Highlighter on your Burp host and asks to pair. Open Burp's **PhoenixBox** tab: the request is at the top, with the requesting extension's origin. Click **Allow**.
-4. The Highlighter tile turns on: *Connected to Highlighter v2.0.0 · 1 listener*.
+4. The pairing window says *Connected to Highlighter v2.0.0*, with one listener per open container.
 
 Only one PhoenixBox is paired at a time: allowing a new one, such as another Firefox profile, replaces the previous pairing. Burp's **PhoenixBox** tab shows who is paired, with **Unpair**. Unpairing there makes PhoenixBox fall back to the legacy mode and ask again. **Unpair** in PhoenixBox's Highlighter window stops it asking until you press **Connect**.
 
 If PhoenixBox can't find Burp (for example Burp's proxy isn't the Burp Suite preset), use the fallback: copy the **manual pairing string** from Burp's **PhoenixBox** tab into **Highlighter → Pair manually**.
 
-Burp's **PhoenixBox** tab lists each marked container and its listener. Unmarking a container closes its listener.
+Burp's **PhoenixBox** tab lists each open container and its listener. A container's listener opens with its first tab and closes 30 seconds after its last one. Turning the Highlighter off closes them all at once.
 
-Then browse in a marked container and open **Proxy** → **HTTP history**. Its requests are highlighted in the container's colour, and the **Notes** column shows the container name.
+Then browse in a container and open **Proxy** → **HTTP history**. Its requests are highlighted in the container's colour, and the **Notes** column shows the container name.
 
 ## How It Works
 
@@ -48,7 +48,7 @@ sequenceDiagram
     participant Jar as Phoenix Highlighter<br/>(in Burp)
     participant Target as Target Server
 
-    PB->>Jar: Marked containers (pairing token)
+    PB->>Jar: Open containers (pairing token)
     Note over Jar: Opens a listener per container,<br/>e.g. Work → 127.0.0.1:18080
     Jar->>PB: Container → listener address
     PB->>Jar: Work's traffic, sent to 127.0.0.1:18080
@@ -56,11 +56,13 @@ sequenceDiagram
     Jar->>Target: The request, unchanged
 ```
 
-- PhoenixBox re-sends the full list of marked containers whenever it changes, and every 10 seconds.
-- **Closing Firefox's last window closes the container listeners at once**, leaving only your own (e.g. `127.0.0.1:8080`). They come back when you open a window. If Firefox quits or crashes before it can say so, Burp closes them after 30 seconds without a check-in, and goes back to legacy mode.
-- After Burp or the Highlighter restarts, PhoenixBox reconnects at its next check-in, within about 10 seconds. The listeners reappear on the same ports: there's no need to re-mark anything.
+- PhoenixBox re-sends the full list of open containers whenever it changes, and every 10 seconds.
+- **Why the 30-second grace:** each time the set of listeners changes, Burp recreates all of its listeners, your own included. Keeping a closed container's listener for 30 seconds means a quick reopen, or closing and reopening a window, doesn't make Burp do that twice. Opening many tabs at once (a restored session) changes the listeners in one go.
+- **Closing Firefox's last window** closes the container listeners 30 seconds later, leaving only your own (e.g. `127.0.0.1:8080`). If Firefox quits or crashes, Burp closes them after 30 seconds without a check-in, and goes back to legacy mode.
+- After Burp or the Highlighter restarts, PhoenixBox reconnects within about 5 seconds. The listeners reappear on the same ports.
+- A container's very first request can arrive before Burp has opened its listener. PhoenixBox waits up to 1.5 seconds for it; after that, the request goes to the preset listener, not highlighted.
 - PhoenixBox routes a container to its listener only after Burp confirms the listener is up. Otherwise the container's traffic goes to the preset listener as usual, just not highlighted.
-- **Promote still decides what reaches Burp.** Marking only chooses which listener a container's Burp traffic arrives on. A marked container that isn't routed to Burp doesn't show up there.
+- **Promote still decides what reaches Burp.** The Highlighter only chooses which listener a container's Burp traffic arrives on. A container that isn't routed to Burp doesn't show up there, though it still has a listener while it is open.
 
 ## Listener Addresses
 
@@ -71,11 +73,11 @@ By default a container's listener uses the **Burp preset's IP**, with the first 
 - its own control port (8079–8099),
 - a port another program already holds, e.g. a dev server on `127.0.0.1:18080`. The Highlighter checks this before opening a listener.
 
-A container keeps its address and gets the same one back the next time it's marked, if it's still free.
+A container keeps its address and gets the same one back the next time it opens, if it's still free.
 
 ### Pinning a container to an address
 
-Open a marked container in PhoenixBox and enter an address under **Burp Listener**, e.g. `192.168.10.5:8080`. Clear it to go back to automatic.
+With the Highlighter on, open a container in PhoenixBox and enter an address under **Burp Listener**, e.g. `192.168.10.5:8080`. Clear it to go back to automatic.
 
 - If you already made a listener at that address in Burp, perhaps with invisible proxying or a custom certificate, the Highlighter **uses it as-is and never changes or removes it**.
 - Otherwise the Highlighter creates it. The IP must belong to the machine Burp runs on.
@@ -109,9 +111,9 @@ Firefox's ninth colour, *toolbar*, has no Burp equivalent: such a container stil
 **"Pairing was denied in Burp"**
 - Press **Connect** to ask again, and click **Allow** this time.
 
-**A marked container isn't highlighted**
+**A container isn't highlighted**
 - Is its traffic going to Burp at all? The Burp preset must be the proxy in use, and if you promote containers, this one must be promoted.
-- Hover its highlighter button, or open the container: an error there says why it has no listener (e.g. a pinned address is in use).
+- Is the Highlighter tile on? Open the container: **Burp Listener** shows its address, or an error saying why it has none (e.g. a pinned address is in use).
 - Check the container's row in Burp's **PhoenixBox** tab.
 
 **A dev server says its port is in use**
