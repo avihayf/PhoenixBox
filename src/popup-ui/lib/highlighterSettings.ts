@@ -1,6 +1,6 @@
 // Burp highlighting, one switch (the Highlighter tile), two modes:
 //   - Paired with Phoenix Highlighter v2 (automatic, after one Allow in Burp):
-//     each container with an open tab gets its own Burp listener, kept for 30 s
+//     each container with an open tab gets its own Burp listener, kept for 15 s
 //     after its last tab closes, and requests are never modified.
 //   - Not paired: containers carry the legacy X-MAC-Container-Color header,
 //     which the old v1.x JAR (and an unpaired v2) colour and strip.

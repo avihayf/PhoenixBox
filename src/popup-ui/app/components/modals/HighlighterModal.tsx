@@ -103,7 +103,7 @@ export function HighlighterModal({ isOpen, onClose, enabled, pairing, status, co
 
           <div className="px-5 pt-4 pb-5 space-y-3.5">
             <p className="text-sm text-[var(--ext-text)] leading-relaxed">
-              Turn the Highlighter tile on. PhoenixBox finds Phoenix Highlighter in Burp and asks to pair; click <strong>Allow</strong> in Burp once. Paired, every container with an open tab gets its own Burp listener, closed 30 seconds after its last tab, and requests are never modified.
+              Turn the Highlighter tile on. PhoenixBox finds Phoenix Highlighter in Burp and asks to pair; click <strong>Allow</strong> in Burp once. Paired, every container with an open tab gets its own Burp listener, closed 15 seconds after its last tab, and requests are never modified.
             </p>
             <p className="text-xs text-[var(--ext-text-muted)] leading-relaxed">
               Not paired (an older Highlighter v1.x, or none), containers send the <code>X-MAC-Container-Color</code> header instead. Burp colours it and strips it; with no Highlighter loaded, it reaches the site.

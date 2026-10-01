@@ -7,7 +7,7 @@
  * step with the containers that have open tabs, and tells the proxy handler
  * which Burp listener each one's traffic should go to. Several tabs of one
  * container share a listener; after its last tab closes, a container keeps
- * its listener for a 30 s grace, so a quick reopen does not make Burp
+ * its listener for a 15 s grace, so a quick reopen does not make Burp
  * recreate its listeners twice.
  *
  * Pairing is automatic: while unpaired and switched on (or when the user

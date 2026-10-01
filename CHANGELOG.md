@@ -5,7 +5,7 @@ All notable changes to PhoenixBox are recorded here.
 ## 3.1.0
 
 ### Burp Suite integration
-- **Highlighting no longer touches your requests** with **Phoenix Highlighter v2.0.0 or later**. Turn on the Highlighter tile and every container with an open tab gets its own Burp proxy listener; Burp colours its traffic and notes the container name by the listener it arrives on. Several tabs share one listener, and a container keeps it for 30 seconds after its last tab closes, so reopening a tab doesn't disturb Burp.
+- **Highlighting no longer touches your requests** with **Phoenix Highlighter v2.0.0 or later**. Turn on the Highlighter tile and every container with an open tab gets its own Burp proxy listener; Burp colours its traffic and notes the container name by the listener it arrives on. Several tabs share one listener, and a container keeps it for 15 seconds after its last tab closes, so reopening a tab doesn't disturb Burp.
 - **Automatic pairing.** PhoenixBox finds the Highlighter in Burp and asks to pair; click **Allow** once in Burp's PhoenixBox tab. A manual pairing string remains as a fallback. The Highlighter tile shows the connection state and why a container has no listener.
 - **Still works with Phoenix Highlighter v1.x.** Not paired, containers send only the `X-MAC-Container-Color` header, as before, and the name is never sent. The Highlighter strips it; with none loaded, it reaches the site.
 - Listeners use free ports from 18080 on the Burp preset's IP and never take a port another program holds. A container keeps its port, and can be pinned to an exact address, including a listener you built in Burp.

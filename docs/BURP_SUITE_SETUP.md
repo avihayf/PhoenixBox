@@ -36,7 +36,7 @@ Only one PhoenixBox is paired at a time: allowing a new one, such as another Fir
 
 If PhoenixBox can't find Burp (for example Burp's proxy isn't the Burp Suite preset), use the fallback: copy the **manual pairing string** from Burp's **PhoenixBox** tab into **Highlighter → Pair manually**.
 
-Burp's **PhoenixBox** tab lists each open container and its listener. A container's listener opens with its first tab and closes 30 seconds after its last one. Turning the Highlighter off closes them all at once.
+Burp's **PhoenixBox** tab lists each open container and its listener. A container's listener opens with its first tab and closes 15 seconds after its last one. Turning the Highlighter off closes them all at once.
 
 Then browse in a container and open **Proxy** → **HTTP history**. Its requests are highlighted in the container's colour, and the **Notes** column shows the container name.
 
@@ -57,8 +57,8 @@ sequenceDiagram
 ```
 
 - PhoenixBox re-sends the full list of open containers whenever it changes, and every 10 seconds.
-- **Why the 30-second grace:** each time the set of listeners changes, Burp recreates all of its listeners, your own included. Keeping a closed container's listener for 30 seconds means a quick reopen, or closing and reopening a window, doesn't make Burp do that twice. Opening many tabs at once (a restored session) changes the listeners in one go.
-- **Closing Firefox's last window** closes the container listeners 30 seconds later, leaving only your own (e.g. `127.0.0.1:8080`). If Firefox quits or crashes, Burp closes them after 30 seconds without a check-in, and goes back to legacy mode.
+- **Why the 15-second grace:** each time the set of listeners changes, Burp recreates all of its listeners, your own included. Keeping a closed container's listener for 15 seconds means a quick reopen, or closing and reopening a window, doesn't make Burp do that twice. Opening many tabs at once (a restored session) changes the listeners in one go.
+- **Closing Firefox's last window** closes the container listeners 15 seconds later, leaving only your own (e.g. `127.0.0.1:8080`). If Firefox quits or crashes, Burp closes them after 30 seconds without a check-in, and goes back to legacy mode.
 - After Burp or the Highlighter restarts, PhoenixBox reconnects within about 5 seconds. The listeners reappear on the same ports.
 - A container's very first request can arrive before Burp has opened its listener. PhoenixBox waits up to 1.5 seconds for it; after that, the request goes to the preset listener, not highlighted.
 - PhoenixBox routes a container to its listener only after Burp confirms the listener is up. Otherwise the container's traffic goes to the preset listener as usual, just not highlighted.

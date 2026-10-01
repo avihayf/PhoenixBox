@@ -9,7 +9,7 @@ Marking each container by hand, with a per-row button next to Promote, was a sec
 ## Behaviour
 
 - **On and paired**: every container (`firefox-container-*`) with at least one open tab has its own Burp listener. Several tabs of one container share one listener. Hidden and discarded tabs count as open. Default and private tabs never get a listener.
-- A container whose last tab closes keeps its listener for a **30 s grace**. If a tab of it opens during that time (Ctrl+Shift+T, a new tab, a reopened window), the grace ends and the listener is reused unchanged. When the grace runs out, the next sync leaves the container out and the JAR closes its listener. The next time the container opens, it gets its old address back (sticky `highlighterLastAddress`).
+- A container whose last tab closes keeps its listener for a **15 s grace** (30 s until 2026-10-01). If a tab of it opens during that time (Ctrl+Shift+T, a new tab, a reopened window), the grace ends and the listener is reused unchanged. When the grace runs out, the next sync leaves the container out and the JAR closes its listener. The next time the container opens, it gets its old address back (sticky `highlighterLastAddress`).
 - **Why the grace:** each change to the listener set makes Burp recreate every listener, the user's own included (JAR `ListenerManager`). The grace and the existing 300 ms debounce keep those changes rare. A session restore produces a single import.
 - Closing the last window puts every container into the grace, like closing every tab. The immediate release on the last window is gone. The JAR's 30 s lease still covers a quit or a crash.
 - **Off**: all graces are dropped, the JAR is told to `release` at once, and nothing is synced or sent until the switch is turned on again.

@@ -1,6 +1,6 @@
 # Header-free Burp highlighting: one Burp listener per marked container
 
-> **Amended 2026-09-29** by `2026-09-29-highlighter-follows-open-tabs-design.md`: containers are no longer marked. With the Highlighter switch on, every container with an open tab has a listener, kept for 30 s after its last tab. The protocol below is unchanged; "marked containers" now means "open containers".
+> **Amended 2026-09-29** by `2026-09-29-highlighter-follows-open-tabs-design.md`: containers are no longer marked. With the Highlighter switch on, every container with an open tab has a listener, kept for 15 s after its last tab. The protocol below is unchanged; "marked containers" now means "open containers".
 
 Status: approved 2026-09-25. Spans this repo and `PhoenixBox-Highlighter` (the Burp JAR).
 
@@ -116,7 +116,7 @@ Response `200`:
 ```
 
 - The request is the **full desired state**. The JAR reconciles to it and imports only if its set of listeners changed.
-- **Lease:** with no successful sync for 30 s, the JAR removes its listeners and forgets the assignments. It was 120 s until 2026-09-28; it was shortened so that quitting Firefox doesn't leave listeners open. PhoenixBox also sends `release` when its last window closes.
+- **Lease:** with no successful sync for 30 s, the JAR removes its listeners and forgets the assignments. It was 120 s until 2026-09-28; it was shortened so that quitting Firefox doesn't leave listeners open. PhoenixBox sends `release` when the Highlighter is switched off or unpaired.
 - PhoenixBox syncs:
   - on mark/unmark, pin change, container rename, recolour or delete,
   - on a preset change and on pairing,

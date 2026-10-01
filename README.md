@@ -93,7 +93,7 @@ Popular workflows:
 ## Burp Suite Integration
 
 Turn on the **Highlighter** tile. PhoenixBox finds the companion JAR in Burp and asks to pair, and you click **Allow** once in Burp.
-- **Paired (JAR v2.0.0+):** each container with an open tab gets its own Burp proxy listener, closed 30 seconds after its last tab. The JAR colours that container's traffic in HTTP history and writes its name into Notes, and **requests are not modified**.
+- **Paired (JAR v2.0.0+):** each container with an open tab gets its own Burp proxy listener, closed 15 seconds after its last tab. The JAR colours that container's traffic in HTTP history and writes its name into Notes, and **requests are not modified**.
 - **Not paired (JAR v1.x):** containers send the legacy `X-MAC-Container-Color` header, which the JAR colours and strips. If no JAR is loaded at all, the header reaches the site.
 
 Basic setup:

@@ -251,7 +251,7 @@ Turn on the **Highlighter** tile and the companion Burp extension, Phoenix Highl
 proxy listener for every container with an open tab. PhoenixBox sends that container's Burp traffic to
 its listener, and Burp knows the container from the listener each request arrives on.
 
-- **Follows your tabs**: several tabs of a container share one listener, and it closes 30 seconds after the container's last tab, so a quick reopen (Ctrl+Shift+T) reuses it
+- **Follows your tabs**: several tabs of a container share one listener, and it closes 15 seconds after the container's last tab, so a quick reopen (Ctrl+Shift+T) reuses it
 - **Nothing is added to requests once paired**: no headers. Without pairing (an older JAR), containers send only the legacy colour header, which the JAR strips
 - **Automatic pairing**: PhoenixBox finds the JAR and asks, and you click Allow once in Burp
 - **Auto-highlighting**: requests are coloured by container, and the **Notes** column shows the container name

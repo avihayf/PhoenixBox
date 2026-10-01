@@ -159,8 +159,8 @@ describe("highlighterSyncHelpers", () => {
     const B = "firefox-container-2";
     const G = GRACE_MS;
 
-    it("uses a 30 s grace", () => {
-      expect(GRACE_MS).to.equal(30_000);
+    it("uses a 15 s grace", () => {
+      expect(GRACE_MS).to.equal(15_000);
     });
 
     it("counts several tabs of one container once, and says when it opens", () => {

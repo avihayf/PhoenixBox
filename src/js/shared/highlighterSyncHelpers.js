@@ -54,7 +54,7 @@
    * change to the listener set makes Burp recreate all of its listeners, the
    * user's own included, so a quick reopen (Ctrl+Shift+T) must not cause two.
    */
-  const GRACE_MS = 30_000;
+  const GRACE_MS = 15_000;
 
   /** Storage keys from earlier Highlighters, removed on upgrade (after initialEnabled has read them). */
   const RETIRED_KEYS = [
