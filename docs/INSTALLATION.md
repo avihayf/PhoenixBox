@@ -179,8 +179,8 @@ npm run package
 
 1. **Download the JAR**
    ```
-   Go to: https://github.com/avihayf/PhoenixBox/releases
-   Download: PhoenixBoxHighlighter.jar
+   Go to: https://github.com/avihayf/PhoenixBox-Highlighter/releases/latest
+   Download: PhoenixBoxHighlighter-2.0.0.jar (or later)
    ```
 
 2. **Install in Burp Suite**
@@ -193,12 +193,13 @@ npm run package
 
 3. **Verify Installation**
    - Check Extensions list
-   - "PhoenixBox" should appear with checkmark
-   - Output window shows "PhoenixBox Loaded"
+   - "PhoenixBox Highlighter v2.0.0" should appear with checkmark
+   - Burp has a new **PhoenixBox** tab
 
-4. **Enable in Firefox**
-   - Click PhoenixBox icon in Firefox
-   - Turn on the **Highlighter** tile and confirm v1.2.0+ when asked
+4. **Turn on the Highlighter and pair in Firefox**
+   - Select the **Burp Suite** proxy preset in PhoenixBox, then turn on the **Highlighter** tile
+   - Burp asks whether to pair PhoenixBox: click **Allow**. No copy-paste; it asks once per Firefox profile
+   - Every container with an open tab now gets its own Burp listener
 
 ### Requirements
 
@@ -270,15 +271,15 @@ See [BURP_SUITE_SETUP.md](BURP_SUITE_SETUP.md) for detailed setup.
 
 ---
 
-### Headers Not Showing in Burp
+### Requests Not Highlighted in Burp
 
-**Problem**: X-MAC-Container-Color headers visible in Burp
+**Problem**: A container's requests aren't coloured in Burp
 
 **Solutions**:
-1. Ensure the **Highlighter** tile is on in the PhoenixBox popup
-2. Verify PhoenixBoxHighlighter.jar is loaded in Burp
-3. Check Burp Output tab for extension errors
-4. Extension should strip headers - if you see them, extension may not be working
+1. The **Highlighter** tile must be on; its gear should say *Connected*. If not, pair again.
+2. Verify Phoenix Highlighter v2.0.0+ is loaded in Burp and its **PhoenixBox** tab lists the container
+3. Make sure the container's traffic goes through the Burp preset (and is promoted, if you promote containers)
+4. Open the container: **Burp Listener** shows any error, e.g. a pinned address in use
 
 ---
 

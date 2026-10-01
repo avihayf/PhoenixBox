@@ -13,7 +13,7 @@ https://github.com/user-attachments/assets/a523d122-7a06-4dc4-a637-e08beb440f68
 
 1. Install PhoenixBox from [Firefox Add-ons (AMO)](https://addons.mozilla.org/firefox/addon/phoenix-box/) or download `PhoenixBox.xpi` from [Releases](https://github.com/avihayf/PhoenixBox/releases).
 2. Open the PhoenixBox popup and start testing with the built-in Attacker, Victim, Admin, and Member containers.
-3. For Burp highlighting, also install `PhoenixBoxHighlighter.jar` in Burp Suite and enable **PhoenixBox Highlighter**.
+3. For Burp highlighting, also load `PhoenixBoxHighlighter.jar` (v2.0.0+) in Burp Suite, turn on the Highlighter tile, and allow pairing in Burp.
 
 ---
 
@@ -22,7 +22,7 @@ https://github.com/user-attachments/assets/a523d122-7a06-4dc4-a637-e08beb440f68
 - **Ready-to-go containers** — Attacker, Victim, Admin, Member ship out of the box. Create as many custom ones as you need.
 - **Proxy routing (global + per-container)** — send everything through Burp, or route only one role through a proxy while keeping the rest clean. Save custom presets and switch with one click.
 - **User-Agent spoofing** — swap the `User-Agent` request header globally or per-container (HTTP header only; `navigator.userAgent` is unchanged). Pick from a live top-100 list (desktop, mobile, all), paste a custom string, or save presets for quick switching.
-- **Burp Suite highlighting** — the `X-MAC-Container-Color` and `X-MAC-Container-Name` headers let the companion JAR color-code HTTP history by container and label Repeater tabs by container name, so you instantly see which role fired each request.
+- **Burp Suite highlighting** — turn on the Highlighter and every open container gets its own Burp listener; the companion JAR colours its traffic in HTTP history and notes the container name, so you instantly see which role fired each request. Requests are never modified.
 - **Site assignments** — lock a domain to a container and it always opens there. No more "wrong session" surprises.
 - **Full session isolation** — cookies, storage, and cache stay walled off between containers. Zero bleed.
 - **Mozilla VPN integration** — route specific containers through VPN while the rest go direct.
@@ -92,16 +92,18 @@ Popular workflows:
 
 ## Burp Suite Integration
 
-PhoenixBox can add `X-MAC-Container-Color` and `X-MAC-Container-Name` headers to requests so Burp can visually separate traffic by container role. The companion JAR strips both before they reach the target — the name header needs **PhoenixBoxHighlighter v1.2.0 or later**.
+Turn on the **Highlighter** tile. PhoenixBox finds the companion JAR in Burp and asks to pair, and you click **Allow** once in Burp.
+- **Paired (JAR v2.0.0+):** each container with an open tab gets its own Burp proxy listener, closed 15 seconds after its last tab. The JAR colours that container's traffic in HTTP history and writes its name into Notes, and **requests are not modified**.
+- **Not paired (JAR v1.x):** containers send the legacy `X-MAC-Container-Color` header, which the JAR colours and strips. If no JAR is loaded at all, the header reaches the site.
 
 Basic setup:
 
-1. Download and install `PhoenixBoxHighlighter.jar` from the [PhoenixBox-Highlighter releases page](https://github.com/avihayf/PhoenixBox-Highlighter/releases/latest) into Burp Suite via **Extensions → Installed → Add**.
-2. Configure Firefox to send traffic through Burp.
-3. Turn on the **Highlighter** tile in PhoenixBox and confirm you have v1.2.0+ loaded, so container names are sent too.
-4. Browse in different containers and check Burp HTTP history.
+1. Install `PhoenixBoxHighlighter.jar` **v2.0.0 or later** from the [PhoenixBox-Highlighter releases page](https://github.com/avihayf/PhoenixBox-Highlighter/releases/latest) in Burp Suite via **Extensions → Installed → Add**.
+2. Send traffic through Burp (the **Burp Suite** proxy preset), then turn on the Highlighter tile.
+3. Click **Allow** when Burp asks to pair PhoenixBox. It asks once per Firefox profile, and there's no string to copy.
+4. Browse in those containers and check Burp HTTP history.
 
-The Burp companion extension strips the header before the request reaches the target server.
+Listeners use free ports from 18080 on the Burp preset's IP, skipping anything already in use. Unmarking a container closes its listener. See [Burp Suite Setup](docs/BURP_SUITE_SETUP.md) for pinning a container to a specific address.
 
 ---
 

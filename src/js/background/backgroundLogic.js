@@ -38,41 +38,12 @@ const backgroundLogic = {
       this.updateTranslationInManifest();
       this._normalizeSecurityProfiles().catch(() => {});
       this._initializeUserAgentCache();
-      this._migrateHighlighterHeadersKey().catch(() => {});
     });
     browser.runtime.onStartup.addListener(() => {
       this.updateTranslationInManifest();
       this._normalizeSecurityProfiles().catch(() => {});
       this._initializeUserAgentCache();
-      this._migrateHighlighterHeadersKey().catch(() => {});
     });
-  },
-
-  /**
-   * Move the Highlighter toggle onto its current key.
-   *
-   * It was named for the colour header back when that was all it added; it now
-   * also arms the container-name header. Readers fall back to the legacy key on
-   * their own, so this is only tidying — losing the race with a reader cannot
-   * lose the setting.
-   */
-  async _migrateHighlighterHeadersKey() {
-    const CURRENT = PhoenixBoxRequestHeaderHelpers.HIGHLIGHTER_HEADERS_KEY;
-    const LEGACY = PhoenixBoxRequestHeaderHelpers.LEGACY_HIGHLIGHTER_HEADERS_KEY;
-
-    // Superseded by highlighterJarAckVersion. It never shipped in a release,
-    // so there is no acknowledgement in it worth carrying over.
-    await browser.storage.local.remove("highlighterJarUpdateNoticePending");
-
-    const stored = await browser.storage.local.get([CURRENT, LEGACY]);
-    if (!(LEGACY in stored)) {
-      return;
-    }
-    // Never clobber a value already written under the current key.
-    if (!(CURRENT in stored)) {
-      await browser.storage.local.set({ [CURRENT]: !!stored[LEGACY] });
-    }
-    await browser.storage.local.remove(LEGACY);
   },
 
   /**

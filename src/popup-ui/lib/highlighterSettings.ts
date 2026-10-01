@@ -1,98 +1,117 @@
-// The Burp Highlighter toggle, which arms both the container-colour and the
-// container-name request header.
+// Burp highlighting, one switch (the Highlighter tile), two modes:
+//   - Paired with Phoenix Highlighter v2 (automatic, after one Allow in Burp):
+//     each container with an open tab gets its own Burp listener, kept for 15 s
+//     after its last tab closes, and requests are never modified.
+//   - Not paired: containers carry the legacy X-MAC-Container-Color header,
+//     which the old v1.x JAR (and an unpaired v2) colour and strip.
 //
-// The key was renamed once it started gating a second header. Readers fall back
-// to the legacy name so a profile written by an older version keeps its setting
-// regardless of whether the background migration has run yet.
-//
-// Keep in sync with HIGHLIGHTER_HEADERS_KEY in src/js/shared/requestHeaderHelpers.js.
+// The background side lives in src/js/background/highlighterSync.js. Keep the
+// keys and parsers here in sync with src/js/shared/highlighterSyncHelpers.js;
+// test/highlighter-settings.test.mjs pins them together.
 
-export const HIGHLIGHTER_HEADERS_KEY = "highlighterHeadersEnabled";
-export const LEGACY_HIGHLIGHTER_HEADERS_KEY = "addContainerColorHeaderEnabled";
-
-/** Defaults to request in a storage.local.get so both keys come back. */
-export const HIGHLIGHTER_STORAGE_DEFAULTS = {
-  [HIGHLIGHTER_HEADERS_KEY]: undefined as boolean | undefined,
-  [LEGACY_HIGHLIGHTER_HEADERS_KEY]: false,
-};
-
-export function resolveHighlighterHeadersEnabled(
-  stored: Record<string, unknown> | null | undefined
-): boolean {
-  const values = stored || {};
-  if (values[HIGHLIGHTER_HEADERS_KEY] !== undefined) {
-    return !!values[HIGHLIGHTER_HEADERS_KEY];
-  }
-  return !!values[LEGACY_HIGHLIGHTER_HEADERS_KEY];
-}
-
-/**
- * Pick the new value out of a storage.onChanged batch, or undefined when the
- * batch says nothing about this setting. Both names are watched because an
- * un-migrated profile can still be written under the legacy key.
- */
-export function highlighterChangeValue(
-  changes: Record<string, { newValue?: unknown }>
-): boolean | undefined {
-  if (changes[HIGHLIGHTER_HEADERS_KEY]) {
-    return !!changes[HIGHLIGHTER_HEADERS_KEY].newValue;
-  }
-  if (changes[LEGACY_HIGHLIGHTER_HEADERS_KEY]) {
-    return !!changes[LEGACY_HIGHLIGHTER_HEADERS_KEY].newValue;
-  }
-  return undefined;
-}
-
-/* ---------------------------------------------------------------------------
- * JAR acknowledgement — gates the X-MAC-Container-Name header.
- *
- * Keep in sync with JAR_ACK_VERSION_KEY / REQUIRED_JAR_VERSION /
- * isJarAcknowledged in src/js/shared/requestHeaderHelpers.js (a parity test in
- * test/highlighter-settings.test.mjs pins them together).
- * ------------------------------------------------------------------------- */
-
-export const JAR_ACK_VERSION_KEY = "highlighterJarAckVersion";
-export const REQUIRED_JAR_VERSION = "1.2.0";
+/** The Highlighter tile's on/off switch. */
+export const ENABLED_KEY = "highlighterEnabled";
+export const PINS_KEY = "highlighterPins";
+export const PAIRING_KEY = "highlighterPairing";
+export const STATUS_KEY = "highlighterStatus";
+/** Written by the Connect button: the background looks for the Highlighter now. */
+export const CONNECT_REQUEST_KEY = "highlighterConnectRequest";
+/** Set by Unpair, cleared by Connect: stops PhoenixBox pairing again on its own. */
+export const AUTO_PAIR_PAUSED_KEY = "highlighterAutoPairPaused";
 
 /** Where to get the JAR. The releases page, not a pinned asset: it cannot 404. */
 export const HIGHLIGHTER_RELEASES_URL =
   "https://github.com/avihayf/PhoenixBox-Highlighter/releases/latest";
 
-export function compareVersions(a: unknown, b: unknown): number {
-  const pa = String(a || "").split(".").map((n) => parseInt(n, 10) || 0);
-  const pb = String(b || "").split(".").map((n) => parseInt(n, 10) || 0);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const diff = (pa[i] || 0) - (pb[i] || 0);
-    if (diff !== 0) return diff < 0 ? -1 : 1;
+export interface HighlighterPairing {
+  host: string;
+  port: number;
+  token: string;
+}
+
+/** Written by the background after every sync attempt. */
+export interface HighlighterStatus {
+  state: "off" | "unpaired" | "searching" | "awaiting" | "denied" | "legacy" | "connected" | "error";
+  message?: string;
+  jar?: string | null;
+  /** cookieStoreId -> "ip:port" the container's traffic is going to. */
+  addresses?: Record<string, string>;
+  /** cookieStoreId -> why it has no listener. */
+  errors?: Record<string, string>;
+}
+
+export interface Address {
+  host: string;
+  port: number;
+}
+
+export function parseAddress(value: unknown): Address | null {
+  if (typeof value !== "string") return null;
+  const match = /^(?:\[([0-9a-fA-F:.]+)\]|([^\s:[\]]+)):(\d{1,5})$/.exec(value.trim());
+  if (!match) return null;
+  const port = Number(match[3]);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return null;
+  let host = (match[1] || match[2]).toLowerCase();
+  if (host === "localhost") host = "127.0.0.1";
+  return { host, port };
+}
+
+export function formatAddress(address: Address): string {
+  const host = address.host.includes(":") ? `[${address.host}]` : address.host;
+  return `${host}:${address.port}`;
+}
+
+/** Reads the "phx1:<host>:<port>:<token>" string from Burp's PhoenixBox tab. */
+export function parsePairingString(value: unknown): HighlighterPairing | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("phx1:")) return null;
+
+  const lastColon = trimmed.lastIndexOf(":");
+  const token = trimmed.slice(lastColon + 1);
+  if (!/^[A-Za-z0-9_-]{16,128}$/.test(token)) return null;
+
+  const address = parseAddress(trimmed.slice("phx1:".length, lastColon));
+  if (!address) return null;
+  return { host: address.host, port: address.port, token };
+}
+
+export function isPaired(pairing: unknown): pairing is HighlighterPairing {
+  if (!pairing || typeof pairing !== "object") return false;
+  const p = pairing as Record<string, unknown>;
+  return typeof p.host === "string" && Number.isInteger(p.port) && typeof p.token === "string";
+}
+
+/** One line for the popup's Highlighter tile and modal. */
+export function describeStatus(status: HighlighterStatus | null | undefined, paired: boolean, enabled = true): string {
+  const state = status?.state;
+  if (!enabled) {
+    return paired
+      ? "Off. Turn the Highlighter on to give every open container its own Burp listener."
+      : "Off. Turn the Highlighter on, or press Connect, to find Phoenix Highlighter in Burp.";
   }
-  return 0;
+  if (paired && state === "connected") {
+    const count = Object.keys(status?.addresses || {}).length;
+    const jar = status?.jar ? ` v${status.jar}` : "";
+    return `Connected to Highlighter${jar} · ${count} listener${count === 1 ? "" : "s"}`;
+  }
+  if (paired) return status?.message || "Can't reach the Highlighter";
+
+  switch (state) {
+  case "searching":
+    return "Looking for Phoenix Highlighter in Burp…";
+  case "awaiting":
+    return status?.message || "Click Allow in Burp's PhoenixBox tab to pair PhoenixBox.";
+  case "denied":
+    return "Pairing was denied in Burp. Containers use the legacy colour header. Press Connect to ask again.";
+  case "legacy":
+    return status?.message || "No Phoenix Highlighter v2 found. Containers use the legacy colour header (works with v1.x).";
+  default:
+    return "Not paired. Press Connect to find Phoenix Highlighter in Burp.";
+  }
 }
 
-export function isJarAcknowledged(ackVersion: unknown, required = REQUIRED_JAR_VERSION): boolean {
-  if (!ackVersion) return false;
-  return compareVersions(ackVersion, required) >= 0;
-}
-
-export type HighlighterNotice = "setup" | "confirm" | null;
-
-/** What to show when the popup opens. Reminds only people using the feature. */
-export function noticeOnPopupOpen(enabled: boolean, acknowledged: boolean): HighlighterNotice {
-  return enabled && !acknowledged ? "confirm" : null;
-}
-
-/** What to show when the user switches the Highlighter on. */
-export function noticeOnEnable(setupShownBefore: boolean, acknowledged: boolean): HighlighterNotice {
-  if (!setupShownBefore) return "setup";
-  return acknowledged ? null : "confirm";
-}
-
-export type NoticeAction = "confirm-installed" | "download" | "dismiss";
-
-/**
- * The acknowledgement to store for a modal action, or null to store nothing.
- * Only an explicit confirmation counts: downloading is not installing, and a
- * dismissal must leave the name withheld.
- */
-export function acknowledgementFor(action: NoticeAction): string | null {
-  return action === "confirm-installed" ? REQUIRED_JAR_VERSION : null;
+/** Whether PhoenixBox is working without a v2 pairing, with the legacy colour header. */
+export function isLegacyMode(paired: boolean, enabled: boolean): boolean {
+  return enabled && !paired;
 }

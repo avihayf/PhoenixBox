@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { X, Save } from 'lucide-react';
 import { type ProxyPreset } from '../../../lib/proxyPresets';
 import { parseGlobalProxyUrl } from '../../../lib/proxy';
-import { Switch } from '../ui/switch';
 
 interface ProxyPresetModalProps {
   isOpen: boolean;
@@ -19,7 +18,6 @@ export function ProxyPresetModal({
 }: ProxyPresetModalProps) {
   const [name, setName] = useState(initialData?.name || '');
   const [url, setUrl] = useState(initialData ? `${initialData.scheme}://${initialData.host}:${initialData.port}` : '');
-  const [autoEnablePaintBurp, setAutoEnablePaintBurp] = useState(initialData?.autoEnablePaintBurp || false);
   const [error, setError] = useState('');
 
   // Reset state when modal opens with new data
@@ -27,7 +25,6 @@ export function ProxyPresetModal({
     if (isOpen) {
       setName(initialData?.name || '');
       setUrl(initialData ? `${initialData.scheme}://${initialData.host}:${initialData.port}` : '');
-      setAutoEnablePaintBurp(initialData?.autoEnablePaintBurp || false);
       setError('');
     }
   }, [isOpen, initialData]);
@@ -64,12 +61,10 @@ export function ProxyPresetModal({
         scheme: parsed.type,
         host: parsed.host,
         port: parsed.port,
-        autoEnablePaintBurp,
       });
       
       setName('');
       setUrl('');
-      setAutoEnablePaintBurp(false);
       onClose();
     } catch (e) {
       setError('Please enter a valid proxy URL (e.g., http://127.0.0.1:8080).');
@@ -140,18 +135,6 @@ export function ProxyPresetModal({
               <p className="mt-1.5 text-[10px] text-[var(--ext-text-muted)]">
                 Format: scheme://host:port
               </p>
-            </div>
-
-            {/* Auto Enable Paint the Burp */}
-            <div className="flex items-center justify-between py-2">
-              <label htmlFor="auto-enable-paint-burp" className="text-xs text-[var(--ext-text)] cursor-pointer flex-1">
-                Turn on the Highlighter when this preset is selected
-              </label>
-              <Switch
-                id="auto-enable-paint-burp"
-                checked={autoEnablePaintBurp}
-                onCheckedChange={setAutoEnablePaintBurp}
-              />
             </div>
 
             {error && (
