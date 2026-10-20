@@ -293,13 +293,19 @@
    * popup's User-Agent list download, for instance). Firefox tags those with
    * cookieStoreId "firefox-default", so without this check they took the
    * global proxy and failed whenever Burp was not running.
+   *
+   * A request made from one of its pages (documentUrl) always counts. The
+   * originUrl only counts for requests with no tab: a tab the extension opens
+   * with a URL also has the extension as its origin, and that page load is
+   * browsing, which must take the container's proxy.
    */
   function isOwnExtensionRequest(requestInfo, extensionBaseUrl) {
     if (!requestInfo || typeof requestInfo !== "object") return false;
     const base = String(extensionBaseUrl || "");
     if (!base) return false;
-    return [requestInfo.originUrl, requestInfo.documentUrl]
-      .some((url) => String(url || "").startsWith(base));
+    if (String(requestInfo.documentUrl || "").startsWith(base)) return true;
+    const inTab = typeof requestInfo.tabId === "number" && requestInfo.tabId >= 0;
+    return !inTab && String(requestInfo.originUrl || "").startsWith(base);
   }
 
   const SHORTCUT_ID = /^open_container_\d$/;

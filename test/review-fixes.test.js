@@ -372,6 +372,30 @@ describe("reviewHelpers", () => {
       }, BASE)).to.equal(true);
     });
 
+    // A tab PhoenixBox opens with a URL (reopen in container, un-hide, move)
+    // is browsing: its page load must go through the container's proxy.
+    it("does not match a tab's page load that PhoenixBox started", () => {
+      expect(isOwnExtensionRequest({
+        tabId: 12,
+        type: "main_frame",
+        originUrl: "moz-extension://abc123/_generated_background_page.html",
+        url: "https://target.test/",
+      }, BASE)).to.equal(false);
+      expect(isOwnExtensionRequest({
+        tabId: 12,
+        originUrl: "moz-extension://abc123/popup/index.html",
+        url: "https://target.test/",
+      }, BASE)).to.equal(false);
+    });
+
+    it("still matches an extension page's own requests inside a tab", () => {
+      expect(isOwnExtensionRequest({
+        tabId: 12,
+        documentUrl: "moz-extension://abc123/endpoint-results.html",
+        url: "https://cdn.jsdelivr.net/x.json",
+      }, BASE)).to.equal(true);
+    });
+
     it("does not match website traffic, service workers or other extensions", () => {
       expect(isOwnExtensionRequest({ originUrl: "https://example.com/sw.js" }, BASE)).to.equal(false);
       expect(isOwnExtensionRequest({ originUrl: "moz-extension://other/page.html" }, BASE)).to.equal(false);

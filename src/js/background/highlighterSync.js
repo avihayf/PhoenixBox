@@ -68,6 +68,8 @@ const highlighterSync = {
 
   _timer: null,
   _graceTimer: null,
+  /** Tabs closed while _loadTabs waits for its query; null otherwise. */
+  _removedDuringLoad: null,
   _lastStatus: null,
   // Auto-pairing. Not persisted: after a restart PhoenixBox simply looks again.
   /** @type {{host: string, port: number, since: number}|null} waiting for Allow in Burp */
@@ -419,6 +421,19 @@ const highlighterSync = {
     });
   },
 
+  /**
+   * Releases once any sync already on its way to the JAR has been answered.
+   * Sent before it, that sync would reopen the listeners right after, and
+   * with no heartbeat to follow they would stay until the lease ran out. No
+   * new sync can start meanwhile: _syncOnce checks the switch and the pairing
+   * first. `stillWanted` drops the release if the user changed their mind.
+   */
+  _releaseAfterSync(pairing, stillWanted) {
+    Promise.resolve(this._currentSync)
+      .then(() => (stillWanted() ? this._closeListeners(pairing) : undefined))
+      .catch(() => {});
+  },
+
   /** Sticky assignment: a container gets the same address back next time. */
   async _rememberAddresses(addresses) {
     let changed = false;
@@ -473,7 +488,7 @@ const highlighterSync = {
             this.tracker.closedAt.clear();
             this._armGraceTimer();
             if (this.pairing) {
-              this._closeListeners(this.pairing).catch(() => {});
+              this._releaseAfterSync(this.pairing, () => !this.enabled);
             }
           }
           resync = true;
@@ -488,7 +503,7 @@ const highlighterSync = {
         this.pairing = this._readPairing(changes[HS.PAIRING_KEY].newValue);
         this.addresses = new Map();
         if (previous && !this.pairing) {
-          this._closeListeners(previous).catch(() => {});
+          this._releaseAfterSync(previous, () => !this.pairing);
         }
         resync = true;
       }
@@ -531,6 +546,7 @@ const highlighterSync = {
       this._armGraceTimer();
     });
     browser.tabs.onRemoved.addListener((tabId) => {
+      if (this._removedDuringLoad) this._removedDuringLoad.add(tabId);
       if (HS.untrackTab(this.tracker, tabId, Date.now())) this._armGraceTimer();
     });
     if (browser.tabs.onReplaced) {
@@ -541,13 +557,21 @@ const highlighterSync = {
   },
 
   async _loadTabs() {
+    // The query's answer can include a tab closed while it ran. Its onRemoved
+    // has already fired, so tracking it now would keep its container's
+    // listener open for good.
+    this._removedDuringLoad = new Set();
     try {
+      const tabs = await browser.tabs.query({});
       const now = Date.now();
-      for (const tab of await browser.tabs.query({})) {
+      for (const tab of tabs) {
+        if (this._removedDuringLoad.has(tab.id)) continue;
         HS.trackTab(this.tracker, tab.id, tab.cookieStoreId, now, HS.GRACE_MS);
       }
     } catch (e) {
       LOG.warn("highlighterSync: could not read tabs", e);
+    } finally {
+      this._removedDuringLoad = null;
     }
   },
 

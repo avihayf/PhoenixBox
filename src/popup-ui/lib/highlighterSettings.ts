@@ -95,6 +95,8 @@ export function describeStatus(status: HighlighterStatus | null | undefined, pai
     const jar = status?.jar ? ` v${status.jar}` : "";
     return `Connected to Highlighter${jar} · ${count} listener${count === 1 ? "" : "s"}`;
   }
+  // Just switched on: nothing has been tried yet, so nothing has failed.
+  if (paired && (!state || state === "off")) return "Connecting to the Highlighter…";
   if (paired) return status?.message || "Can't reach the Highlighter";
 
   switch (state) {
@@ -111,7 +113,17 @@ export function describeStatus(status: HighlighterStatus | null | undefined, pai
   }
 }
 
-/** Whether PhoenixBox is working without a v2 pairing, with the legacy colour header. */
-export function isLegacyMode(paired: boolean, enabled: boolean): boolean {
-  return enabled && !paired;
+/**
+ * The Highlighter tile's status dot: null while switched off, "ok" when
+ * paired and connected, "bad" when it failed or was denied, and "pending"
+ * otherwise (connecting, waiting for Allow, or the legacy colour header).
+ */
+export function statusTone(
+  status: HighlighterStatus | null | undefined, paired: boolean, enabled: boolean,
+): "ok" | "pending" | "bad" | null {
+  if (!enabled) return null;
+  const state = status?.state;
+  if (paired && state === "connected") return "ok";
+  if (state === "error" || state === "denied") return "bad";
+  return "pending";
 }

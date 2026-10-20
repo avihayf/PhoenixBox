@@ -949,7 +949,9 @@ function App() {
         <ContainerDetailView
           burpListener={highlighterEnabled ? {
             address: highlighterStatus?.addresses?.[selectedContainer.cookieStoreId],
-            idleLabel: !highlighterPairing ? 'not paired' : selectedContainer.tabCount > 0 ? 'waiting…' : 'opens with a tab',
+            // The live tab list, not the count captured when the container was opened.
+            idleLabel: !highlighterPairing ? 'not paired'
+              : (tabsByContainer[selectedContainer.cookieStoreId] || []).length > 0 ? 'waiting…' : 'opens with a tab',
             pin: highlighterPins[selectedContainer.cookieStoreId],
             error: highlighterStatus?.errors?.[selectedContainer.cookieStoreId],
             onSetPin: async (pin) => {

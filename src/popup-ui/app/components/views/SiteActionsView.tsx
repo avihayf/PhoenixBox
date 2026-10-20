@@ -10,20 +10,24 @@ import { HueAccentPicker } from '../HueAccentPicker';
 import { LogoAccentPicker } from '../LogoAccentPicker';
 import { accentToHue, type AccentValue, type LogoAccentValue } from '../../../lib/accentColors';
 import { HighlighterModal } from '../modals/HighlighterModal';
-import type { HighlighterPairing, HighlighterStatus } from '../../../lib/highlighterSettings';
+import { describeStatus, statusTone, type HighlighterPairing, type HighlighterStatus } from '../../../lib/highlighterSettings';
+
+const TONE_COLORS = { ok: 'var(--ext-green)', pending: 'var(--ext-yellow)', bad: 'var(--ext-red)' } as const;
 
 /**
  * Compact on/off toggle tile used for the Proxy / Highlighter / User-Agent controls.
  * `onConfigure` adds a corner settings button inside the tile, so turning a
- * control on never makes the main view taller.
+ * control on never makes the main view taller. `status` adds a corner dot for
+ * whether an "On" control is actually working, with its explanation.
  */
-function ControlTile({ icon: Icon, label, active, disabled, onClick, onConfigure }: {
+function ControlTile({ icon: Icon, label, active, disabled, onClick, onConfigure, status }: {
   icon: LucideIcon;
   label: string;
   active: boolean;
   disabled?: boolean;
   onClick: () => void;
   onConfigure?: () => void;
+  status?: { tone: keyof typeof TONE_COLORS; text: string } | null;
 }) {
   const color = active ? 'var(--ext-accent)' : 'var(--ext-text-muted)';
   return (
@@ -33,13 +37,22 @@ function ControlTile({ icon: Icon, label, active, disabled, onClick, onConfigure
         onClick={onClick}
         disabled={disabled}
         aria-pressed={active}
+        title={status?.text}
         className="w-full flex flex-col items-center gap-1.5 py-2.5 px-1.5 rounded-xl border transition-colors disabled:opacity-50"
         style={{ borderColor: active ? 'var(--ext-accent)' : 'var(--ext-border)', background: active ? 'var(--ext-accent-bg)' : 'transparent' }}
       >
         <Icon className="w-5 h-5" style={{ color }} />
         <span className="text-[11px] font-medium leading-tight text-center" style={{ color }}>{label}</span>
         <span className="text-[9px] uppercase tracking-wide font-semibold" style={{ color }}>{active ? 'On' : 'Off'}</span>
+        {status && <span className="sr-only">{status.text}</span>}
       </button>
+      {status && (
+        <span
+          aria-hidden="true"
+          className="absolute top-2 left-2 w-2 h-2 rounded-full pointer-events-none"
+          style={{ background: TONE_COLORS[status.tone] }}
+        />
+      )}
       {onConfigure && (
         <button
           type="button"
@@ -177,6 +190,7 @@ export function SiteActionsView({
   const [showProxyModal, setShowProxyModal] = useState(false);
   const [editingPreset, setEditingPreset] = useState<ProxyPreset | null>(null);
   const [showHighlighterModal, setShowHighlighterModal] = useState(false);
+  const highlighterTone = statusTone(highlighterStatus, !!highlighterPairing, highlighterEnabled);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmDeletePresetId, setConfirmDeletePresetId] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -381,6 +395,10 @@ export function SiteActionsView({
                   if (next && !highlighterPairing) setShowHighlighterModal(true);
                 }}
                 onConfigure={() => setShowHighlighterModal(true)}
+                status={highlighterTone ? {
+                  tone: highlighterTone,
+                  text: describeStatus(highlighterStatus, !!highlighterPairing, highlighterEnabled),
+                } : null}
               />
               <ControlTile
                 icon={UserCog}

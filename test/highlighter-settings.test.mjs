@@ -61,6 +61,11 @@ describe("highlighterSettings (popup)", () => {
         .to.equal("Connected to Highlighter · 0 listeners");
     });
 
+    it("says it is connecting, not unreachable, right after being switched on", () => {
+      expect(settings.describeStatus({ state: "off" }, true, true)).to.match(/^Connecting/);
+      expect(settings.describeStatus(null, true, true)).to.match(/^Connecting/);
+    });
+
     it("says it is off, whatever the last status was", () => {
       const connected = { state: "connected", addresses: { a: "127.0.0.1:18080" } };
       expect(settings.describeStatus(connected, true, false)).to.match(/^Off\./);
@@ -76,11 +81,23 @@ describe("highlighterSettings (popup)", () => {
     });
   });
 
-  describe("isLegacyMode", () => {
-    it("is on only while switched on and unpaired", () => {
-      expect(settings.isLegacyMode(false, true)).to.equal(true);
-      expect(settings.isLegacyMode(true, true)).to.equal(false);
-      expect(settings.isLegacyMode(false, false)).to.equal(false);
+  describe("statusTone", () => {
+    it("is nothing while off", () => {
+      expect(settings.statusTone({ state: "connected" }, true, false)).to.equal(null);
+    });
+    it("is ok only when paired and connected", () => {
+      expect(settings.statusTone({ state: "connected" }, true, true)).to.equal("ok");
+      expect(settings.statusTone({ state: "connected" }, false, true)).to.equal("pending");
+    });
+    it("is bad for errors and a denial", () => {
+      expect(settings.statusTone({ state: "error" }, true, true)).to.equal("bad");
+      expect(settings.statusTone({ state: "denied" }, false, true)).to.equal("bad");
+    });
+    it("is pending while connecting, pairing or in legacy mode", () => {
+      for (const state of ["off", "searching", "awaiting", "legacy", "unpaired"]) {
+        expect(settings.statusTone({ state }, state === "off", true), state).to.equal("pending");
+      }
+      expect(settings.statusTone(null, true, true)).to.equal("pending");
     });
   });
 });
