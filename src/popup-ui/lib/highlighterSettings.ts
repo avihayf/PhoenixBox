@@ -19,9 +19,13 @@ export const CONNECT_REQUEST_KEY = "highlighterConnectRequest";
 /** Set by Unpair, cleared by Connect: stops PhoenixBox pairing again on its own. */
 export const AUTO_PAIR_PAUSED_KEY = "highlighterAutoPairPaused";
 
-/** Where to get the JAR. The releases page, not a pinned asset: it cannot 404. */
-export const HIGHLIGHTER_RELEASES_URL =
-  "https://github.com/avihayf/PhoenixBox-Highlighter/releases/latest";
+/**
+ * Downloads the Highlighter JAR itself from its newest GitHub release (v2.0.0
+ * when 3.1.0 shipped). Every release must keep the asset name
+ * PhoenixBoxHighlighter.jar, or this link 404s.
+ */
+export const HIGHLIGHTER_DOWNLOAD_URL =
+  "https://github.com/avihayf/PhoenixBox-Highlighter/releases/latest/download/PhoenixBoxHighlighter.jar";
 
 export interface HighlighterPairing {
   host: string;

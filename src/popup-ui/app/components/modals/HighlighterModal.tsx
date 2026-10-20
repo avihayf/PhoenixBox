@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { X, Highlighter, Download, Info, Link2, Unlink, RefreshCw } from 'lucide-react';
 import type { Container } from '../../../lib/types';
 import {
-  HIGHLIGHTER_RELEASES_URL, parsePairingString, describeStatus, formatAddress,
+  HIGHLIGHTER_DOWNLOAD_URL, parsePairingString, describeStatus, formatAddress,
   type HighlighterPairing, type HighlighterStatus,
 } from '../../../lib/highlighterSettings';
 
@@ -195,14 +195,17 @@ export function HighlighterModal({ isOpen, onClose, enabled, pairing, status, co
             </details>
 
             <a
-              href={HIGHLIGHTER_RELEASES_URL}
+              href={HIGHLIGHTER_DOWNLOAD_URL}
               target="_blank"
               rel="noreferrer"
               className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-[var(--ext-text)] border border-[var(--ext-accent)]/35 rounded-xl hover:bg-[var(--ext-accent-bg)] transition-colors font-medium"
             >
               <Download className="w-3.5 h-3.5" />
-              Get Phoenix Highlighter (v2.0.0 or later)
+              Download Phoenix Highlighter (v2.0.0+)
             </a>
+            <p className="-mt-1.5 text-[10px] text-[var(--ext-text-muted)] leading-snug text-center">
+              In Burp: Extensions → Installed → Add (type Java). Remove an older v1.x first.
+            </p>
           </div>
         </div>
       </div>
