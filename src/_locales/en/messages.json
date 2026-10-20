@@ -1,6 +1,6 @@
 {
   "extensionDescription": {
-      "message": "PhoenixBox — multi-container browser for pentesting and bug bounty. Isolate sessions by role (Attacker, Victim, Admin), route containers through Burp Suite or custom proxies with per-container highlighting, spoof User-Agents, and auto-assign sites.",
+      "message": "PhoenixBox — multi-container browser for pentesting and bug bounty. Isolate sessions by role, route containers through Burp Suite or any proxy, give every container its own Burp listener for highlighting, spoof User-Agents, and auto-assign sites.",
       "description": "Description of the extension."
   },
   "openInNewTabTitle": {
