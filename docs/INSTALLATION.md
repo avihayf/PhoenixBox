@@ -180,7 +180,7 @@ npm run package
 1. **Download the JAR**
    ```
    Go to: https://github.com/avihayf/PhoenixBox-Highlighter/releases/latest
-   Download: PhoenixBoxHighlighter-2.0.0.jar (or later)
+   Download: PhoenixBoxHighlighter.jar (v2.0.0 or later)
    ```
 
 2. **Install in Burp Suite**
