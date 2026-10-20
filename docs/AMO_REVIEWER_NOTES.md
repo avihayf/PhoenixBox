@@ -100,7 +100,7 @@ Only when the user has switched highlighting on, or pressed Connect, the backgro
 - **Pairing:** `POST /v1/pair` with a random per-profile client ID. The user must approve it in Burp, which then returns a token.
 - **Syncing:** `POST /v1/sync` with the token in an `Authorization` header. The body lists the containers with open tabs (ID, name, colour), and the reply says which proxy listener each got.
 
-Nothing is sent anywhere other than the user's Burp host.
+Nothing is sent anywhere other than the user's Burp host. Each container's browsing traffic is then sent, through `proxy.onRequest`, to the listener address that Burp reported for it, on that same host; this changes only which Burp port receives the request, never the request itself.
 
 The Burp extension's control port is 8079–8099 on whichever host Burp runs, which may be a LAN address, so the CSP allows exactly `http://*:8079` … `http://*:8099`.
 
@@ -119,7 +119,7 @@ default-src 'self'; script-src 'self'; style-src 'self'; connect-src https://cdn
 ```
 
 - `connect-src https://cdn.jsdelivr.net` is the narrowest origin-level scope CSP allows (path restrictions are not supported in CSP `connect-src` directives). The actual URLs are further restricted in code via pinned commit hash.
-- `http://*:8079` … `http://*:8099` (21 explicit ports) is the Burp Highlighter's control server, on whatever host the user's Burp runs. Only the address from the user's pairing string is ever contacted.
+- `http://*:8079` … `http://*:8099` (21 explicit ports) is the Burp Highlighter's control server, on whatever host the user's Burp runs. Only the host of the user's own Burp proxy preset is ever probed, and once paired only the paired address (or the one from a pasted pairing string) is contacted.
 
 ---
 
@@ -136,7 +136,7 @@ Extraction results are stored only in `browser.storage.local` so the results tab
 
 ## Known web-ext Lint Warnings
 
-`web-ext lint` reports two `UNSAFE_VAR_ASSIGNMENT` warnings for `innerHTML` in `popup/assets/index-*.js`. These originate entirely from React 18's internal DOM reconciler (minified into the bundle by Vite) — specifically React's synthetic event system probing CSS animation event names on a temporary detached `<div>`. No extension-authored code writes to `innerHTML`. The legacy background scripts and content script use `innerText`, `textContent`, and `createElement` exclusively.
+`web-ext lint` reports two `UNSAFE_VAR_ASSIGNMENT` warnings for `innerHTML` in `popup/assets/index-*.js`. These originate entirely from React 18's DOM renderer (react-dom, minified into the bundle by Vite): its `setInnerHTML` helper, which only runs for the `dangerouslySetInnerHTML` prop, and the constant `<script></script>` placeholder it creates when rendering a `<script>` element. The extension never uses `dangerouslySetInnerHTML` or renders a `<script>`, so neither path receives dynamic data. No extension-authored code writes to `innerHTML`. The legacy background scripts and content script use `innerText`, `textContent`, and `createElement` exclusively.
 
 ---
 
