@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { X, Save } from 'lucide-react';
-import { ProxyPreset } from '../../data/mockData';
+import { type ProxyPreset } from '../../../lib/proxyPresets';
 import { parseGlobalProxyUrl } from '../../../lib/proxy';
-import { Switch } from '../ui/switch';
 
 interface ProxyPresetModalProps {
   isOpen: boolean;
@@ -19,7 +18,6 @@ export function ProxyPresetModal({
 }: ProxyPresetModalProps) {
   const [name, setName] = useState(initialData?.name || '');
   const [url, setUrl] = useState(initialData ? `${initialData.scheme}://${initialData.host}:${initialData.port}` : '');
-  const [autoEnablePaintBurp, setAutoEnablePaintBurp] = useState(initialData?.autoEnablePaintBurp || false);
   const [error, setError] = useState('');
 
   // Reset state when modal opens with new data
@@ -27,7 +25,6 @@ export function ProxyPresetModal({
     if (isOpen) {
       setName(initialData?.name || '');
       setUrl(initialData ? `${initialData.scheme}://${initialData.host}:${initialData.port}` : '');
-      setAutoEnablePaintBurp(initialData?.autoEnablePaintBurp || false);
       setError('');
     }
   }, [isOpen, initialData]);
@@ -64,12 +61,10 @@ export function ProxyPresetModal({
         scheme: parsed.type,
         host: parsed.host,
         port: parsed.port,
-        autoEnablePaintBurp,
       });
       
       setName('');
       setUrl('');
-      setAutoEnablePaintBurp(false);
       onClose();
     } catch (e) {
       setError('Please enter a valid proxy URL (e.g., http://127.0.0.1:8080).');
@@ -87,15 +82,21 @@ export function ProxyPresetModal({
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div 
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="preset-modal-title"
           className="bg-[var(--ext-bg-secondary)] border-2 border-[var(--ext-accent)] rounded-xl shadow-2xl w-full max-w-[320px] pointer-events-auto animate-in scale-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--ext-border)]">
-            <h2 className="text-sm font-medium uppercase tracking-wider text-[var(--ext-accent)] brand-title">
+            <h2 id="preset-modal-title" className="text-sm font-medium uppercase tracking-wider text-[var(--ext-accent)] brand-title">
               {initialData ? 'Edit Proxy Preset' : 'Add Proxy Preset'}
             </h2>
             <button
+              type="button"
+              aria-label="Close"
               onClick={onClose}
               className="p-1.5 hover:bg-[var(--ext-bg-tertiary)] rounded transition-all duration-200"
             >
@@ -134,18 +135,6 @@ export function ProxyPresetModal({
               <p className="mt-1.5 text-[10px] text-[var(--ext-text-muted)]">
                 Format: scheme://host:port
               </p>
-            </div>
-
-            {/* Auto Enable Paint the Burp */}
-            <div className="flex items-center justify-between py-2">
-              <label htmlFor="auto-enable-paint-burp" className="text-xs text-[var(--ext-text)] cursor-pointer flex-1">
-                Auto enable Paint the Burp when this preset is selected
-              </label>
-              <Switch
-                id="auto-enable-paint-burp"
-                checked={autoEnablePaintBurp}
-                onCheckedChange={setAutoEnablePaintBurp}
-              />
             </div>
 
             {error && (

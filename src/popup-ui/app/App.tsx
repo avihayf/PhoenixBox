@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { SiteActionsView } from "./components/views/SiteActionsView";
 import { ContainerSelectorView } from "./components/views/ContainerSelectorView";
 import { ManageContainersView } from "./components/views/ManageContainersView";
@@ -10,38 +10,21 @@ import { OnboardingView } from "./components/views/OnboardingView";
 import { requireWebExt } from "../lib/browser";
 import { parseGlobalProxyUrl, sanitizeProxyUrlForStorage, stripSensitiveProxyFields } from "../lib/proxy";
 import { getUserAgents, type UserAgentData } from "../lib/userAgent";
-import { DEFAULT_PROXY_PRESETS, type ProxyPreset } from "../data/mockData";
+import { DEFAULT_PROXY_PRESETS, effectivePresetId, presetProxyType, type ProxyPreset } from "../lib/proxyPresets";
 import { logError } from "../lib/logger";
 import { type AccentValue, ACCENT_PRESETS, applyCustomHue, clearCustomHue, serializeAccent, deserializeAccent, type LogoAccentValue, applyLogoAccentToDOM, serializeLogoAccent, deserializeLogoAccent } from "../lib/accentColors";
+import { toProxyType, type Container, type Tab, type AssignedSite } from "../lib/types";
+import * as msg from "../lib/messages";
+import { defaultSecurityIcon } from "../lib/securityProfiles";
+import { ENABLED_KEY as HIGHLIGHTER_ENABLED_KEY, PAIRING_KEY as HIGHLIGHTER_PAIRING_KEY,
+  STATUS_KEY as HIGHLIGHTER_STATUS_KEY, PINS_KEY as HIGHLIGHTER_PINS_KEY,
+  CONNECT_REQUEST_KEY as HIGHLIGHTER_CONNECT_KEY, AUTO_PAIR_PAUSED_KEY as HIGHLIGHTER_AUTO_PAIR_PAUSED_KEY, isPaired,
+  parseAddress, formatAddress,
+  type HighlighterPairing, type HighlighterStatus } from "../lib/highlighterSettings";
+import { readProxyMap, getProxyForContainer,
+  setProxyForContainer as storeSetProxyForContainer } from "../lib/proxyStore";
 
 type View = "main" | "detail" | "edit" | "picker" | "manage" | "assignedSites" | "advancedProxy" | "onboarding";
-
-type Container = {
-  cookieStoreId: string;
-  name: string;
-  color: string;
-  icon: string;
-  displayIcon: string;
-  tabCount: number;
-  visibleTabCount: number;
-  hiddenTabCount: number;
-  proxyUrl?: string;
-  proxySource?: string;
-  isIsolated?: boolean;
-  userAgent?: string;
-};
-
-type Tab = {
-  id: number;
-  title: string;
-  url: string;
-  favicon?: string;
-};
-
-type AssignedSite = {
-  key: string;
-  hostname: string;
-};
 
 function countVisibleAndHiddenTabs(visibleTabs: unknown[], hiddenTabs: unknown) {
   const visibleCount = Array.isArray(visibleTabs) ? visibleTabs.length : 0;
@@ -49,11 +32,6 @@ function countVisibleAndHiddenTabs(visibleTabs: unknown[], hiddenTabs: unknown) 
   return visibleCount + hiddenCount;
 }
 
-// Enforce standard Firefox container colors for our security profiles.
-const FIREFOX_DEFAULT_ICONS = new Set([
-  "fingerprint", "briefcase", "dollar", "cart", "circle",
-  "gift", "vacation", "food", "fruit", "pet", "tree", "chill"
-]);
 
 function PopupWrapper({ children, isMainView = false }: { children: ReactNode; isMainView?: boolean }) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -122,14 +100,21 @@ function applyAccentToDOM(accent: AccentValue, isDark: boolean) {
 function App() {
   const [currentView, setCurrentView] = useState<View>("main");
   const [selectedContainer, setSelectedContainer] = useState<Container | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
   const [globalProxyEnabled, setGlobalProxyEnabled] = useState(false);
   const [proxyUrl, setProxyUrl] = useState("");
   const [globalProxyError, setGlobalProxyError] = useState<string>("");
   const [proxyToggleBusy, setProxyToggleBusy] = useState(false);
   const proxyToggleBusyRef = useRef(false);
+  // Proxy URLs this popup wrote itself. Their storage.onChanged echo must not
+  // be copied back into the input: the stored copy is password-stripped, so
+  // echoing it erased a password mid-typing (and a stale echo of an earlier
+  // keystroke rewound the text).
+  const selfWrittenProxyUrlsRef = useRef(new Set<string>());
   const quickHideBusyRef = useRef(new Set<string>());
-  const [paintBurp, setPaintBurp] = useState(false);
+  const [highlighterEnabled, setHighlighterEnabled] = useState(false);
+  const [highlighterPairing, setHighlighterPairing] = useState<HighlighterPairing | null>(null);
+  const [highlighterStatus, setHighlighterStatus] = useState<HighlighterStatus | null>(null);
+  const [highlighterPins, setHighlighterPins] = useState<Record<string, string>>({});
   const [promotedProxyContainerIds, setPromotedProxyContainerIds] = useState<string[]>([]);
   const [globalUserAgent, setGlobalUserAgent] = useState(false);
   const [userAgentType, setUserAgentType] = useState<'all' | 'desktop' | 'mobile'>('all');
@@ -204,12 +189,6 @@ function App() {
     await browser.storage.local.set({ customProxyPresets: updated });
   };
 
-  const filteredContainers = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
-    if (!q) return containers;
-    return containers.filter((c) => c.name.toLowerCase().includes(q));
-  }, [containers, searchTerm]);
-
   const loadUserAgents = async (forceRefresh = false) => {
     try {
       const data = await getUserAgents(forceRefresh);
@@ -271,27 +250,12 @@ function App() {
     return userContextId !== csid ? Number(userContextId) : false;
   };
 
-  const enforceProfileColor = (name: string, color: string) => {
-    const lower = (name || "").toLowerCase();
-    if (lower === "attacker") return "red";
-    if (lower === "victim") return "orange";
-    if (lower === "member") return "yellow";
-    return color;
-  };
-
-  const getSecurityProfileIcon = (cookieStoreId: string, name: string) => {
-    const n = Number(cookieStoreId.replace("firefox-container-", ""));
-    if (n === 1) return "skull";
-    if (n === 2) return "user-x";
-    if (n === 3) return "user-cog";
-    if (n === 4) return "user-minus";
-
-    const lower = (name || "").toLowerCase();
-    if (lower === "attacker") return "skull";
-    if (lower === "victim") return "user-x";
-    if (lower === "admin") return "user-cog";
-    if (lower === "member") return "user-minus";
-    return null;
+  // container.proxyUrl is "type://host:port" built by refreshContainers
+  // (with "direct://" for a Disable-proxy entry).
+  const parseContainerProxyUrl = (url: string) => {
+    if (url === "direct://") return { type: "direct" };
+    const m = /^([a-z0-9]+):\/\/(\[[^\]]+\]|[^:/]+)(?::(\d+))?/i.exec(url);
+    return m ? { type: m[1], host: m[2].replace(/^\[|\]$/g, ""), port: Number(m[3]) } : null;
   };
 
   const normalizeContainerColor = (value: string) => {
@@ -331,8 +295,7 @@ function App() {
     const currentUserContextId = cookieStoreIdToUserContextId(tab.cookieStoreId);
 
     if (pickerAction === "reopenSiteIn") {
-      await browser.runtime.sendMessage({
-        method: "reloadInContainer",
+      await msg.reloadInContainer({
         url: tab.url,
         currentUserContextId,
         newUserContextId,
@@ -346,8 +309,7 @@ function App() {
 
     if (pickerAction === "alwaysOpenIn") {
       if (tab.cookieStoreId !== c.cookieStoreId) {
-        await browser.runtime.sendMessage({
-          method: "assignAndReloadInContainer",
+        await msg.assignAndReloadInContainer({
           url: tab.url,
           currentUserContextId: false,
           newUserContextId,
@@ -356,99 +318,32 @@ function App() {
           groupId: tab.groupId,
         });
       } else {
-        await browser.runtime.sendMessage({
-          method: "setOrRemoveAssignment",
-          tabId: tab.id,
-          url: tab.url,
-          userContextId: newUserContextId,
-          value: false,
-        });
+        await msg.setOrRemoveAssignment(tab.id, tab.url, newUserContextId, false);
       }
       window.close();
       return;
     }
   };
 
+  // Read-only. It used to rewrite container identities and icon overrides on
+  // every popup open — forcing colours by name (reverting a user's choice the
+  // moment they saved it), forcing icons, and fighting the background's own
+  // startup normalization. The background now owns that, once.
   const refreshContainers = async () => {
     const browser = requireWebExt();
-    const win = await browser.windows.getCurrent();
-    const winId = win?.id ?? null;
     const identities = await browser.contextualIdentities.query({});
-    const originalIconById = new Map(
-      identities.map((id) => [id.cookieStoreId, id.icon]),
-    );
-    const { containerDisplayIconOverrides = {} } = await browser.storage.local.get({
-      containerDisplayIconOverrides: {},
-    });
-    // Ensure security profiles keep their intended custom icons.
-    const securityIcons = new Set(["skull", "user-x", "user-cog", "user-minus"]);
-    const desiredSecurityIconByName: Record<string, string> = {
-      attacker: "skull",
-      victim: "user-x",
-      admin: "user-cog",
-      member: "user-minus",
-    };
-    const normalizedOverrides =
-      containerDisplayIconOverrides && typeof containerDisplayIconOverrides === "object"
-        ? { ...containerDisplayIconOverrides }
-        : {};
-    let overridesChanged = false;
-    const normalizedIdentities = identities.map((id) => ({ ...id }));
-    for (const id of normalizedIdentities) {
-      const desired = desiredSecurityIconByName[(id.name || "").toLowerCase()];
-      if (!desired) continue;
-      const current = normalizedOverrides[id.cookieStoreId];
-      if (!current || !securityIcons.has(current)) {
-        normalizedOverrides[id.cookieStoreId] = desired;
-        overridesChanged = true;
-      }
-    }
-    if (overridesChanged) {
-      await browser.storage.local.set({ containerDisplayIconOverrides: normalizedOverrides });
-    }
-    for (const id of normalizedIdentities) {
-      const updates: { name: string; color?: string; icon?: string } = {
-        name: id.name,
-      };
-      let shouldUpdate = false;
-
-      // Determine the intended icon from overrides or the current identity.
-      const overrideIcon = normalizedOverrides[id.cookieStoreId];
-      const intendedIcon = overrideIcon || id.icon;
-      const isCustomIcon = intendedIcon && !FIREFOX_DEFAULT_ICONS.has(intendedIcon);
-      const targetIconForFirefox = isCustomIcon ? "fingerprint" : intendedIcon;
-
-      if (id.icon !== targetIconForFirefox) {
-        updates.icon = targetIconForFirefox;
-        shouldUpdate = true;
-        id.icon = targetIconForFirefox;
-      }
-
-      const enforcedColor = enforceProfileColor(id.name, id.color);
-      if (enforcedColor !== id.color) {
-        updates.color = enforcedColor;
-        shouldUpdate = true;
-        id.color = enforcedColor;
-      }
-
-      if (shouldUpdate) {
-        try {
-          await browser.contextualIdentities.update(id.cookieStoreId, updates);
-        } catch (err) {
-          logError("Failed to enforce container identity:", err);
-        }
-      }
-    }
-    const tabQuery = await browser.tabs.query(winId ? { windowId: winId } : {});
-    const { proxifiedContainersKey = [] } = await browser.storage.local.get({
-      proxifiedContainersKey: [],
-    });
-    const { containerUserAgents = {} } = await browser.storage.local.get({
-      containerUserAgents: {},
-    });
-    const proxifiedMap = new Map(
-      (proxifiedContainersKey as any[]).map((p) => [p.cookieStoreId, p.proxy]),
-    );
+    // Every window, not just the current one. These counts drive the hide/show
+    // toggle, and hiding is container-scoped — a per-window count would offer
+    // "show" for a container whose tabs are simply in another window.
+    const stateKeys = identities.map((id) => `identitiesState@@_${id.cookieStoreId}`);
+    const [tabQuery, stored, proxifiedMap] = await Promise.all([
+      browser.tabs.query({}),
+      // One read for everything, rather than one per container.
+      browser.storage.local.get([...stateKeys, "containerUserAgents", "containerDisplayIconOverrides"]),
+      readProxyMap(),
+    ]);
+    const containerUserAgents = (stored.containerUserAgents || {}) as Record<string, string>;
+    const overrides = (stored.containerDisplayIconOverrides || {}) as Record<string, string>;
 
     const tabsGrouped: Record<string, Tab[]> = {};
     for (const t of tabQuery) {
@@ -462,33 +357,17 @@ function App() {
       });
     }
     setTabsByContainer(tabsGrouped);
-    const computed: Container[] = await Promise.all(normalizedIdentities.map(async (id) => {
-      const enforcedColor = enforceProfileColor(id.name, id.color);
-      const overrideIcon =
-        normalizedOverrides && typeof normalizedOverrides === "object"
-          ? normalizedOverrides[id.cookieStoreId]
-          : null;
-      const uiFallbackIcon =
-        originalIconById.get(id.cookieStoreId) || id.icon;
-      
-      const containerStateKey = `identitiesState@@_${id.cookieStoreId}`;
-      const containerState = await browser.storage.local.get(containerStateKey);
-      const storedContainerState = containerState[containerStateKey] || {};
-      const isIsolated = !!storedContainerState.isIsolated;
+
+    const computed: Container[] = identities.map((id) => {
+      const storedContainerState =
+        ((stored as Record<string, any>)[`identitiesState@@_${id.cookieStoreId}`] || {}) as Record<string, any>;
       const visibleTabs = tabsGrouped[id.cookieStoreId] || [];
-      const hiddenTabs = Array.isArray(storedContainerState.hiddenTabs)
-        ? storedContainerState.hiddenTabs
-        : [];
-      const tabCount = countVisibleAndHiddenTabs(
-        visibleTabs,
-        hiddenTabs,
-      );
-      
+      const hiddenTabs = Array.isArray(storedContainerState.hiddenTabs) ? storedContainerState.hiddenTabs : [];
+
       const proxyObj = proxifiedMap.get(id.cookieStoreId);
-      let proxyUrlStr = "";
-      if (proxyObj) {
-        proxyUrlStr = `${proxyObj.type}://${proxyObj.host}${proxyObj.port ? ":" + proxyObj.port : ""}`;
-      }
+      const proxyUrlStr = proxyObj
+        ? `${proxyObj.type}://${proxyObj.host}${proxyObj.port ? ":" + proxyObj.port : ""}`
+        : "";
       const legacyAdvancedProxy =
         proxyObj &&
         !proxyObj.source &&
@@ -500,35 +379,31 @@ function App() {
       return {
         cookieStoreId: id.cookieStoreId,
         name: id.name,
-        color: enforcedColor,
+        color: id.color,
         icon: id.icon,
         displayIcon:
-          overrideIcon ||
-          getSecurityProfileIcon(id.cookieStoreId, id.name) ||
-          uiFallbackIcon,
-        tabCount,
+          overrides[id.cookieStoreId] ||
+          defaultSecurityIcon(id.cookieStoreId) ||
+          id.icon,
+        tabCount: countVisibleAndHiddenTabs(visibleTabs, hiddenTabs),
         visibleTabCount: visibleTabs.length,
         hiddenTabCount: hiddenTabs.length,
         proxyUrl: proxyUrlStr,
-        proxySource: proxyObj?.source || (legacyAdvancedProxy ? "advanced" : undefined),
-        isIsolated,
+        proxySource: (proxyObj?.source as string | undefined) || (legacyAdvancedProxy ? "advanced" : undefined),
+        isIsolated: !!storedContainerState.isIsolated,
         userAgent: containerUserAgents[id.cookieStoreId] || "",
       };
-    }));
+    });
     setContainers(computed);
     return computed;
   };
 
   const loadAssignedSites = async (cookieStoreId: string) => {
-    const browser = requireWebExt();
     const userContextId = cookieStoreIdToUserContextId(cookieStoreId);
     if (!userContextId) return;
     setAssignedSitesLoading(true);
     try {
-      const response = await browser.runtime.sendMessage({
-        method: "getAssignmentObjectByContainer",
-        message: { userContextId },
-      });
+      const response = await msg.getAssignmentObjectByContainer<Record<string, any>>(userContextId);
       const assignments = response || {};
       const sites = Object.keys(assignments).map((key) => {
         const site = assignments[key] || {};
@@ -549,25 +424,7 @@ function App() {
     proxy: { type: string; host: string; port: number; mozProxyEnabled: boolean; proxyDNS?: boolean; source?: string } | null,
   ) => {
     try {
-      const browser = requireWebExt();
-      const { proxifiedContainersKey = [] } = await browser.storage.local.get({
-        proxifiedContainersKey: [],
-      });
-      const store = Array.isArray(proxifiedContainersKey) ? [...(proxifiedContainersKey as any[])] : [];
-      const idx = store.findIndex((p) => p.cookieStoreId === cookieStoreId);
-      if (!proxy) {
-        if (idx !== -1) {
-          store.splice(idx, 1);
-          await browser.storage.local.set({ proxifiedContainersKey: store });
-        }
-        return;
-      }
-      if (idx === -1) {
-        store.push({ cookieStoreId, proxy });
-      } else {
-        store[idx] = { cookieStoreId, proxy };
-      }
-      await browser.storage.local.set({ proxifiedContainersKey: store });
+      await storeSetProxyForContainer(cookieStoreId, proxy);
     } catch (err) {
       logError("Failed to set proxy for container:", err);
     }
@@ -575,19 +432,15 @@ function App() {
 
   const loadAdvancedProxyInitial = async (cookieStoreId: string) => {
     try {
-      const browser = requireWebExt();
-      const { proxifiedContainersKey = [] } = await browser.storage.local.get({
-        proxifiedContainersKey: [],
-      });
-      const entries = Array.isArray(proxifiedContainersKey) ? (proxifiedContainersKey as any[]) : [];
-      const entry = entries.find((p) => p.cookieStoreId === cookieStoreId);
+      const entryProxy = await getProxyForContainer(cookieStoreId);
+      const entry = entryProxy ? { proxy: entryProxy } : undefined;
       // Show whatever proxy is configured (including VPN proxies) so the
       // user can see what's active.  Previously, VPN proxies (which have
       // countryCode) were silently filtered out, letting users unknowingly
       // overwrite them.
       if (entry?.proxy?.host && entry?.proxy?.port) {
         setAdvancedProxyInitial({
-          type: entry.proxy.type || "http",
+          type: toProxyType(entry.proxy.type),
           host: entry.proxy.host,
           port: String(entry.proxy.port),
           proxyDNS: !!entry.proxy.proxyDNS,
@@ -603,11 +456,20 @@ function App() {
 
   // Initial load: containers, current window, tab counts, and global toggles.
   useEffect(() => {
-    let intervalId: number | null = null;
+    // Held in the effect's closure, not inside run(), so the cleanup React
+    // actually receives can reach them: run() is async, so anything it returns
+    // is a promise React discards.
+    let permissionListener: (() => void) | null = null;
+    let storageListener: ((changes: any, areaName: string) => void) | null = null;
+    let cancelled = false;
 
     // Default to dark mode if no theme is set
     const savedTheme = localStorage.getItem("theme");
-    const shouldBeDark = savedTheme === "dark" || !savedTheme;
+    // "auto" (set from the options page) follows the system; unset keeps the
+    // popup's dark default.
+    const shouldBeDark = savedTheme === "auto"
+      ? window.matchMedia("(prefers-color-scheme: dark)").matches
+      : savedTheme === "dark" || !savedTheme;
     if (shouldBeDark) {
       document.documentElement.classList.add("dark");
       setIsDark(true);
@@ -630,12 +492,6 @@ function App() {
     const run = async () => {
       const browser = requireWebExt();
 
-      // Kick VPN status refresh (safe, uses existing background port if available)
-      try {
-        await browser.runtime.sendMessage({ method: "MozillaVPN_queryStatus" });
-      } catch {
-        // ignore
-      }
 
       const win = await browser.windows.getCurrent();
       const winId = win?.id ?? null;
@@ -647,7 +503,11 @@ function App() {
         globalProxyEnabled: false,
         globalProxyUrl: "",
         globalProxyParsed: null,
-        addContainerColorHeaderEnabled: false,
+        globalProxyCredentialsMissing: false,
+        [HIGHLIGHTER_ENABLED_KEY]: false,
+        [HIGHLIGHTER_PAIRING_KEY]: null,
+        [HIGHLIGHTER_STATUS_KEY]: null,
+        [HIGHLIGHTER_PINS_KEY]: {},
         promotedProxyContainerId: "",
         promotedProxyContainerIds: null,
         globalUserAgentEnabled: false,
@@ -682,11 +542,20 @@ function App() {
         await browser.storage.local.set({ globalProxyEnabled: false });
       } else {
         setGlobalProxyEnabled(!!stored.globalProxyEnabled);
-        setGlobalProxyError("");
+        // Proxy passwords are never written to disk, so an authenticated proxy
+        // comes back without credentials after a browser restart.
+        setGlobalProxyError(
+          stored.globalProxyCredentialsMissing
+            ? "Proxy password isn't saved. Re-enter the proxy URL with its password to reconnect."
+            : ""
+        );
       }
       setProxyUrl(sanitizedStoredProxyUrl);
 
-      setPaintBurp(!!stored.addContainerColorHeaderEnabled);
+      setHighlighterEnabled(stored[HIGHLIGHTER_ENABLED_KEY] === true);
+      setHighlighterPairing(isPaired(stored[HIGHLIGHTER_PAIRING_KEY]) ? stored[HIGHLIGHTER_PAIRING_KEY] as HighlighterPairing : null);
+      setHighlighterStatus((stored[HIGHLIGHTER_STATUS_KEY] as HighlighterStatus | null) || null);
+      setHighlighterPins((stored[HIGHLIGHTER_PINS_KEY] as Record<string, string>) || {});
       if (Array.isArray(stored.promotedProxyContainerIds)) {
         setPromotedProxyContainerIds(
           (stored.promotedProxyContainerIds as unknown[]).map((id) => String(id || "")).filter((id) => id)
@@ -708,27 +577,20 @@ function App() {
         stored.globalUserAgent ||
         Object.keys(stored.containerUserAgents || {}).length > 0
       ) {
-        await loadUserAgents(false);
+        // Not awaited: on a cold cache this is three CDN fetches, and the
+        // presets menu, VPN state and storage listener used to wait on them.
+        void loadUserAgents(false);
       }
       await loadCustomProxyPresets();
 
       // Mozilla VPN status + permissions warning
+      // Only the permissions warning dot lives in the main view. It depends on
+      // two permissions and one storage key, all of which have change events,
+      // so it is recomputed on those rather than polled. The old 3-second poll
+      // also pinged the VPN app each time, and every status reply bumps the
+      // VPN proxy isolation key — forcing fresh proxy connections every three
+      // seconds while the popup was open.
       const refreshVpn = async () => {
-        try {
-          await browser.runtime.sendMessage({ method: "MozillaVPN_queryStatus" });
-        } catch {
-          // ignore
-        }
-
-        try {
-          await Promise.all([
-            browser.runtime.sendMessage({ method: "MozillaVPN_getInstallationStatus" }),
-            browser.runtime.sendMessage({ method: "MozillaVPN_getConnectionStatus" }),
-          ]);
-        } catch {
-          // VPN may not be installed
-        }
-
         const permissionsOk = await browser.permissions.contains({
           permissions: ["proxy", "nativeMessaging"],
         });
@@ -743,9 +605,13 @@ function App() {
       };
 
       await refreshVpn();
-      intervalId = window.setInterval(() => {
-        refreshVpn().catch(() => {});
-      }, 3000);
+      // The popup can be dismissed while the awaits above are still in flight,
+      // in which case cleanup has already run and there is nothing to register.
+      if (cancelled) return;
+
+      permissionListener = () => { refreshVpn().catch(() => {}); };
+      browser.permissions.onAdded.addListener(permissionListener);
+      browser.permissions.onRemoved.addListener(permissionListener);
 
       // Listen for storage changes from background (e.g. permission rescue)
       const handleStorageChange = (changes: any, areaName: string) => {
@@ -755,10 +621,26 @@ function App() {
           if (changes.globalProxyEnabled.newValue) setGlobalProxyError("");
         }
         if (changes.globalProxyUrl) {
-          setProxyUrl(String(changes.globalProxyUrl.newValue || ""));
+          const next = String(changes.globalProxyUrl.newValue || "");
+          if (!selfWrittenProxyUrlsRef.current.has(next)) setProxyUrl(next);
         }
-        if (changes.addContainerColorHeaderEnabled) {
-          setPaintBurp(!!changes.addContainerColorHeaderEnabled.newValue);
+        if (changes.globalProxyCredentialsMissing?.newValue) {
+          setGlobalProxyError(
+            "Proxy password isn't saved. Re-enter the proxy URL with its password to reconnect."
+          );
+        }
+        if (changes[HIGHLIGHTER_ENABLED_KEY]) {
+          setHighlighterEnabled(changes[HIGHLIGHTER_ENABLED_KEY].newValue === true);
+        }
+        if (changes[HIGHLIGHTER_PAIRING_KEY]) {
+          const next = changes[HIGHLIGHTER_PAIRING_KEY].newValue;
+          setHighlighterPairing(isPaired(next) ? next : null);
+        }
+        if (changes[HIGHLIGHTER_STATUS_KEY]) {
+          setHighlighterStatus(changes[HIGHLIGHTER_STATUS_KEY].newValue || null);
+        }
+        if (changes[HIGHLIGHTER_PINS_KEY]) {
+          setHighlighterPins(changes[HIGHLIGHTER_PINS_KEY].newValue || {});
         }
         if (changes.promotedProxyContainerIds) {
           const next = changes.promotedProxyContainerIds.newValue;
@@ -767,24 +649,43 @@ function App() {
           );
         }
         if (changes.containerUserAgents) {
-          refreshContainers().catch((e) => logError("Failed to refresh container UAs:", e));
+          // Patch the one field locally instead of rebuilding every container.
+          const next = (changes.containerUserAgents.newValue || {}) as Record<string, string>;
+          setContainers((current) => current.map((c) => ({ ...c, userAgent: next[c.cookieStoreId] || "" })));
+        }
+        if (changes.mozillaVpnHiddenToutsList) {
+          refreshVpn().catch(() => {});
         }
       };
+      storageListener = handleStorageChange;
       browser.storage.onChanged.addListener(handleStorageChange);
-      return () => {
-        if (intervalId) window.clearInterval(intervalId);
-        browser.storage.onChanged.removeListener(handleStorageChange);
-      };
     };
 
     run().catch((e) => logError("Failed to load popup data:", e));
+
+    return () => {
+      cancelled = true;
+      if (permissionListener) {
+        try {
+          const b = requireWebExt();
+          b.permissions.onAdded.removeListener(permissionListener);
+          b.permissions.onRemoved.removeListener(permissionListener);
+        } catch {
+          // Extension context already gone.
+        }
+        permissionListener = null;
+      }
+      if (storageListener) {
+        try {
+          requireWebExt().storage.onChanged.removeListener(storageListener);
+        } catch {
+          // Extension context already gone; nothing to detach from.
+        }
+        storageListener = null;
+      }
+    };
   }, []);
 
-  // Shared wrapper style for all views - RESTORED h-fit for auto-adjusting
-  // Main view uses fixed height to keep footer visible; other views auto-fit.
-  // Main view: fixed height within Firefox popup limit (~600px max)
-  const mainWrapperClass = "w-[352px] h-[580px] flex flex-col bg-[var(--phoenix-bg)] text-[var(--phoenix-text)] dark:text-[var(--phoenix-text)] border border-[var(--phoenix-border)] shadow-xl font-['JetBrains_Mono',monospace]";
-  const subWrapperClass = "w-[352px] h-fit max-h-[620px] flex flex-col bg-[var(--phoenix-bg)] text-[var(--phoenix-text)] dark:text-[var(--phoenix-text)] border border-[var(--phoenix-border)] overflow-hidden shadow-xl font-['JetBrains_Mono',monospace]";
 
   // Onboarding View
   if (currentView === "onboarding") {
@@ -827,27 +728,16 @@ function App() {
           loading={assignedSitesLoading}
           onBack={handleBack}
           onRemoveSite={async (siteKey) => {
-            const browser = requireWebExt();
             const userContextId = cookieStoreIdToUserContextId(selectedContainer.cookieStoreId);
             if (!userContextId) return;
-            await browser.runtime.sendMessage({
-              method: "setOrRemoveAssignment",
-              tabId: null,
-              url: siteKey,
-              userContextId,
-              value: true,
-            });
+            await msg.setOrRemoveAssignment(null, siteKey, userContextId, true);
             setAssignedSites((prev) => prev.filter((s) => s.key !== siteKey));
           }}
           onResetCookies={async (hostname) => {
             const browser = requireWebExt();
             const granted = await browser.permissions.request({ permissions: ["browsingData"] });
             if (!granted) return;
-            await browser.runtime.sendMessage({
-              method: "resetCookiesForSite",
-              pageUrl: hostname,
-              cookieStoreId: selectedContainer.cookieStoreId,
-            });
+            await msg.resetCookiesForSite(hostname, selectedContainer.cookieStoreId);
           }}
         />
       </PopupWrapper>
@@ -937,88 +827,27 @@ function App() {
         <EditContainerView
           container={selectedContainer}
           onBack={handleBack}
-          onSave={async (name, color, icon, proxyUrl, siteIsolation) => {
+          onSave={async (name, color, icon, siteIsolation) => {
           try {
-            const browser = requireWebExt();
             const isNew = selectedContainer.cookieStoreId === "new";
             const userContextId = isNew
               ? "new"
               : String(cookieStoreIdToUserContextId(selectedContainer.cookieStoreId));
 
-            const nativeIcon = icon === "skull" ? "circle" : icon;
-
-            const response = await browser.runtime.sendMessage({
-              method: "createOrUpdateContainer",
-              message: {
-                userContextId,
-                params: {
-                  name: name || (isNew ? "New Container" : selectedContainer.name),
-                  color: normalizeContainerColor(color),
-                  icon: nativeIcon,
-                },
-              },
-            });
+            // The real chosen icon: the background maps it for Firefox and
+            // records it as the display override, once.
+            const response = await msg.createOrUpdateContainer<{ cookieStoreId?: string }>(
+              userContextId,
+              {
+                name: name || (isNew ? "New Container" : selectedContainer.name),
+                color: normalizeContainerColor(color),
+                icon,
+              }
+            );
             const targetId = isNew ? response?.cookieStoreId : selectedContainer.cookieStoreId;
 
-            // Persist the user's chosen display icon (supports security icons) so UI matches choice.
-            if (targetId) {
-              const stored = await browser.storage.local.get({
-                containerDisplayIconOverrides: {},
-              });
-              const overrides =
-                (stored.containerDisplayIconOverrides &&
-                  typeof stored.containerDisplayIconOverrides === "object"
-                  ? stored.containerDisplayIconOverrides
-                  : {}) || {};
-              overrides[targetId] = icon;
-              await browser.storage.local.set({ containerDisplayIconOverrides: overrides });
-            }
-
-            const updatedContainers = await refreshContainers();
-
-            if (isNew && response) {
-              const realId = response.cookieStoreId;
-              const newC = updatedContainers.find(c => c.cookieStoreId === realId);
-              if (newC) setSelectedContainer(newC);
-            }
-
             if (!isNew && siteIsolation !== !!selectedContainer.isIsolated) {
-              await browser.runtime.sendMessage({
-                method: "addRemoveSiteIsolation",
-                cookieStoreId: selectedContainer.cookieStoreId,
-                remove: !siteIsolation,
-              });
-            }
-
-            if (proxyUrl) {
-              const parsed = parseGlobalProxyUrl(proxyUrl);
-              if (parsed) {
-                if (targetId) {
-                  const { proxifiedContainersKey = [] } = await browser.storage.local.get({
-                    proxifiedContainersKey: [],
-                  });
-                  const store = [...(proxifiedContainersKey as any[])];
-                  const idx = store.findIndex(p => p.cookieStoreId === targetId);
-                  // Preserve existing proxy properties (e.g. proxyDNS set
-                  // via Advanced Proxy Settings) when updating from the
-                  // simple URL input.
-                  const existing = idx !== -1 ? store[idx].proxy : {};
-                  const merged = { ...existing, ...parsed };
-                  if (idx === -1) {
-                    store.push({ cookieStoreId: targetId, proxy: merged });
-                  } else {
-                    store[idx] = { cookieStoreId: targetId, proxy: merged };
-                  }
-                  await browser.storage.local.set({ proxifiedContainersKey: store });
-                }
-              }
-            } else if (!isNew) {
-              // Clear proxy if empty
-              const { proxifiedContainersKey = [] } = await browser.storage.local.get({
-                proxifiedContainersKey: [],
-              });
-              const store = (proxifiedContainersKey as any[]).filter(p => p.cookieStoreId !== selectedContainer.cookieStoreId);
-              await browser.storage.local.set({ proxifiedContainersKey: store });
+              await msg.addRemoveSiteIsolation(selectedContainer.cookieStoreId, !siteIsolation);
             }
 
             const latestContainers = await refreshContainers();
@@ -1090,10 +919,7 @@ function App() {
           onDelete={async () => {
           const browser = requireWebExt();
           const userContextId = Number(selectedContainer.cookieStoreId.split("-").pop());
-          await browser.runtime.sendMessage({
-            method: "deleteContainer",
-            message: { userContextId },
-          });
+          await msg.deleteContainer(userContextId);
           // Remove any display icon override for this container
           const stored = await browser.storage.local.get({
             containerDisplayIconOverrides: {},
@@ -1121,6 +947,26 @@ function App() {
     return (
       <PopupWrapper>
         <ContainerDetailView
+          burpListener={highlighterEnabled ? {
+            address: highlighterStatus?.addresses?.[selectedContainer.cookieStoreId],
+            // The live tab list, not the count captured when the container was opened.
+            idleLabel: !highlighterPairing ? 'not paired'
+              : (tabsByContainer[selectedContainer.cookieStoreId] || []).length > 0 ? 'waiting…' : 'opens with a tab',
+            pin: highlighterPins[selectedContainer.cookieStoreId],
+            error: highlighterStatus?.errors?.[selectedContainer.cookieStoreId],
+            onSetPin: async (pin) => {
+              const id = selectedContainer.cookieStoreId;
+              const address = pin === null ? null : parseAddress(pin);
+              if (pin !== null && !address) return "Use ip:port, e.g. 192.168.10.5:8080";
+              const browser = requireWebExt();
+              const stored = await browser.storage.local.get({ [HIGHLIGHTER_PINS_KEY]: {} });
+              const next = { ...(stored[HIGHLIGHTER_PINS_KEY] as Record<string, string>) };
+              if (address) next[id] = formatAddress(address); else delete next[id];
+              setHighlighterPins(next);
+              await browser.storage.local.set({ [HIGHLIGHTER_PINS_KEY]: next });
+              return null;
+            },
+          } : undefined}
           containerName={selectedContainer.name}
           containerColor={selectedContainer.color}
           containerIcon={selectedContainer.displayIcon}
@@ -1130,21 +976,15 @@ function App() {
             const browser = requireWebExt();
             await browser.tabs.create({ cookieStoreId: selectedContainer.cookieStoreId });
           }}
+          // Refresh afterwards: the tab list otherwise kept showing tabs that
+          // had just been closed, and closing one of those failed.
           onHideContainer={async () => {
-            const browser = requireWebExt();
-            await browser.runtime.sendMessage({
-              method: "hideTabs",
-              cookieStoreId: selectedContainer.cookieStoreId,
-              windowId,
-            });
+            await msg.hideTabs(selectedContainer.cookieStoreId);
+            await refreshContainers();
           }}
           onMoveToWindow={async () => {
-            const browser = requireWebExt();
-            await browser.runtime.sendMessage({
-              method: "moveTabsToWindow",
-              cookieStoreId: selectedContainer.cookieStoreId,
-              windowId,
-            });
+            await msg.moveTabsToWindow(selectedContainer.cookieStoreId);
+            await refreshContainers();
           }}
           onManageSites={() => {
             if (!selectedContainer?.cookieStoreId) return;
@@ -1154,11 +994,19 @@ function App() {
           }}
           onClearStorage={async () => {
             const browser = requireWebExt();
+            // browsingData is optional; request it from this click (a user
+            // gesture). Without it the background call failed and the user
+            // was never told, so they believed the session had been cleared.
+            let granted = false;
+            try {
+              granted = await browser.permissions.request({ permissions: ["browsingData"] });
+            } catch {
+              granted = false;
+            }
+            if (!granted) return false;
             const userContextId = Number(selectedContainer.cookieStoreId.split("-").pop());
-            await browser.runtime.sendMessage({
-              method: "deleteContainerDataOnly",
-              message: { userContextId },
-            });
+            const result = await msg.deleteContainerDataOnly<{ done?: boolean }>(userContextId);
+            return !!(result && result.done);
           }}
           onManageContainer={handleManageContainer}
           onCloseTab={async (tabId) => {
@@ -1167,18 +1015,15 @@ function App() {
             await refreshContainers();
           }}
           proxyPresets={customProxyPresets}
-          activeProxyPresetId={(() => {
-            // "Disable Proxy" — container has a direct entry overriding global proxy
-            if (selectedContainer.proxyUrl === "direct://") return "__direct__";
-            // Check per-container proxy first, then fall back to global proxy
-            const effectiveUrl = selectedContainer.proxyUrl || (globalProxyEnabled ? proxyUrl : "");
-            if (!effectiveUrl) return undefined;
-            const match = customProxyPresets.find(p => {
-              const presetUrl = `${p.scheme}://${p.host}:${p.port}`;
-              return effectiveUrl === presetUrl;
-            });
-            return match?.id;
-          })()}
+          activeProxyPresetId={effectivePresetId(
+            selectedContainer.proxyUrl
+              ? parseContainerProxyUrl(selectedContainer.proxyUrl)
+              : null,
+            globalProxyEnabled ? parseGlobalProxyUrl(proxyUrl) : null,
+            promotedProxyContainerIds.length === 0 ||
+              promotedProxyContainerIds.includes(selectedContainer.cookieStoreId),
+            customProxyPresets,
+          )}
           onSelectProxyPreset={async (preset) => {
             if (!preset) {
               await setProxyForContainer(selectedContainer.cookieStoreId, null);
@@ -1192,14 +1037,20 @@ function App() {
               });
             } else {
               await setProxyForContainer(selectedContainer.cookieStoreId, {
-                type: preset.scheme,
+                type: presetProxyType(preset.scheme),
                 host: preset.host,
                 port: preset.port,
-                mozProxyEnabled: true,
+                // A preset is a plain proxy. true marked it as a Mozilla VPN
+                // proxy, so the VPN section showed "Use VPN" on for it and
+                // turning that off deleted the preset.
+                mozProxyEnabled: false,
                 source: "preset",
               });
             }
-            await refreshContainers();
+            // Keep the view's copy current, or the dropdown snaps back.
+            const updated = await refreshContainers();
+            const next = updated.find((c) => c.cookieStoreId === selectedContainer.cookieStoreId);
+            if (next) setSelectedContainer(next);
           }}
         />
       </PopupWrapper>
@@ -1263,7 +1114,7 @@ function App() {
         onQuickDeleteContainer={async (container) => {
           const browser = requireWebExt();
           const userContextId = Number(container.cookieStoreId.split("-").pop());
-          await browser.runtime.sendMessage({ method: "deleteContainer", message: { userContextId } });
+          await msg.deleteContainer(userContextId);
           const stored = await browser.storage.local.get({ containerDisplayIconOverrides: {}, promotedProxyContainerIds: null });
           const overrides = (stored.containerDisplayIconOverrides && typeof stored.containerDisplayIconOverrides === "object" ? stored.containerDisplayIconOverrides : {}) || {};
           if (overrides[container.cookieStoreId]) {
@@ -1281,17 +1132,13 @@ function App() {
           await refreshContainers();
         }}
         onQuickHideContainer={async (container) => {
-          const browser = requireWebExt();
           if (quickHideBusyRef.current.has(container.cookieStoreId)) return;
           quickHideBusyRef.current.add(container.cookieStoreId);
           try {
             let hasOpenTabs = container.visibleTabCount > 0;
             let hasHiddenTabs = container.hiddenTabCount > 0;
             try {
-              const stateByContainer = await browser.runtime.sendMessage({
-                method: "queryIdentitiesState",
-                message: { windowId },
-              });
+              const stateByContainer = await msg.queryIdentitiesState<Record<string, any>>(windowId);
               const state = stateByContainer?.[container.cookieStoreId];
               if (state) {
                 hasOpenTabs = !!state.hasOpenTabs;
@@ -1302,16 +1149,9 @@ function App() {
             }
 
             if (hasOpenTabs) {
-              await browser.runtime.sendMessage({
-                method: "hideTabs",
-                cookieStoreId: container.cookieStoreId,
-                windowId,
-              });
+              await msg.hideTabs(container.cookieStoreId);
             } else if (hasHiddenTabs) {
-              await browser.runtime.sendMessage({
-                method: "showTabs",
-                cookieStoreId: container.cookieStoreId,
-              });
+              await msg.showTabs(container.cookieStoreId);
             }
             await refreshContainers();
           } finally {
@@ -1361,12 +1201,14 @@ function App() {
                 return false;
               }
 
-              await browser.runtime.sendMessage({ method: "setGlobalProxyConfig", proxy: parsed });
+              await msg.setGlobalProxyConfig(parsed as unknown as Record<string, unknown>);
 
               setGlobalProxyEnabled(true);
+              const storedUrl = sanitizeProxyUrlForStorage(urlToUse);
+              selfWrittenProxyUrlsRef.current.add(storedUrl);
               await browser.storage.local.set({
                 globalProxyEnabled: true,
-                globalProxyUrl: sanitizeProxyUrlForStorage(urlToUse),
+                globalProxyUrl: storedUrl,
                 globalProxyParsed: stripSensitiveProxyFields(parsed),
                 globalProxyUserDisabled: false,
               });
@@ -1374,7 +1216,7 @@ function App() {
             }
 
             setGlobalProxyEnabled(false);
-            await browser.runtime.sendMessage({ method: "clearGlobalProxyConfig" });
+            await msg.clearGlobalProxyConfig();
             await browser.storage.local.set({
               globalProxyEnabled: false,
               globalProxyUserDisabled: true,
@@ -1390,29 +1232,55 @@ function App() {
         onProxyUrlChange={async (url) => {
           setProxyUrl(url);
           setGlobalProxyError("");
-          const browser = requireWebExt();
-          const updates: Record<string, any> = { globalProxyUrl: sanitizeProxyUrlForStorage(url) };
+          // Persist only a URL that parses. Anything else is mid-typing and may
+          // hold a half-typed password; the last valid URL stays stored.
           const parsed = parseGlobalProxyUrl(url);
-          if (parsed) {
-            await browser.runtime.sendMessage({ method: "setGlobalProxyConfig", proxy: parsed });
-            updates.globalProxyParsed = stripSensitiveProxyFields(parsed);
-          }
-          await browser.storage.local.set(updates);
+          if (!parsed) return;
+          const browser = requireWebExt();
+          await msg.setGlobalProxyConfig(parsed as unknown as Record<string, unknown>);
+          const storedUrl = sanitizeProxyUrlForStorage(url);
+          selfWrittenProxyUrlsRef.current.add(storedUrl);
+          await browser.storage.local.set({
+            globalProxyUrl: storedUrl,
+            globalProxyParsed: stripSensitiveProxyFields(parsed),
+          });
         }}
         proxyError={globalProxyError}
-        paintBurp={paintBurp}
-        onTogglePaintBurp={async (enabled) => {
-          setPaintBurp(enabled);
-          const browser = requireWebExt();
-          await browser.storage.local.set({ addContainerColorHeaderEnabled: enabled });
+        highlighterEnabled={highlighterEnabled}
+        onToggleHighlighter={async (enabled) => {
+          setHighlighterEnabled(enabled);
+          await requireWebExt().storage.local.set({ [HIGHLIGHTER_ENABLED_KEY]: enabled });
+        }}
+        highlighterPairing={highlighterPairing}
+        highlighterStatus={highlighterStatus}
+        onPairHighlighter={async (pairing) => {
+          setHighlighterPairing(pairing);
+          await requireWebExt().storage.local.set({ [HIGHLIGHTER_PAIRING_KEY]: pairing });
+        }}
+        onUnpairHighlighter={async () => {
+          setHighlighterPairing(null);
+          // Unpairing on purpose: don't find Burp and ask again until Connect.
+          await requireWebExt().storage.local.set({
+            [HIGHLIGHTER_PAIRING_KEY]: null,
+            [HIGHLIGHTER_AUTO_PAIR_PAUSED_KEY]: true,
+          });
+        }}
+        onConnectHighlighter={async () => {
+          // The background watches the request key and looks for the Highlighter now.
+          await requireWebExt().storage.local.set({
+            [HIGHLIGHTER_AUTO_PAIR_PAUSED_KEY]: false,
+            [HIGHLIGHTER_CONNECT_KEY]: Date.now(),
+          });
         }}
         userAgentEnabled={globalUserAgent}
         onToggleUserAgent={async (enabled) => {
           setGlobalUserAgent(enabled);
           const browser = requireWebExt();
           if (enabled) {
-            await loadUserAgents(false);
+            // Store first, then fetch: awaiting the (network) list first let a
+            // quick close write "off" and then this late "on" win.
             await browser.storage.local.set({ globalUserAgentEnabled: true });
+            void loadUserAgents(false);
           } else {
             await browser.storage.local.set({ globalUserAgentEnabled: false, globalUserAgent: "" });
             setSelectedUserAgent("");
@@ -1440,15 +1308,15 @@ function App() {
         onOpenInNewTab={() => openPicker("Open in new tab in…", "openNewTab")}
         onReopenSiteIn={() => openPicker("Reopen this site in…", "reopenSiteIn")}
         onSortTabs={async () => {
-          const browser = requireWebExt();
-          await browser.runtime.sendMessage({ method: "sortTabs" });
+          await msg.sortTabs();
         }}
         onAlwaysOpenIn={() => openPicker("Always open this site in…", "alwaysOpenIn")}
         vpnWarnDot={vpnWarnDot}
         onOpenOptions={async () => {
           try {
             const browser = requireWebExt();
-            browser.runtime.openOptionsPage();
+            // Save first: opening the options page can close the popup before
+            // a write issued after it lands, and the dot came back.
             if (vpnWarnDot) {
               const stored = await browser.storage.local.get({
                 mozillaVpnHiddenToutsList: [],
@@ -1460,6 +1328,7 @@ function App() {
               }
               setVpnWarnDot(false);
             }
+            await browser.runtime.openOptionsPage();
           } catch { /* ignore */ }
         }}
         proxyPresets={customProxyPresets}

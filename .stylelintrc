@@ -22,8 +22,6 @@
     "selector-id-pattern": null,
     "alpha-value-notation": "number",
     "color-function-notation": "modern",
-    "declaration-block-no-shorthand-property-overrides": null,
-    "declaration-block-no-duplicate-custom-properties": null,
     "@stylistic/indentation": 2,
     "@stylistic/max-empty-lines": 2,
     "@stylistic/color-hex-case": "lower",

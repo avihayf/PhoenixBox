@@ -16,15 +16,11 @@
     "text-content": "off",
     "element-required-content": "off",
     "prefer-tbody": "off",
-    "parser-error": "off",
     "id-pattern": "off",
     "class-pattern": "off",
     "wcag/h30": "off",
-    "wcag/h37": "off",
     "wcag/h32": "off",
     "wcag/h71": "off",
-    "no-dup-id": "off",
-    "element-permitted-content": "off",
     "attribute-allowed-values": "off",
     "attribute-boolean-style": "off"
   }

@@ -1,6 +1,13 @@
 "use strict";
 
-const STORAGE_KEY = "endpointScanResults";
+const STORAGE_PREFIX = "endpointScanResults@@_";
+// Pre-scan-id builds wrote a single shared key; still read it as a fallback.
+const LEGACY_STORAGE_KEY = "endpointScanResults";
+
+function getStorageKey() {
+  const scanId = new URLSearchParams(window.location.search).get("scan");
+  return scanId ? `${STORAGE_PREFIX}${scanId}` : LEGACY_STORAGE_KEY;
+}
 
 // Sort modes: "alpha" = A→Z, "depth" = fewest segments first
 let sortMode = "alpha";
@@ -86,7 +93,10 @@ function renderEndpoints(endpoints) {
   } else if (rawAccent && ACCENT_HUES[rawAccent] !== undefined) {
     accentHue = ACCENT_HUES[rawAccent];
   }
-  const theme = localStorage.getItem("theme") || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const storedTheme = localStorage.getItem("theme");
+  const theme = storedTheme && storedTheme !== "auto"
+    ? storedTheme
+    : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
   const isDark = theme === "dark";
   const root = document.documentElement;
   if (isDark) {
@@ -106,18 +116,41 @@ function renderEndpoints(endpoints) {
 }
 
 async function init() {
-  const stored = await browser.storage.local.get(STORAGE_KEY);
-  const data = stored[STORAGE_KEY];
+  try {
+    await load();
+  } catch (e) {
+    document.getElementById("count").textContent = "error";
+    document.getElementById("empty-state").textContent = "Could not load the scan results.";
+    throw e;
+  }
+}
 
-  // Clear results from storage immediately after reading
-  await browser.storage.local.remove(STORAGE_KEY);
+async function load() {
+  const storageKey = getStorageKey();
+  const stored = await browser.storage.local.get(storageKey);
+  const data = stored[storageKey];
+
+  // Results are intentionally left in storage so reloading this tab still
+  // works; the background page caps how many scans are retained.
 
   if (!data || !data.endpoints) {
-    document.getElementById("count").textContent = "0 endpoints";
+    // Distinguish "this scan found nothing" from "these results are gone".
+    // Scans are cleared at browser startup, so a session-restored tab lands
+    // here and a bare "0 endpoints" would read as a failed scan.
+    document.getElementById("count").textContent = "no results";
+    document.getElementById("empty-state").textContent =
+      "These scan results are no longer available. Rescan the page to see its endpoints.";
     return;
   }
 
-  const { endpoints, pageUrl, scannedAt } = data;
+  const { pageUrl, scannedAt, scanFailed, truncated } = data;
+  const endpoints = data.endpoints.filter((e) => typeof e === "string");
+
+  if (scanFailed) {
+    document.getElementById("count").textContent = "scan failed";
+    document.getElementById("empty-state").textContent =
+      "PhoenixBox could not read this page. Firefox does not let extensions run on some pages (such as about: pages and addons.mozilla.org); reload the page and try again otherwise.";
+  }
 
   const urlEl = document.getElementById("page-url");
   urlEl.textContent = pageUrl || "";
@@ -125,10 +158,11 @@ async function init() {
 
   if (scannedAt) {
     document.getElementById("scanned-at").textContent =
-      `Scanned at ${new Date(scannedAt).toLocaleTimeString()}`;
+      `Scanned at ${new Date(scannedAt).toLocaleTimeString()}` +
+      (truncated ? " — showing the first 5000" : "");
   }
 
-  renderEndpoints(endpoints);
+  if (!scanFailed) renderEndpoints(endpoints);
 
   document.getElementById("filter-input").addEventListener("input", () => {
     renderEndpoints(endpoints);

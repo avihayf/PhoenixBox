@@ -1,51 +1,74 @@
-import { Plus, RotateCcw, ArrowUpDown, Hourglass, Sun, Moon, Info, Search, ChevronRight, ChevronDown, ChevronUp, Palette, Trash2, Edit2, X, ArrowUp, Eye, EyeOff, Globe, Highlighter, UserCog, Download, type LucideIcon } from 'lucide-react';
+import { Plus, RotateCcw, ArrowUpDown, Hourglass, Sun, Moon, Info, Search, ChevronRight, ChevronDown, ChevronUp, Palette, Trash2, Edit2, X, ArrowUp, Eye, EyeOff, Globe, Highlighter, UserCog, Settings, Lock, type LucideIcon } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { ContainerIcon } from '../ContainerIcon';
 import { UserAgentModal } from '../modals/UserAgentModal';
 import { ProxyPresetModal } from '../modals/ProxyPresetModal';
 import type { UserAgentData } from '../../../lib/userAgent';
 import { getContainerColorHex } from '../../../lib/containerColors';
-import { DEFAULT_PROXY_PRESETS, type ProxyPreset } from '../../../data/mockData';
-import { requireWebExt } from '../../../lib/browser';
+import { type ProxyPreset } from '../../../lib/proxyPresets';
 import { HueAccentPicker } from '../HueAccentPicker';
 import { LogoAccentPicker } from '../LogoAccentPicker';
 import { accentToHue, type AccentValue, type LogoAccentValue } from '../../../lib/accentColors';
+import { HighlighterModal } from '../modals/HighlighterModal';
+import { describeStatus, statusTone, type HighlighterPairing, type HighlighterStatus } from '../../../lib/highlighterSettings';
 
-/** Compact on/off toggle tile used for the Proxy / Highlighter / User-Agent controls. */
-function ControlTile({ icon: Icon, label, active, disabled, onClick }: {
+const TONE_COLORS = { ok: 'var(--ext-green)', pending: 'var(--ext-yellow)', bad: 'var(--ext-red)' } as const;
+
+/**
+ * Compact on/off toggle tile used for the Proxy / Highlighter / User-Agent controls.
+ * `onConfigure` adds a corner settings button inside the tile, so turning a
+ * control on never makes the main view taller. `status` adds a corner dot for
+ * whether an "On" control is actually working, with its explanation.
+ */
+function ControlTile({ icon: Icon, label, active, disabled, onClick, onConfigure, status }: {
   icon: LucideIcon;
   label: string;
   active: boolean;
   disabled?: boolean;
   onClick: () => void;
+  onConfigure?: () => void;
+  status?: { tone: keyof typeof TONE_COLORS; text: string } | null;
 }) {
   const color = active ? 'var(--ext-accent)' : 'var(--ext-text-muted)';
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-pressed={active}
-      className="flex-1 flex flex-col items-center gap-2 py-3 px-1.5 rounded-xl border transition-colors disabled:opacity-50"
-      style={{ borderColor: active ? 'var(--ext-accent)' : 'var(--ext-border)', background: active ? 'var(--ext-accent-bg)' : 'transparent' }}
-    >
-      <Icon className="w-5 h-5" style={{ color }} />
-      <span className="text-[11px] font-medium leading-tight text-center" style={{ color }}>{label}</span>
-      <span className="text-[9px] uppercase tracking-wide font-semibold" style={{ color }}>{active ? 'On' : 'Off'}</span>
-    </button>
+    <div className="relative flex-1">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        aria-pressed={active}
+        title={status?.text}
+        className="w-full flex flex-col items-center gap-1.5 py-2.5 px-1.5 rounded-xl border transition-colors disabled:opacity-50"
+        style={{ borderColor: active ? 'var(--ext-accent)' : 'var(--ext-border)', background: active ? 'var(--ext-accent-bg)' : 'transparent' }}
+      >
+        <Icon className="w-5 h-5" style={{ color }} />
+        <span className="text-[11px] font-medium leading-tight text-center" style={{ color }}>{label}</span>
+        <span className="text-[9px] uppercase tracking-wide font-semibold" style={{ color }}>{active ? 'On' : 'Off'}</span>
+        {status && <span className="sr-only">{status.text}</span>}
+      </button>
+      {status && (
+        <span
+          aria-hidden="true"
+          className="absolute top-2 left-2 w-2 h-2 rounded-full pointer-events-none"
+          style={{ background: TONE_COLORS[status.tone] }}
+        />
+      )}
+      {onConfigure && (
+        <button
+          type="button"
+          onClick={onConfigure}
+          className="absolute top-1 right-1 p-1 rounded-md text-[var(--ext-accent)] hover:bg-[var(--ext-accent)]/15 focus-visible:bg-[var(--ext-accent)]/15 transition-colors"
+          aria-label={`Configure ${label}`}
+          title={`Configure ${label}`}
+        >
+          <Settings className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
   );
 }
 
-type Container = {
-  cookieStoreId: string;
-  name: string;
-  color: string;
-  icon: string;
-  displayIcon: string;
-  tabCount: number;
-  visibleTabCount: number;
-  hiddenTabCount: number;
-};
+import type { Container } from '../../../lib/types';
 
 interface SiteActionsViewProps {
   containers: Container[];
@@ -62,8 +85,16 @@ interface SiteActionsViewProps {
   proxyUrl: string;
   onProxyUrlChange: (url: string) => void;
   proxyError?: string;
-  paintBurp: boolean;
-  onTogglePaintBurp: (enabled: boolean) => Promise<void>;
+
+  // Burp highlighting: one Burp listener per open container
+  /** The Highlighter tile's switch: on, every container with an open tab gets its own Burp listener. */
+  highlighterEnabled: boolean;
+  onToggleHighlighter: (enabled: boolean) => Promise<void>;
+  highlighterPairing: HighlighterPairing | null;
+  highlighterStatus: HighlighterStatus | null;
+  onPairHighlighter: (pairing: HighlighterPairing) => Promise<void>;
+  onUnpairHighlighter: () => Promise<void>;
+  onConnectHighlighter: () => Promise<void>;
 
   // User Agent
   userAgentEnabled: boolean;
@@ -116,8 +147,13 @@ export function SiteActionsView({
   proxyUrl,
   onProxyUrlChange,
   proxyError,
-  paintBurp,
-  onTogglePaintBurp,
+  highlighterEnabled,
+  onToggleHighlighter,
+  highlighterPairing,
+  highlighterStatus,
+  onPairHighlighter,
+  onUnpairHighlighter,
+  onConnectHighlighter,
   userAgentEnabled,
   onToggleUserAgent,
   userAgentType,
@@ -153,8 +189,11 @@ export function SiteActionsView({
   const [showPresetDropdown, setShowPresetDropdown] = useState(false);
   const [showProxyModal, setShowProxyModal] = useState(false);
   const [editingPreset, setEditingPreset] = useState<ProxyPreset | null>(null);
-  const [showPaintBurpFirstTimeMessage, setShowPaintBurpFirstTimeMessage] = useState(false);
+  const [showHighlighterModal, setShowHighlighterModal] = useState(false);
+  const highlighterTone = statusTone(highlighterStatus, !!highlighterPairing, highlighterEnabled);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmDeletePresetId, setConfirmDeletePresetId] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [hoveredContainerId, setHoveredContainerId] = useState<string | null>(null);
   const presetDropdownRef = useRef<HTMLDivElement>(null);
   const accentPickerRef = useRef<HTMLDivElement>(null);
@@ -186,10 +225,13 @@ export function SiteActionsView({
     }
   };
 
-  const handleCloseUserAgentModal = () => {
+  // Uses the value the modal reports rather than the selectedUserAgent prop,
+  // which after "Clear Override" was still the old agent in this render — the
+  // tile stayed on with no User-Agent set.
+  const handleCloseUserAgentModal = (userAgent: string) => {
     setShowUserAgentModal(false);
     // If no user-agent was selected, auto-disable the toggle
-    if (!selectedUserAgent) {
+    if (!userAgent) {
       onToggleUserAgent(false);
     }
   };
@@ -201,7 +243,10 @@ export function SiteActionsView({
   const filteredContainers = containers.filter(container =>
     container.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
-  const shouldScrollContainers = filteredContainers.length > 6;
+  // A fresh profile has four containers, and the view is sized so those four
+  // fit the 600px popup without scrolling. Past that the list scrolls on its
+  // own, capped at four rows, so the Manage button stays in view.
+  const shouldScrollContainers = filteredContainers.length > 4;
 
   return (
     <div className="w-full max-h-[600px] flex flex-col bg-[var(--ext-bg)] rounded-xl">
@@ -244,7 +289,7 @@ export function SiteActionsView({
           </div>
         </div>
 
-        <h1 className="brand-main-title text-[32px]">
+        <h1 className="brand-main-title text-[32px] leading-none">
           {"PhoenixBox".split("").map((ch, i) => (
             <span key={i} style={{ color: i >= 7 ? 'var(--ext-logo-accent)' : 'var(--ext-accent)' }}>
               {ch}
@@ -271,6 +316,8 @@ export function SiteActionsView({
           {/* Toggle Header - Clickable */}
           <button
             onClick={toggleQuickActions}
+            aria-expanded={isQuickActionsExpanded}
+            aria-controls="quick-actions-list"
             className="w-full flex items-center gap-2.5 p-2 hover:bg-[var(--ext-bg-secondary)] rounded transition-colors group"
           >
             <Plus className="w-4 h-4 text-[var(--ext-accent)]" />
@@ -284,6 +331,11 @@ export function SiteActionsView({
 
           {/* Expandable Actions */}
           <div
+            id="quick-actions-list"
+            // Collapsed actions stay out of the tab order and the a11y tree;
+            // visually hiding them left invisible buttons focusable.
+            // (React 18's types predate `inert`; "" sets the boolean attribute.)
+            {...({ inert: isQuickActionsExpanded ? undefined : "" } as Record<string, unknown>)}
             className={`overflow-hidden transition-all duration-300 ease-in-out space-y-1 ${isQuickActionsExpanded
               ? 'max-h-40 opacity-100 mt-1'
               : 'max-h-0 opacity-0'
@@ -331,28 +383,29 @@ export function SiteActionsView({
                 disabled={!!proxyToggleDisabled}
                 onClick={() => onToggleProxy(!proxyEnabled)}
               />
+              {/* On: every container with an open tab gets its own Burp listener. The gear pairs with Burp. */}
               <ControlTile
                 icon={Highlighter}
                 label="Highlighter"
-                active={paintBurp}
-                onClick={async () => {
-                  const enabled = !paintBurp;
-                  await onTogglePaintBurp(enabled);
-                  if (enabled) {
-                    const browser = requireWebExt();
-                    const stored = await browser.storage.local.get({ paintBurpFirstTimeMessageShown: false });
-                    if (!stored.paintBurpFirstTimeMessageShown) {
-                      await browser.storage.local.set({ paintBurpFirstTimeMessageShown: true });
-                      setShowPaintBurpFirstTimeMessage(true);
-                    }
-                  }
+                active={highlighterEnabled}
+                onClick={() => {
+                  const next = !highlighterEnabled;
+                  void onToggleHighlighter(next);
+                  // Show the "click Allow in Burp" step the first time it is needed.
+                  if (next && !highlighterPairing) setShowHighlighterModal(true);
                 }}
+                onConfigure={() => setShowHighlighterModal(true)}
+                status={highlighterTone ? {
+                  tone: highlighterTone,
+                  text: describeStatus(highlighterStatus, !!highlighterPairing, highlighterEnabled),
+                } : null}
               />
               <ControlTile
                 icon={UserCog}
                 label="User-Agent"
                 active={userAgentEnabled}
                 onClick={() => handleToggleUserAgent(!userAgentEnabled)}
+                onConfigure={userAgentEnabled ? () => setShowUserAgentModal(true) : undefined}
               />
             </div>
 
@@ -386,10 +439,7 @@ export function SiteActionsView({
                               onClick={async () => {
                                 const url = `${preset.scheme}://${preset.host}:${preset.port}`;
                                 onProxyUrlChange(url);
-                                const proxyEnabled = await onToggleProxy(true, url);
-                                if (preset.autoEnablePaintBurp && proxyEnabled) {
-                                  await onTogglePaintBurp(true);
-                                }
+                                await onToggleProxy(true, url);
                                 setShowPresetDropdown(false);
                               }}
                               className="flex-1 px-3 py-2 text-left min-w-0"
@@ -399,7 +449,7 @@ export function SiteActionsView({
                                 {preset.scheme}://{preset.host}:{preset.port}
                               </p>
                             </button>
-                            <div className="flex items-center pr-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center pr-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                               <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -409,16 +459,25 @@ export function SiteActionsView({
                                     }}
                                     className="p-1.5 text-[var(--ext-text-muted)] hover:text-[var(--ext-accent)] transition-colors"
                                     title="Edit preset"
+                                    aria-label={`Edit ${preset.name}`}
                                   >
                                 <Edit2 className="w-3 h-3" />
                               </button>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  // Two clicks: the built-in Burp preset cannot be
+                                  // restored once deleted.
+                                  if (confirmDeletePresetId !== preset.id) {
+                                    setConfirmDeletePresetId(preset.id);
+                                    return;
+                                  }
+                                  setConfirmDeletePresetId(null);
                                   onDeleteProxyPreset(preset.id);
                                 }}
-                                className="p-1.5 text-[var(--ext-text-muted)] hover:text-[var(--ext-red)] transition-colors"
-                                title="Delete preset"
+                                className={`p-1.5 transition-colors ${confirmDeletePresetId === preset.id ? 'text-[var(--ext-red)]' : 'text-[var(--ext-text-muted)] hover:text-[var(--ext-red)]'}`}
+                                title={confirmDeletePresetId === preset.id ? 'Click again to delete' : 'Delete preset'}
+                                aria-label={confirmDeletePresetId === preset.id ? `Confirm deleting ${preset.name}` : `Delete ${preset.name}`}
                               >
                                 <Trash2 className="w-3 h-3" />
                               </button>
@@ -441,27 +500,37 @@ export function SiteActionsView({
                   )}
                 </div>
                 
-                {/* Proxy URL Input */}
-                <input
-                  type="text"
-                  value={proxyUrl}
-                  onChange={(e) => onProxyUrlChange(e.target.value)}
-                  readOnly={proxyEnabled}
-                  placeholder="Select preset"
-                  className={`flex-1 px-2.5 py-1.5 bg-transparent border border-[var(--ext-border)] rounded-lg text-xs text-[var(--ext-text)] placeholder:text-[var(--ext-text-muted)] focus:outline-none focus:border-[var(--ext-accent)] ${proxyEnabled ? 'opacity-70 cursor-not-allowed' : ''}`}
-                />
+                {/* Proxy URL Input - locked while the proxy is on */}
+                <div className="relative flex-1 min-w-0">
+                  <input
+                    type="text"
+                    value={proxyUrl}
+                    onChange={(e) => onProxyUrlChange(e.target.value)}
+                    readOnly={proxyEnabled}
+                    placeholder="Select preset"
+                    aria-invalid={!!proxyError}
+                    aria-describedby={proxyError ? 'proxy-url-error' : undefined}
+                    title={proxyEnabled ? 'Disable proxy to edit URL manually' : undefined}
+                    className={`w-full px-2.5 py-1.5 bg-transparent border rounded-lg text-xs text-[var(--ext-text)] placeholder:text-[var(--ext-text-muted)] focus:outline-none focus:border-[var(--ext-accent)] ${proxyError ? 'border-[var(--ext-red)]' : 'border-[var(--ext-border)]'} ${proxyEnabled ? 'pr-7 opacity-70 cursor-not-allowed' : ''}`}
+                  />
+                  {proxyEnabled && (
+                    <Lock
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-[var(--ext-text-muted)] pointer-events-none"
+                      aria-hidden="true"
+                    />
+                  )}
+                </div>
               </div>
-              <div className="mt-1 space-y-1">
-                {proxyError && (
-                  <p className="text-[10px] text-[var(--ext-red)]">{proxyError}</p>
-                )}
-                {proxyEnabled && !proxyError && (
-                  <p className="text-[10px] text-[var(--ext-text-muted)] flex items-center gap-1">
-                    <Info className="w-2.5 h-2.5" />
-                    Disable proxy to edit URL manually
-                  </p>
-                )}
-              </div>
+              {/* Floats over the section below so an error never resizes the view */}
+              {proxyError && (
+                <p
+                  id="proxy-url-error"
+                  role="alert"
+                  className="absolute left-0 right-0 top-full mt-1 z-20 px-2 py-1 text-[10px] text-[var(--ext-red)] bg-[var(--ext-bg-secondary)] border border-[var(--ext-red)]/50 rounded-md shadow-lg"
+                >
+                  {proxyError}
+                </p>
+              )}
             </div>
 
             {/* Proxy Modal for Custom Configuration */}
@@ -481,15 +550,6 @@ export function SiteActionsView({
               initialData={editingPreset || undefined}
             />
 
-            {/* User Agent Configure Button (when enabled) */}
-            {userAgentEnabled && (
-              <button
-                onClick={() => setShowUserAgentModal(true)}
-                className="w-full px-3 py-2 text-xs bg-[var(--ext-accent-bg)] border border-[var(--ext-accent)] text-[var(--ext-accent)] rounded-lg hover:bg-[var(--ext-accent)] hover:text-black transition-colors"
-              >
-                Configure User-Agent
-              </button>
-            )}
           </div>
         </div>
 
@@ -501,6 +561,8 @@ export function SiteActionsView({
                 Containers
               </h2>
             <button
+              type="button"
+              onClick={() => searchInputRef.current?.focus()}
               className="p-1 hover:bg-[var(--ext-bg-secondary)] rounded transition-colors"
               aria-label="Search containers"
             >
@@ -510,7 +572,9 @@ export function SiteActionsView({
 
             {/* Search Input */}
             <input
+              ref={searchInputRef}
               type="text"
+              aria-label="Search containers"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search..."
@@ -518,12 +582,13 @@ export function SiteActionsView({
             />
 
             {/* Container List */}
-            <div className={`${shouldScrollContainers ? 'max-h-[220px] overflow-y-auto custom-scrollbar' : ''}`}>
+            <div className={`${shouldScrollContainers ? 'max-h-[164px] overflow-y-auto custom-scrollbar' : ''}`}>
               <div className="space-y-1">
                 {filteredContainers.map(container => {
                   const cHex = getContainerColorHex(container.color);
                   const isConfirming = confirmDeleteId === container.cookieStoreId;
                   const isPromoted = promotedProxyContainerIds.includes(container.cookieStoreId);
+                  const pinned = isPromoted;
                   const hasVisibleTabs = container.visibleTabCount > 0;
                   const hasHiddenTabs = container.hiddenTabCount > 0;
                   const hideActionLabel = hasVisibleTabs ? "Hide" : "Show";
@@ -604,7 +669,7 @@ export function SiteActionsView({
                             </span>
                             <div
                               className={`flex items-center gap-1 transition-opacity duration-150 ${
-                                isPromoted
+                                pinned
                                   ? 'opacity-100'
                                   : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto'
                               }`}
@@ -676,94 +741,17 @@ export function SiteActionsView({
 
       </div>
 
-      {/* Paint the Burp First-Time Message Modal */}
-      {showPaintBurpFirstTimeMessage && (
-        <>
-          {/* Backdrop */}
-          <div 
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 animate-in fade-in duration-200"
-            onClick={() => setShowPaintBurpFirstTimeMessage(false)}
-          />
-          
-          {/* Modal */}
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-            <div
-              className="relative bg-[var(--ext-bg-secondary)] border border-[var(--ext-accent)]/40 rounded-2xl overflow-hidden w-full max-w-[340px] pointer-events-auto animate-in scale-in-95 duration-200"
-              style={{ boxShadow: '0 24px 60px rgba(0,0,0,0.6), 0 0 32px var(--ext-glow-accent)' }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Accent top line */}
-              <div
-                className="h-0.5 w-full"
-                style={{ background: 'linear-gradient(90deg, transparent, var(--ext-accent) 30%, var(--ext-accent-light) 50%, var(--ext-accent) 70%, transparent)' }}
-              />
-
-              {/* Header */}
-              <div className="flex items-start gap-3 px-5 pt-5 pb-4 border-b border-[var(--ext-accent)]/15">
-                <div
-                  className="w-10 h-10 flex-none rounded-xl flex items-center justify-center border border-[var(--ext-accent)]/40"
-                  style={{ background: 'var(--ext-accent-bg)', boxShadow: 'inset 0 0 18px var(--ext-glow-accent)' }}
-                >
-                  <Highlighter className="w-5 h-5 text-[var(--ext-accent)]" />
-                </div>
-                <div className="flex-1 min-w-0 pt-0.5">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--ext-text-muted)] mb-1.5">
-                    Burp Integration
-                  </div>
-                  <h2 className="font-medium uppercase tracking-wider text-[var(--ext-text)] brand-title" style={{ fontSize: '15px', lineHeight: 1.2 }}>
-                    Phoenix Highlighter Setup
-                  </h2>
-                </div>
-                <button
-                  onClick={() => setShowPaintBurpFirstTimeMessage(false)}
-                  className="w-8 h-8 flex-none flex items-center justify-center rounded-lg text-[var(--ext-text-muted)] hover:bg-[var(--ext-accent-bg)] hover:text-[var(--ext-accent)] transition-all duration-200"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Content */}
-              <div className="px-5 pt-5 pb-6 space-y-3.5">
-                <p className="text-sm text-[var(--ext-text)] leading-relaxed">
-                  Color-codes your Burp requests by container, so you can see at a glance which container each request came from.
-                </p>
-                <div
-                  className="flex items-start gap-3 p-3.5 rounded-xl border border-[var(--ext-accent)]/25"
-                  style={{ background: 'var(--ext-accent-bg)' }}
-                >
-                  <Info className="w-4 h-4 flex-none mt-0.5 text-[var(--ext-accent)]" />
-                  <p className="text-sm text-[var(--ext-text)] leading-relaxed">
-                    Make sure the <strong className="text-[var(--ext-accent)] font-semibold">Phoenix Highlighter</strong> extension (JAR) is loaded in Burp Suite.
-                  </p>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="px-5 pb-5">
-                <a
-                  href="https://github.com/avihayf/PhoenixBox-Highlighter/releases/download/v1.1.0/PhoenixBoxHighlighter.jar"
-                  download
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={() => setShowPaintBurpFirstTimeMessage(false)}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-3 text-sm text-black rounded-xl font-semibold transition-all duration-200"
-                  style={{ background: 'linear-gradient(180deg, var(--ext-accent-light), var(--ext-accent))', boxShadow: '0 0 22px var(--ext-glow-accent)' }}
-                >
-                  <Download className="w-4 h-4" />
-                  Download Phoenix JAR
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setShowPaintBurpFirstTimeMessage(false)}
-                  className="w-full mt-2 px-3 py-2 text-xs text-[var(--ext-text-muted)] hover:text-[var(--ext-accent)] transition-colors font-medium"
-                >
-                  I already have it
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      <HighlighterModal
+        isOpen={showHighlighterModal}
+        onClose={() => setShowHighlighterModal(false)}
+        enabled={highlighterEnabled}
+        pairing={highlighterPairing}
+        status={highlighterStatus}
+        containers={containers}
+        onPair={onPairHighlighter}
+        onUnpair={onUnpairHighlighter}
+        onConnect={onConnectHighlighter}
+      />
 
       {/* User Agent Modal */}
       <UserAgentModal

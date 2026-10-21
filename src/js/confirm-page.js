@@ -12,7 +12,10 @@
   } else if (rawAccent && ACCENT_HUES[rawAccent] !== undefined) {
     accentHue = ACCENT_HUES[rawAccent];
   }
-  const theme = localStorage.getItem("theme") || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const storedTheme = localStorage.getItem("theme");
+  const theme = storedTheme && storedTheme !== "auto"
+    ? storedTheme
+    : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
   const isDark = theme === "dark";
   const root = document.documentElement;
   if (isDark) {
@@ -48,7 +51,6 @@ async function load() {
   const currentCookieStoreId = searchParams.get("currentCookieStoreId");
   const redirectUrlElement = document.getElementById("redirect-url");
   redirectUrlElement.textContent = redirectUrl;
-  appendFavicon(redirectUrl, redirectUrlElement);
 
   // Option for staying on the previous container
   document.getElementById("deny").addEventListener("click", (e) => {
@@ -91,13 +93,6 @@ function setDenyButton(currentContainerName) {
   return;
 }
 
-function appendFavicon(pageUrl, redirectUrlElement) {
-  const origin = new URL(pageUrl).origin;
-  const favIconElement = Utils.createFavIconElement(`${origin}/favicon.ico`);
-
-  redirectUrlElement.prepend(favIconElement);
-}
-
 function confirmSubmit(redirectUrl, cookieStoreId) {
   const neverAsk = document.getElementById("never-ask").checked;
   // Sending neverAsk message to background to store for next time we see this process
@@ -116,11 +111,10 @@ function confirmSubmit(redirectUrl, cookieStoreId) {
  * @returns {Promise<Tab>}
  */
 async function getCurrentTab() {
-  const tabs = await browser.tabs.query({
-    active: true,
-    windowId: browser.windows.WINDOW_ID_CURRENT
-  });
-  return tabs[0];
+  // The tab this page lives in, not whichever tab happens to be active: if
+  // focus moved while the prompt was open, the old query exempted the wrong
+  // tab from the assignment.
+  return browser.tabs.getCurrent();
 }
 
 async function denySubmit(redirectUrl, currentCookieStoreId) {

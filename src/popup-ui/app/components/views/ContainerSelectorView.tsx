@@ -3,14 +3,7 @@ import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { ContainerIcon } from '../ContainerIcon';
 import { getContainerColorHex } from '../../../lib/containerColors';
 
-type Container = {
-  cookieStoreId: string;
-  name: string;
-  color: string;
-  icon: string;
-  displayIcon: string;
-  tabCount: number;
-};
+import type { Container } from '../../../lib/types';
 
 interface ContainerSelectorViewProps {
   title: string;
@@ -30,7 +23,7 @@ export function ContainerSelectorView({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   return (
-    <div className="w-full h-auto max-h-[720px] flex flex-col bg-[var(--ext-bg)] border border-[var(--ext-border)] rounded-xl shadow-xl overflow-hidden">
+    <div className="w-full h-auto max-h-[600px] flex flex-col bg-[var(--ext-bg)] border border-[var(--ext-border)] rounded-xl shadow-xl overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 px-3 py-2 border-b border-[var(--ext-border)] bg-[var(--ext-bg)] z-20">
         <button

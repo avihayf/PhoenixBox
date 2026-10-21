@@ -10,7 +10,12 @@ const messageHandler = {
 
   init() {
     // Handles messages from webextension code
-    browser.runtime.onMessage.addListener(async (m) => {
+    browser.runtime.onMessage.addListener(async (m, sender) => {
+      if (!PhoenixBoxReviewHelpers.isExtensionPageSender(
+        sender, browser.runtime.id, browser.runtime.getURL(""))) {
+        LOG.warn("Ignored a runtime message from outside the extension's pages", sender && sender.url);
+        return undefined;
+      }
       try {
         let response;
         let tab;
@@ -20,7 +25,9 @@ const messageHandler = {
           response = identityState.storageArea.loadKeyboardShortcuts();
           break;
         case "setShortcut":
-          identityState.storageArea.setKeyboardShortcut(m.shortcut, m.cookieStoreId);
+          // Otherwise this is a write of any value to any storage key.
+          if (!PhoenixBoxReviewHelpers.isValidShortcutAssignment(m.shortcut, m.cookieStoreId)) break;
+          response = identityState.storageArea.setKeyboardShortcut(m.shortcut, m.cookieStoreId);
           break;
         case "resetSync":
           response = sync.resetSync();
@@ -46,11 +53,6 @@ const messageHandler = {
         case "addRemoveSiteIsolation":
           response = backgroundLogic.addRemoveSiteIsolation(m.cookieStoreId, !!m.remove);
           break;
-        case "getAssignment":
-          response = browser.tabs.get(m.tabId).then((tab) => {
-            return assignManager._getAssignment(tab);
-          });
-          break;
         case "getAssignmentObjectByContainer":
           response = assignManager._getByContainer(m.message.userContextId);
           break;
@@ -60,7 +62,7 @@ const messageHandler = {
           response = assignManager._setOrRemoveAssignment(m.tabId, m.url, m.userContextId, m.value);
           break;
         case "resetCookiesForSite":
-          response = assignManager._resetCookiesForSite(m.pageUrl, m.cookieStoreId);
+          response = assignManager._resetCookiesForSite(m.hostname, m.cookieStoreId);
           break;
         case "sortTabs":
           backgroundLogic.sortTabs();
@@ -70,22 +72,12 @@ const messageHandler = {
           break;
         case "hideTabs":
           response = backgroundLogic.hideTabs({
-            cookieStoreId: m.cookieStoreId,
-            windowId: m.windowId
+            cookieStoreId: m.cookieStoreId
           });
-          break;
-        case "checkIncompatibleAddons":
           break;
         case "moveTabsToWindow":
           response = backgroundLogic.moveTabsToWindow({
-            cookieStoreId: m.cookieStoreId,
-            windowId: m.windowId
-          });
-          break;
-        case "getTabs":
-          response = backgroundLogic.getTabs({
-            cookieStoreId: m.cookieStoreId,
-            windowId: m.windowId
+            cookieStoreId: m.cookieStoreId
           });
           break;
         case "queryIdentitiesState":
@@ -95,6 +87,7 @@ const messageHandler = {
           response = assignManager._exemptTab(m);
           break;
         case "reloadInContainer":
+          if (!backgroundLogic.isPermissibleURL(m.url)) break;
           response = assignManager.reloadPageInContainer(
             m.url,
             m.currentUserContextId,
@@ -107,6 +100,13 @@ const messageHandler = {
           );
           break;
         case "assignAndReloadInContainer":
+          if (!backgroundLogic.isPermissibleURL(m.url)) break;
+          // Save the assignment before opening the tab. The other way round,
+          // the new tab loaded the site while any old assignment was still in
+          // force, got bounced back to the old container, and — being the
+          // "last created tab" — was closed, so the new assignment was never
+          // written.
+          await assignManager._setOrRemoveAssignment(null, m.url, m.newUserContextId, m.value);
           tab = await assignManager.reloadPageInContainer(
             m.url,
             m.currentUserContextId,
@@ -117,11 +117,11 @@ const messageHandler = {
             null,
             m.groupId
           );
-          // m.tabId is used for where to place the in content message
-          // m.url is the assignment to be removed/added
-          response = browser.tabs.get(tab.id).then((tab) => {
-            return assignManager._setOrRemoveAssignment(tab.id, m.url, m.newUserContextId, m.value);
-          });
+          if (tab && tab.id) {
+            assignManager._announceToTab(tab.id,
+              "Successfully assigned site to always open in this container");
+          }
+          response = tab;
           break;
 
         case "MozillaVPN_attemptPort":
@@ -151,20 +151,39 @@ const messageHandler = {
             // Tab may have closed between click and handler; pageUrl stays empty.
           }
           let endpoints = [];
+          // A failed scan (a page the content script cannot run in, such as
+          // about: pages or addons.mozilla.org) is reported as such rather
+          // than as "0 endpoints", which read as "this page has none".
+          let scanFailed = false;
           try {
             const reply = await browser.tabs.sendMessage(tabId, { method: "scanEndpoints" });
-            endpoints = Array.isArray(reply) ? reply : [];
+            endpoints = Array.isArray(reply) ? reply.filter((e) => typeof e === "string") : [];
           } catch (scanErr) {
+            scanFailed = true;
             LOG.error("[PhoenixBox] extractEndpoints: scan failed:", scanErr);
           }
+          // Bounded: a huge bundled page can yield tens of thousands of paths.
+          const MAX_ENDPOINTS = 5000;
+          const truncated = endpoints.length > MAX_ENDPOINTS;
+          if (truncated) endpoints = endpoints.slice(0, MAX_ENDPOINTS);
+          // Key each scan separately so two scans in flight can't overwrite
+          // each other, and so reloading a results tab still finds its data.
+          const scanId = `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+          const scanKey = `endpointScanResults@@_${scanId}`;
+          const scannedAt = Date.now();
           await browser.storage.local.set({
-            endpointScanResults: {
+            [scanKey]: {
               endpoints,
               pageUrl,
-              scannedAt: Date.now(),
+              scannedAt,
+              scanFailed,
+              truncated,
             }
           });
-          await browser.tabs.create({ url: browser.runtime.getURL("endpoint-results.html") });
+          await this.pruneEndpointScanResults(5, { key: scanKey, scannedAt });
+          await browser.tabs.create({
+            url: browser.runtime.getURL(`endpoint-results.html?scan=${encodeURIComponent(scanId)}`)
+          });
           break;
         }
         }
@@ -174,6 +193,11 @@ const messageHandler = {
         LOG.error("Background onMessage failed:", e, m && m.method);
         return undefined;
       }
+    });
+
+    // Scan results only need to outlive a tab reload, not the browser session.
+    browser.runtime.onStartup.addListener(() => {
+      this.pruneEndpointScanResults(0).catch(() => {});
     });
 
     if (browser.contextualIdentities.onRemoved) {
@@ -201,11 +225,10 @@ const messageHandler = {
       if (details.frameId !== 0 || details.tabId === -1) {
         return {};
       }
-      assignManager.removeContextMenu();
       browser.pageAction.show(details.tabId).catch(() => {});
 
       browser.tabs.get(details.tabId).then((tab) => {
-        assignManager.calculateContextMenu(tab);
+        assignManager.refreshContextMenuFor(tab);
       }).catch((e) => {
         LOG.error("Failed to update context menu onCompleted:", e);
       });
@@ -250,7 +273,10 @@ const messageHandler = {
             // if it's a container tab wait for it to complete and
             // unhide other tabs from this container
             if (tab.cookieStoreId.startsWith("firefox-container")) {
+              // Filtered to this tab, so a burst of new tabs does not make
+              // every handler run for every other tab's status change.
               browser.tabs.onUpdated.addListener(tabUpdateHandler, {
+                tabId: tab.id,
                 properties: ["status"]
               });
               // Clean up the listener if the tab is closed before loading completes
@@ -259,10 +285,51 @@ const messageHandler = {
           }
         }
       }
+      // Only forget *this* tab: an earlier tab's timer used to clear a later
+      // one, so a redirect in the second tab left a stray tab behind.
       setTimeout(() => {
-        this.lastCreatedTab = null;
+        if (this.lastCreatedTab === tab) this.lastCreatedTab = null;
       }, this.LAST_CREATED_TAB_TIMER);
     });
+  },
+
+  // Scan results are kept so their tab survives a reload, so they need a cap.
+  // Keep the newest few and drop the legacy single-key entry on the way past.
+  /**
+   * Cap the stored endpoint scans, optionally recording a new one first.
+   *
+   * Scans are tracked in a small index key. This used to read the whole of
+   * storage.local — every container's hidden tabs and site assignments — on
+   * every scan just to find these few keys. A profile without the index
+   * (upgraded from an older version) is read in full once to build it.
+   */
+  async pruneEndpointScanResults(keep = 5, added = null) {
+    const INDEX_KEY = "endpointScanIndex";
+    try {
+      const { [INDEX_KEY]: index } = await browser.storage.local.get(INDEX_KEY);
+      let candidates;
+      if (Array.isArray(index)) {
+        candidates = {};
+        for (const entry of index) {
+          if (entry && entry.key) candidates[entry.key] = { scannedAt: entry.scannedAt };
+        }
+      } else {
+        candidates = await browser.storage.local.get();
+      }
+      if (added) candidates[added.key] = { scannedAt: added.scannedAt };
+
+      const removable =
+        PhoenixBoxReviewHelpers.selectEndpointScanKeysToRemove(candidates, keep);
+      if (removable.length) {
+        await browser.storage.local.remove(removable);
+      }
+      const kept = Object.keys(candidates)
+        .filter((key) => key.startsWith("endpointScanResults@@_") && !removable.includes(key))
+        .map((key) => ({ key, scannedAt: Number(candidates[key] && candidates[key].scannedAt) || 0 }));
+      await browser.storage.local.set({ [INDEX_KEY]: kept });
+    } catch (e) {
+      LOG.error("Failed to prune endpoint scan results:", e);
+    }
   },
 
   async incrementCountOfContainerTabsOpened() {
@@ -274,13 +341,15 @@ const messageHandler = {
 
   async onFocusChangedCallback(windowId) {
     assignManager.removeContextMenu();
-    badge.displayBrowserActionBadge();
     browser.tabs.query({active: true, windowId}).then((tabs) => {
       if (tabs && tabs[0]) {
         assignManager.calculateContextMenu(tabs[0]);
       }
     }).catch((e) => {
-      throw e;
+      // Focus can land on a window with no queryable active tab (devtools,
+      // a closing window). Log it rather than re-throwing into an unhandled
+      // rejection on the background page.
+      LOG.error("Failed to update context menu onFocusChanged:", e);
     });
   },
 };

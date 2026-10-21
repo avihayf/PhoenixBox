@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { requireWebExt } from "../../lib/browser";
 import { Switch } from "./ui/switch";
+import * as msg from "../../lib/messages";
+import { getProxyForContainer, setProxyForContainer, PROXY_STORAGE_KEY,
+  type ProxyEntry } from "../../lib/proxyStore";
 
 type VpnServerCity = {
   name: string;
@@ -11,18 +14,6 @@ type VpnServerCountry = {
   code: string;
   name?: string;
   cities: VpnServerCity[];
-};
-
-type ProxyEntry = {
-  cookieStoreId: string;
-  proxy: {
-    type?: string | null;
-    host?: string;
-    port?: number;
-    countryCode?: string;
-    cityName?: string;
-    mozProxyEnabled?: boolean;
-  };
 };
 
 interface MozillaVpnSectionProps {
@@ -48,27 +39,31 @@ export function MozillaVpnSection({ cookieStoreId, expanded, onToggle }: Mozilla
 
     const load = async () => {
       try {
-        await browser.runtime.sendMessage({ method: "MozillaVPN_attemptPort" });
-      } catch {}
+        await msg.vpnAttemptPort();
+      } catch {
+        // The VPN client may not be installed; status below reflects that.
+      }
 
       try {
-        await browser.runtime.sendMessage({ method: "MozillaVPN_queryStatus" });
-      } catch {}
+        await msg.vpnQueryStatus();
+      } catch {
+        // Best-effort refresh.
+      }
 
       if (isExpanded) {
         try {
-          await browser.runtime.sendMessage({ method: "MozillaVPN_queryServers" });
-        } catch {}
+          await msg.vpnQueryServers();
+        } catch {
+          // Best-effort refresh; the server list keeps its last value.
+        }
       }
 
-      const [isInstalled, isConnected, permOk, stored] = await Promise.all([
-        browser.runtime.sendMessage({ method: "MozillaVPN_getInstallationStatus" }),
-        browser.runtime.sendMessage({ method: "MozillaVPN_getConnectionStatus" }),
+      const [isInstalled, isConnected, permOk, stored, containerProxy] = await Promise.all([
+        msg.vpnGetInstallationStatus<any>(),
+        msg.vpnGetConnectionStatus<any>(),
         browser.permissions.contains({ permissions: ["proxy", "nativeMessaging"] }),
-        browser.storage.local.get({
-          mozillaVpnServers: [],
-          proxifiedContainersKey: [],
-        }),
+        browser.storage.local.get({ mozillaVpnServers: [] }),
+        getProxyForContainer(cookieStoreId),
       ]);
 
       if (!active) return;
@@ -78,13 +73,9 @@ export function MozillaVpnSection({ cookieStoreId, expanded, onToggle }: Mozilla
       setPermissionsOk(!!permOk);
       setServers(Array.isArray(stored.mozillaVpnServers) ? stored.mozillaVpnServers : []);
 
-      const entries = Array.isArray(stored.proxifiedContainersKey)
-        ? (stored.proxifiedContainersKey as ProxyEntry[])
-        : [];
-      const entry = entries.find((p) => p.cookieStoreId === cookieStoreId);
-      setCountryCode(entry?.proxy?.countryCode || "");
-      setCityName(entry?.proxy?.cityName || "");
-      setEnabled(entry?.proxy?.mozProxyEnabled === true);
+      setCountryCode(containerProxy?.countryCode || "");
+      setCityName(containerProxy?.cityName || "");
+      setEnabled(containerProxy?.mozProxyEnabled === true);
     };
 
     const refresh = () => {
@@ -93,7 +84,7 @@ export function MozillaVpnSection({ cookieStoreId, expanded, onToggle }: Mozilla
 
     const onStorageChange = (changes: Record<string, { newValue?: unknown }>, areaName: string) => {
       if (areaName !== "local") return;
-      if (changes.mozillaVpnServers || changes.proxifiedContainersKey) {
+      if (changes.mozillaVpnServers || changes[PROXY_STORAGE_KEY]) {
         refresh();
       }
     };
@@ -148,27 +139,7 @@ export function MozillaVpnSection({ cookieStoreId, expanded, onToggle }: Mozilla
   };
 
   const saveProxy = async (proxy: ProxyEntry["proxy"] | null) => {
-    const browser = requireWebExt();
-    const stored = await browser.storage.local.get({ proxifiedContainersKey: [] });
-    const list = Array.isArray(stored.proxifiedContainersKey)
-      ? (stored.proxifiedContainersKey as ProxyEntry[])
-      : [];
-    const idx = list.findIndex((p) => p.cookieStoreId === cookieStoreId);
-
-    if (!proxy) {
-      if (idx !== -1) {
-        list.splice(idx, 1);
-        await browser.storage.local.set({ proxifiedContainersKey: list });
-      }
-      return;
-    }
-
-    if (idx === -1) {
-      list.push({ cookieStoreId, proxy });
-    } else {
-      list[idx] = { cookieStoreId, proxy };
-    }
-    await browser.storage.local.set({ proxifiedContainersKey: list });
+    await setProxyForContainer(cookieStoreId, proxy);
   };
 
   const handleToggle = async (nextEnabled: boolean) => {
@@ -268,7 +239,7 @@ export function MozillaVpnSection({ cookieStoreId, expanded, onToggle }: Mozilla
             <>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-[var(--ext-text)]">Use VPN for this container</span>
-                <Switch checked={enabled} onCheckedChange={handleToggle} />
+                <Switch aria-label="Use Mozilla VPN for this container" checked={enabled} onCheckedChange={handleToggle} />
               </div>
 
               <div className="grid grid-cols-2 gap-2">

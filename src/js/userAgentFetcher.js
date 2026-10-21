@@ -10,7 +10,10 @@
 
 const UA_CACHE_KEY = "cachedUserAgents";
 const UA_CACHE_TIMESTAMP_KEY = "userAgentsCacheTimestamp";
-const UA_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+// Cached lists are keyed to the pinned revision: its content can never
+// change, so a cache from it is valid forever (see lib/userAgent.ts).
+const UA_CACHE_REV_KEY = "userAgentsCacheRev";
+const FETCH_TIMEOUT_MS = 8000;
 
 const TOP_UA_REV = "e1dad9fe2c6255198fff142e36aaddc5b5adc0d2";
 const CDN_URLS = {
@@ -24,17 +27,8 @@ const userAgentFetcher = {
    * Check if cached data exists and is still valid
    */
   async isCacheValid() {
-    const stored = await browser.storage.local.get({
-      [UA_CACHE_TIMESTAMP_KEY]: 0
-    });
-    
-    const cacheTimestamp = stored[UA_CACHE_TIMESTAMP_KEY];
-    if (!cacheTimestamp) return false;
-    
-    const now = Date.now();
-    const age = now - cacheTimestamp;
-    
-    return age < UA_CACHE_TTL;
+    const stored = await browser.storage.local.get({ [UA_CACHE_REV_KEY]: null });
+    return stored[UA_CACHE_REV_KEY] === TOP_UA_REV;
   },
 
   /**
@@ -50,9 +44,9 @@ const userAgentFetcher = {
     try {
       // Fetch all three lists in parallel
       const [allResponse, desktopResponse, mobileResponse] = await Promise.all([
-        fetch(CDN_URLS.all),
-        fetch(CDN_URLS.desktop),
-        fetch(CDN_URLS.mobile)
+        fetch(CDN_URLS.all, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }),
+        fetch(CDN_URLS.desktop, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }),
+        fetch(CDN_URLS.mobile, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
       ]);
 
       const validateUAData = (data) =>
@@ -81,7 +75,8 @@ const userAgentFetcher = {
       // Save to storage
       await browser.storage.local.set({
         [UA_CACHE_KEY]: results,
-        [UA_CACHE_TIMESTAMP_KEY]: Date.now()
+        [UA_CACHE_TIMESTAMP_KEY]: Date.now(),
+        [UA_CACHE_REV_KEY]: TOP_UA_REV
       });
 
       return results;
@@ -133,111 +128,6 @@ const userAgentFetcher = {
     return await this.fetchFromCDN();
   },
 
-  /**
-   * Parse User-Agent string to create a friendly display name
-   * Example: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)..." -> "Chrome 143 - Windows 10"
-   */
-  parseUserAgentForDisplay(userAgent) {
-    if (!userAgent) return "Unknown";
-
-    // Extract browser name and version
-    let browser = "Unknown";
-    let version = "";
-    let os = "";
-
-    // Detect browser
-    if (userAgent.includes("Edg/")) {
-      const match = userAgent.match(/Edg\/([\d.]+)/);
-      browser = "Edge";
-      version = match ? match[1].split(".")[0] : "";
-    } else if (userAgent.includes("Chrome/")) {
-      const match = userAgent.match(/Chrome\/([\d.]+)/);
-      browser = "Chrome";
-      version = match ? match[1].split(".")[0] : "";
-    } else if (userAgent.includes("Firefox/")) {
-      const match = userAgent.match(/Firefox\/([\d.]+)/);
-      browser = "Firefox";
-      version = match ? match[1].split(".")[0] : "";
-    } else if (userAgent.includes("Safari/") && !userAgent.includes("Chrome")) {
-      const match = userAgent.match(/Version\/([\d.]+)/);
-      browser = "Safari";
-      version = match ? match[1].split(".")[0] : "";
-    } else if (userAgent.includes("OPR/") || userAgent.includes("Opera/")) {
-      const match = userAgent.match(/OPR\/([\d.]+)/) || userAgent.match(/Opera\/([\d.]+)/);
-      browser = "Opera";
-      version = match ? match[1].split(".")[0] : "";
-    }
-
-    // Detect OS
-    if (userAgent.includes("Windows NT 10.0")) {
-      os = "Windows 10";
-    } else if (userAgent.includes("Windows NT 6.3")) {
-      os = "Windows 8.1";
-    } else if (userAgent.includes("Windows NT 6.2")) {
-      os = "Windows 8";
-    } else if (userAgent.includes("Windows NT 6.1")) {
-      os = "Windows 7";
-    } else if (userAgent.includes("Windows")) {
-      os = "Windows";
-    } else if (userAgent.includes("Mac OS X 10_15")) {
-      os = "macOS 10.15";
-    } else if (userAgent.includes("Mac OS X")) {
-      const match = userAgent.match(/Mac OS X ([\d_]+)/);
-      if (match) {
-        os = "macOS " + match[1].replace(/_/g, ".");
-      } else {
-        os = "macOS";
-      }
-    } else if (userAgent.includes("Linux")) {
-      os = "Linux";
-    } else if (userAgent.includes("Android")) {
-      const match = userAgent.match(/Android ([\d.]+)/);
-      os = match ? "Android " + match[1] : "Android";
-    } else if (userAgent.includes("iPhone")) {
-      const match = userAgent.match(/iPhone OS ([\d_]+)/);
-      os = match ? "iOS " + match[1].replace(/_/g, ".") : "iOS";
-    } else if (userAgent.includes("iPad")) {
-      const match = userAgent.match(/CPU OS ([\d_]+)/);
-      os = match ? "iPadOS " + match[1].replace(/_/g, ".") : "iPadOS";
-    }
-
-    // Build display name
-    let displayName = browser;
-    if (version) {
-      displayName += " " + version;
-    }
-    if (os) {
-      displayName += " - " + os;
-    }
-
-    return displayName;
-  },
-
-  /**
-   * Get cache status information
-   */
-  async getCacheStatus() {
-    const stored = await browser.storage.local.get({
-      [UA_CACHE_KEY]: null,
-      [UA_CACHE_TIMESTAMP_KEY]: 0
-    });
-
-    const cached = stored[UA_CACHE_KEY];
-    const timestamp = stored[UA_CACHE_TIMESTAMP_KEY];
-    
-    let count = 0;
-    if (cached) {
-      count = (cached.all?.length || 0) + (cached.desktop?.length || 0) + (cached.mobile?.length || 0);
-    }
-
-    return {
-      exists: !!cached,
-      timestamp: timestamp,
-      lastUpdated: timestamp ? new Date(timestamp) : null,
-      isValid: await this.isCacheValid(),
-      count: count
-    };
-  }
 };
 
 // Make it available globally for popup and background scripts

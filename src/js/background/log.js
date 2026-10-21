@@ -6,8 +6,12 @@
 
 const LOG_DEBUG = false;
 
+// Errors always reach the background console. Gating them behind LOG_DEBUG
+// meant every failure in a shipped build — a proxy that could not be
+// reloaded, a scan that failed — left no trace anywhere to diagnose it.
+// Warnings stay debug-only: several fire routinely (a tab closed mid-lookup).
 // eslint-disable-next-line no-unused-vars
 const LOG = {
-  error(...args) { if (LOG_DEBUG) { console.error(...args); } },
+  error(...args) { console.error(...args); },
   warn(...args)  { if (LOG_DEBUG) { console.warn(...args);  } },
 };

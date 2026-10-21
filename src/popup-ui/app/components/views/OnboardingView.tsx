@@ -1,6 +1,7 @@
 import { ArrowRight, ArrowLeft } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { requireWebExt } from '../../../lib/browser';
+import * as msg from "../../../lib/messages";
 
 interface OnboardingViewProps {
   onComplete: () => void;
@@ -86,8 +87,8 @@ export function OnboardingView({ onComplete, initialStep = 0 }: OnboardingViewPr
         const syncData = await browser.storage.sync.get();
         const syncKeys = Object.keys(syncData || {});
         const hasSyncData = syncKeys.some(
-          (key) => key.includes("identity@@_")
-            || key.includes("siteContainerMap@@_")
+          (key) => key.startsWith("identity@@_")
+            || key.startsWith("siteContainerMap@@_")
             || key.includes("MACinstance")
         );
         if (!cancelled) {
@@ -123,7 +124,7 @@ export function OnboardingView({ onComplete, initialStep = 0 }: OnboardingViewPr
       return false;
     }
     await browser.storage.local.set({ syncEnabled: true });
-    await browser.runtime.sendMessage({ method: "resetSync" });
+    await msg.resetSync();
     return true;
   }
 
@@ -177,7 +178,7 @@ export function OnboardingView({ onComplete, initialStep = 0 }: OnboardingViewPr
       if (step.id === 4) {
         await browser.storage.local.set({ syncEnabled: false });
         try {
-          await browser.runtime.sendMessage({ method: "resetSync" });
+          await msg.resetSync();
         } catch {
           // Don't block onboarding completion if sync reset fails.
         }
@@ -195,7 +196,7 @@ export function OnboardingView({ onComplete, initialStep = 0 }: OnboardingViewPr
       const browser = requireWebExt();
       await browser.storage.local.set({ "onboarding-stage": 9, syncEnabled: false });
       try {
-        await browser.runtime.sendMessage({ method: "resetSync" });
+        await msg.resetSync();
       } catch {
         // Don't block finishing onboarding if sync reset fails.
       }

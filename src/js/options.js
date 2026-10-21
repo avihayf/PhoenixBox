@@ -12,7 +12,10 @@
   } else if (rawAccent && ACCENT_HUES[rawAccent] !== undefined) {
     accentHue = ACCENT_HUES[rawAccent];
   }
-  const theme = localStorage.getItem("theme") || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const storedTheme = localStorage.getItem("theme");
+  const theme = storedTheme && storedTheme !== "auto"
+    ? storedTheme
+    : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
   const isDark = theme === "dark";
   const root = document.documentElement;
   if (isDark) {
@@ -93,20 +96,26 @@ async function enableDisableReplaceTab() {
   await browser.storage.local.set({replaceTabEnabled: !!checkbox.checked});
 }
 
+// One theme for every extension page. They share an origin, so they share
+// localStorage; this menu used to write only storage.local, which just the
+// page-action popup read — so it changed neither the main popup nor this page.
 async function changeTheme(event) {
-  const theme = event.currentTarget;
-  await browser.storage.local.set({currentTheme: theme.value});
-  await browser.storage.local.set({currentThemeId: theme.selectedIndex});
+  const theme = event.currentTarget.value;
+  localStorage.setItem("theme", theme);
+  await browser.storage.local.set({ currentTheme: theme });
+  const isDark = theme === "dark" ||
+    (theme === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.classList.toggle("dark", isDark);
 }
 
 async function setupOptions() {
   const { syncEnabled } = await browser.storage.local.get("syncEnabled");
   const { replaceTabEnabled } = await browser.storage.local.get("replaceTabEnabled");
-  const { currentThemeId } = await browser.storage.local.get("currentThemeId");
+  const { currentTheme } = await browser.storage.local.get("currentTheme");
 
   document.querySelector("#syncCheck").checked = !!syncEnabled;
   document.querySelector("#replaceTabCheck").checked = !!replaceTabEnabled;
-  document.querySelector("#changeTheme").selectedIndex = currentThemeId;
+  document.querySelector("#changeTheme").value = localStorage.getItem("theme") || currentTheme || "auto";
   setupContainerShortcutSelects();
 }
 
@@ -116,14 +125,12 @@ async function setupContainerShortcutSelects () {
   const fragment = document.createDocumentFragment();
   const noneOption = document.createElement("option");
   noneOption.value = "none";
-  noneOption.id = "none";
   noneOption.textContent = "None";
   fragment.append(noneOption);
 
   for (const identity of identities) {
     const option = document.createElement("option");
     option.value = identity.cookieStoreId;
-    option.id = identity.cookieStoreId;
     option.textContent = identity.name;
     fragment.append(option);
   }
@@ -132,9 +139,15 @@ async function setupContainerShortcutSelects () {
     const shortcutKey = "open_container_"+i;
     const shortcutSelect = document.getElementById(shortcutKey);
     shortcutSelect.appendChild(fragment.cloneNode(true));
+    // Select by value. The old querySelector("#" + id) threw on a shortcut
+    // pointing at a deleted container, which aborted the loop and left the
+    // remaining selects empty. An unknown value now just shows "None".
+    // (It also gave ten selects' options duplicate element ids.)
     if (keyboardShortcut && keyboardShortcut[shortcutKey]) {
-      const cookieStoreId = keyboardShortcut[shortcutKey];
-      shortcutSelect.querySelector("#" + cookieStoreId).selected = true;
+      shortcutSelect.value = keyboardShortcut[shortcutKey];
+      if (shortcutSelect.value !== keyboardShortcut[shortcutKey]) {
+        shortcutSelect.value = "none";
+      }
     }
   }
 }

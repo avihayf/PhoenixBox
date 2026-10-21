@@ -52,6 +52,13 @@ PhoenixBox comes with four pre-configured containers for security testing:
 - **Organize** containers with custom sorting
 - **Icons** - Choose from multiple icon options for easy identification
 
+### Hiding and Moving Containers
+
+**Hide** and **Move tabs to a new window** act on the whole container, across every window:
+
+- **Hide** closes all of the container's web tabs and remembers them; un-hiding restores them all (pinned state kept) into the focused window. Tabs PhoenixBox cannot reopen — `file://`, `view-source:`, reader view — are left open rather than closed and lost. Blank new-tab pages are simply closed.
+- **Move tabs to a new window** gathers the container's tabs from every window, plus any hidden ones, into one new window.
+
 ### Session Isolation
 
 Each container provides complete isolation:
@@ -138,6 +145,15 @@ Choose from five distinct accent color themes:
 
 PhoenixBox includes advanced user-agent spoofing capabilities with real-world data.
 
+### Scope: request headers only
+
+Spoofing rewrites the `User-Agent` **HTTP request header**, so the server (and
+your proxy) sees the identity you picked. It does not change what JavaScript on
+the page sees — `navigator.userAgent`, `navigator.appVersion` and
+`navigator.platform` still report the real Firefox build. A site that fingerprints in JS can
+therefore tell the difference. If you need the page-side values changed too,
+use a dedicated fingerprinting tool alongside PhoenixBox.
+
 ### Data Source
 
 - **Source**: [microlinkhq/top-user-agents](https://github.com/microlinkhq/top-user-agents)
@@ -175,7 +191,9 @@ PhoenixBox includes advanced user-agent spoofing capabilities with real-world da
 - **HTTP** - Standard HTTP proxy
 - **HTTPS** - Encrypted HTTPS proxy
 - **SOCKS4** - SOCKS version 4
-- **SOCKS5** - SOCKS version 5 (most common for Burp)
+- **SOCKS5** - SOCKS version 5 (`socks://`, `socks5://` or `socks5h://`)
+
+Proxy URLs take the form `scheme://[user[:password]@]host:port`; the port is always required, IPv6 hosts go in brackets (`http://[::1]:8080`), and special characters in credentials are percent-encoded.
 
 ### Proxy Modes
 
@@ -201,8 +219,10 @@ Configure different proxies for each container:
 - **Host** - IP address or hostname
 - **Port** - Proxy port number
 - **Username** - Optional authentication
-- **Password** - Optional authentication
+- **Password** - Optional authentication. Kept in memory only, never written to disk, so it must be re-entered after a browser restart (the popup says so). SOCKS proxies receive it directly; HTTP/HTTPS proxies receive it when they ask (`407 Proxy Authentication Required`).
 - **DNS over Proxy** - Route DNS queries through proxy
+
+Traffic is routed by the container a request belongs to, including requests with no tab such as service-worker fetches.
 
 ### Proxy Presets
 
@@ -215,8 +235,7 @@ Save and reuse common proxy configurations:
 ### Proxy Status
 
 - **Visual Indicator** - Know when proxy is active
-- **Per-Container Status** - See which containers are proxied
-- **Connection Testing** - Verify proxy connectivity
+- **Per-Container Status** - The container view shows the proxy its traffic actually uses, taking promoted containers into account
 
 ---
 
@@ -226,34 +245,28 @@ Save and reuse common proxy configurations:
 
 Seamless integration with Burp Suite for request highlighting and identification.
 
-### X-MAC-Container-Color Header
+### One Burp Listener per Open Container
 
-PhoenixBox adds a custom header to all requests:
+Turn on the **Highlighter** tile and the companion Burp extension, Phoenix Highlighter v2.0.0+, opens a
+proxy listener for every container with an open tab. PhoenixBox sends that container's Burp traffic to
+its listener, and Burp knows the container from the listener each request arrives on.
 
-```
-X-MAC-Container-Color: red
-```
-
-This header:
-- **Identifies** which container sent the request
-- **Auto-stripped** by Burp extension before forwarding to target when the companion Burp extension is installed and active
-- **Visible to the target** if you enable the header without routing through Burp or if the Burp extension is not stripping it
-
-### Burp Extension Features
-
-The PhoenixBoxHighlighter.jar extension provides:
-
-- **Auto-highlighting** - Requests highlighted by container color
-- **Zero configuration** - Works immediately after installation
-- **Stealth mode** - Headers stripped automatically
-- **All colors supported** - Recognizes all 8 container colors
+- **Follows your tabs**: several tabs of a container share one listener, and it closes 15 seconds after the container's last tab, so a quick reopen (Ctrl+Shift+T) reuses it
+- **Nothing is added to requests once paired**: no headers. Without pairing (an older JAR), containers send only the legacy colour header, which the JAR strips
+- **Automatic pairing**: PhoenixBox finds the JAR and asks, and you click Allow once in Burp
+- **Auto-highlighting**: requests are coloured by container, and the **Notes** column shows the container name
+- **Automatic addresses**: free ports from 18080 on the Burp preset's IP, skipping anything already in use
+- **Pinning**: a container can be pinned to a specific `IP:port`, including a listener you built in Burp yourself
+- **Send to Repeater (PhoenixBox)**: opens the request in a Repeater tab named after the container
 
 ### Setup Process
 
-1. Install PhoenixBoxHighlighter.jar in Burp Suite
-2. Enable "Add container color header" in Firefox extension
-3. Configure proxy (127.0.0.1:8080 typically)
-4. Start testing - requests auto-highlight
+1. Install PhoenixBoxHighlighter.jar (v2.0.0+) in Burp Suite
+2. Route traffic through Burp (the **Burp Suite** preset, 127.0.0.1:8080 typically)
+3. Turn on the **Highlighter** tile, and click **Allow** when Burp asks to pair PhoenixBox
+4. Requests from every open container are highlighted from then on
+
+See [Burp Suite Setup](BURP_SUITE_SETUP.md) for details.
 
 ### Use Cases
 
@@ -304,12 +317,12 @@ Complete separation between containers prevents:
 
 ### Stealth Mode
 
-Headers stripped before reaching target:
+When paired with Phoenix Highlighter v2, Burp highlighting doesn't modify requests:
 
-- **X-MAC-Container-Color** removed by Burp extension
-- **No fingerprinting** from custom headers
-- **Clean requests** to target servers
-- **Privacy preserved**
+- **No custom headers**: containers are told apart by the Burp listener they use
+- **No fingerprinting** from highlighting
+
+Unpaired (an older Highlighter v1.x), containers send the `X-MAC-Container-Color` header, which the Highlighter strips; with no Highlighter loaded, it reaches the target.
 
 ### Proxy Security
 

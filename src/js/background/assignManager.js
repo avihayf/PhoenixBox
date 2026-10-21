@@ -12,6 +12,13 @@ window.assignManager = {
   GLOBAL_PROXY_ENABLED_KEY: "globalProxyEnabled",
   GLOBAL_PROXY_URL_KEY: "globalProxyUrl",
   GLOBAL_PROXY_PARSED_KEY: "globalProxyParsed",
+  // Set when the configured global proxy was given a password. The password
+  // itself is deliberately never persisted, so this flag is what lets us
+  // notice that the in-memory copy is gone after a restart.
+  GLOBAL_PROXY_NEEDS_PASSWORD_KEY: "globalProxyNeedsPassword",
+  // Signal for the popup: the proxy is enabled and needs a password we no
+  // longer hold, so requests through it will fail until the user re-enters it.
+  GLOBAL_PROXY_CREDENTIALS_MISSING_KEY: "globalProxyCredentialsMissing",
   PROMOTED_PROXY_CONTAINER_ID_KEY: "promotedProxyContainerId",
   PROMOTED_PROXY_CONTAINER_IDS_KEY: "promotedProxyContainerIds",
   _sessionGlobalProxyPassword: null,
@@ -22,9 +29,7 @@ window.assignManager = {
   promotedProxyContainerIds: [],
 
   _sanitizeGlobalProxyUrl(rawUrl) {
-    const raw = String(rawUrl || "").trim();
-    if (!raw) return "";
-    return raw.replace(/(\/\/[^:@/]+):[^@/]*@/, "$1@");
+    return PhoenixBoxReviewHelpers.sanitizeGlobalProxyUrl(rawUrl);
   },
 
   _cacheGlobalProxySecret(proxy) {
@@ -47,38 +52,40 @@ window.assignManager = {
   setGlobalProxyConfig(proxy) {
     const sanitizedProxy = this._cacheGlobalProxySecret(proxy);
     this.globalProxy.proxy = sanitizedProxy;
+    // This is the one moment we see the real password, so it is also the only
+    // place that can record whether the proxy needs one. Requests are already
+    // servable from the in-memory copy, so don't block on the write.
+    browser.storage.local.set({
+      [this.GLOBAL_PROXY_NEEDS_PASSWORD_KEY]: !!this._sessionGlobalProxyPassword,
+      [this.GLOBAL_PROXY_CREDENTIALS_MISSING_KEY]: false,
+    }).catch(() => {});
     return sanitizedProxy;
   },
 
   clearGlobalProxyConfig() {
     this._sessionGlobalProxyPassword = null;
     this.globalProxy.proxy = null;
+    browser.storage.local.set({
+      [this.GLOBAL_PROXY_NEEDS_PASSWORD_KEY]: false,
+      [this.GLOBAL_PROXY_CREDENTIALS_MISSING_KEY]: false,
+    }).catch(() => {});
   },
   storageArea: {
     area: browser.storage.local,
     exemptedTabs: {},
 
+    isSiteStoreKey(value) {
+      return PhoenixBoxReviewHelpers.isSiteStoreKey(value);
+    },
+
     getSiteStoreKey(pageUrlorUrlKey) {
-      if (pageUrlorUrlKey.includes("siteContainerMap@@_")) return pageUrlorUrlKey;
+      if (this.isSiteStoreKey(pageUrlorUrlKey)) return pageUrlorUrlKey;
       const url = new window.URL(pageUrlorUrlKey);
-      const storagePrefix = "siteContainerMap@@_";
-      const sanitizedHostname = url.hostname.replace(/[^a-z0-9.-]/gi, "");
-      if (url.port === "80" || url.port === "443" || !url.port) {
-        return `${storagePrefix}${sanitizedHostname}`;
-      } else {
-        return `${storagePrefix}${sanitizedHostname}:${url.port}`;
-      }
+      return PhoenixBoxReviewHelpers.buildSiteStoreKey(url.hostname, url.port);
     },
 
     getHostnameFromSiteStoreKey(siteStoreKey) {
-      const raw = String(siteStoreKey).replace(/^siteContainerMap@@_/, "");
-      if (!raw) return "";
-
-      const colonIdx = raw.lastIndexOf(":");
-      if (colonIdx > 0) {
-        return raw.slice(0, colonIdx);
-      }
-      return raw;
+      return PhoenixBoxReviewHelpers.getHostnameFromSiteStoreKey(siteStoreKey);
     },
 
     setExempted(pageUrlorUrlKey, tabId) {
@@ -140,7 +147,7 @@ window.assignManager = {
       }
       data.identityMacAddonUUID =
         await identityState.lookupMACaddonUUID(data.userContextId);
-      if (!data.hostname && !pageUrlorUrlKey.includes("siteContainerMap@@_")) {
+      if (!data.hostname && !this.isSiteStoreKey(pageUrlorUrlKey)) {
         try {
           const parsed = new window.URL(pageUrlorUrlKey);
           data.hostname = parsed.hostname;
@@ -169,6 +176,9 @@ window.assignManager = {
     },
 
     async deleteContainer(userContextId) {
+      // getAssignedSites treats a falsy id as "every container", so without
+      // this guard a bad id would delete every site assignment.
+      if (!userContextId) return;
       const sitesByContainer = await this.getAssignedSites(userContextId);
       await this.area.remove(Object.keys(sitesByContainer));
       await identityState.storageArea.remove(backgroundLogic.cookieStoreId(userContextId));
@@ -178,7 +188,7 @@ window.assignManager = {
       const sites = {};
       const siteConfigs = await this.area.get();
       for(const urlKey of Object.keys(siteConfigs)) {
-        if (urlKey.includes("siteContainerMap@@_")) {
+        if (this.isSiteStoreKey(urlKey)) {
         // For some reason this is stored as string... lets check
         // them both as that
           if (!!userContextId &&
@@ -203,7 +213,7 @@ window.assignManager = {
       const identitiesList = await browser.contextualIdentities.query({});
       const macConfigs = await this.area.get();
       for(const configKey of Object.keys(macConfigs)) {
-        if (configKey.includes("siteContainerMap@@_")) {
+        if (this.isSiteStoreKey(configKey)) {
           const cookieStoreId =
             "firefox-container-" + macConfigs[configKey].userContextId;
           const match = identitiesList.find(
@@ -258,25 +268,47 @@ window.assignManager = {
     return true;
   },
 
-  async handleProxifiedRequest(requestInfo) {
-    // The following blocks potentially dangerous requests for privacy that come without a tabId
+  /**
+   * Which container a proxied request belongs to.
+   *
+   * Firefox puts cookieStoreId on proxy.onRequest details when the extension
+   * holds the cookies permission — including requests with no tab, such as
+   * service-worker fetches and navigation preload. Keying on the tab alone
+   * sent all of those DIRECT, straight past Burp or the VPN.
+   */
+  async _cookieStoreIdForProxyRequest(requestInfo) {
+    if (requestInfo.cookieStoreId) return requestInfo.cookieStoreId;
+    if (typeof requestInfo.tabId !== "number" || requestInfo.tabId < 0) return null;
+    try {
+      const tab = await browser.tabs.get(requestInfo.tabId);
+      return tab.cookieStoreId || null;
+    } catch {
+      // Tab may have been closed between request dispatch and lookup.
+      LOG.warn("handleProxifiedRequest: tab lookup failed", requestInfo.tabId);
+      return null;
+    }
+  },
 
-    if(requestInfo.tabId === -1) {
+  async handleProxifiedRequest(requestInfo) {
+    // Runs for every request of every type. When no proxy of either kind is
+    // configured, answer without touching tabs or storage.
+    if (!this.globalProxy.enabled && proxifiedContainers.hasAnyCached() === false) {
       return { type: "direct" };
     }
 
-    let tab;
-    try {
-      tab = await browser.tabs.get(requestInfo.tabId);
-    } catch {
-      // Tab may have been closed between request dispatch and lookup.
-      // Fail safely (DIRECT) instead of throwing and breaking proxy resolution.
-      LOG.warn("handleProxifiedRequest: tab lookup failed", requestInfo.tabId);
+    // The extension's own requests are not browsing traffic to intercept.
+    if (PhoenixBoxReviewHelpers.isOwnExtensionRequest(requestInfo, browser.runtime.getURL(""))) {
+      return { type: "direct" };
+    }
+
+    const cookieStoreId = await this._cookieStoreIdForProxyRequest(requestInfo);
+    if (!cookieStoreId) {
+      // Browser-internal traffic with no container to route by.
       return { type: "direct" };
     }
 
     // 1) Container-specific proxy has priority (existing behavior).
-    const result = await proxifiedContainers.retrieve(tab.cookieStoreId);
+    const result = await proxifiedContainers.retrieve(cookieStoreId);
     if (result && result.proxy) {
       // proxyDNS only applies to SOCKS proxies.  Respect the stored
       // preference (set via Advanced Proxy Settings); default to true
@@ -288,7 +320,7 @@ window.assignManager = {
       }
 
       if (!result.proxy.mozProxyEnabled) {
-        return result.proxy;
+        return highlighterSync.route(cookieStoreId, result.proxy);
       }
 
       // Let's add the isolation key.
@@ -297,7 +329,7 @@ window.assignManager = {
 
     // 2) Global proxy fallback (only when no container-specific proxy exists).
     const globalFallbackAllowed = PhoenixBoxReviewHelpers.shouldAllowGlobalProxyFallback(
-      tab.cookieStoreId,
+      cookieStoreId,
       this.promotedProxyContainerIds
     );
     if (globalFallbackAllowed && this.globalProxy.enabled && this.globalProxy.proxy) {
@@ -312,7 +344,8 @@ window.assignManager = {
           proxy.proxyDNS = true;
         }
       }
-      return proxy;
+      // While highlighting, a container goes to its own Burp listener.
+      return highlighterSync.route(cookieStoreId, proxy);
     }
 
     return { type: "direct" };
@@ -324,24 +357,27 @@ window.assignManager = {
     if (options.frameId !== 0 || options.tabId === -1) {
       return {};
     }
-    this.removeContextMenu();
     const [tab, siteSettings] = await Promise.all([
       browser.tabs.get(options.tabId),
       this.storageArea.get(options.url)
     ]);
-    let container;
-    try {
-      container = await browser.contextualIdentities
-        .get(backgroundLogic.cookieStoreId(siteSettings.userContextId));
-    } catch {
-      container = false;
-    }
+    if (siteSettings) {
+      const container =
+        await this._lookupAssignedContainer(siteSettings.userContextId);
 
-    // The container we have in the assignment map isn't present any
-    // more so lets remove it then continue the existing load
-    if (siteSettings && !container) {
-      await this.deleteContainer(siteSettings.userContextId);
-      return {};
+      // Lookup failed for a reason we can't attribute to a missing container.
+      // Dropping every assignment for the container is irreversible, so leave
+      // the stored data alone and let the load continue untouched.
+      if (container === null) {
+        return {};
+      }
+
+      // The container we have in the assignment map isn't present any
+      // more so lets remove it then continue the existing load
+      if (container === false) {
+        await this.deleteContainer(siteSettings.userContextId);
+        return {};
+      }
     }
     const userContextId = this.getUserContextIdFromCookieStore(tab);
 
@@ -421,16 +457,20 @@ window.assignManager = {
       }
     }
 
-    if (siteIsolatedReloadInDefault) {
-      this.reloadPageInDefaultContainer(
+    // The original request is cancelled below either way, so the reopen must
+    // succeed before the original tab may be closed — otherwise a failed
+    // create (e.g. an opener in another window) loses the navigation and,
+    // with replaceTabEnabled, the tab itself.
+    const reopened = siteIsolatedReloadInDefault
+      ? this.reloadPageInDefaultContainer(
         options.url,
         tab.index + 1,
         tab.active,
         openTabId,
-        tab.groupId
-      );
-    } else {
-      this.reloadPageInContainer(
+        tab.groupId,
+        tab.windowId
+      )
+      : this.reloadPageInContainer(
         options.url,
         userContextId,
         siteSettings.userContextId,
@@ -438,10 +478,10 @@ window.assignManager = {
         tab.active,
         siteSettings.neverAsk,
         openTabId,
-        tab.groupId
+        tab.groupId,
+        tab.windowId
       );
-    }
-    this.calculateContextMenu(tab);
+    this.refreshContextMenuFor(tab);
 
     /* Removal of existing tabs:
         We aim to open the new assigned container tab / warning prompt in
@@ -466,12 +506,47 @@ window.assignManager = {
         the timeout to try to capture pages which haven't had user
         interaction or history.
     */
-    if (removeTab) {
-      browser.tabs.remove(tab.id);
-    }
+    // Not awaited: this is a blocking listener, and cancelling must not wait
+    // on tab creation. The close is chained onto the reopen succeeding.
+    Promise.resolve(reopened).then(() => {
+      if (removeTab) return browser.tabs.remove(tab.id);
+    }).catch((e) => {
+      LOG.error("Could not reopen the page in its assigned container:", e);
+    });
     return {
       cancel: true,
     };
+  },
+
+  /**
+   * Resolve the container an assignment points at.
+   *
+   * `contextualIdentities.get` rejects both when the container is genuinely
+   * gone and on transient failures, and the caller deletes every assignment
+   * for the container on a negative answer. So confirm against the full
+   * identity list before reporting the container as missing.
+   *
+   * @param {string|number} userContextId
+   * @returns {Promise<object|false|null>} the identity, `false` when the
+   *   container is confirmed missing, or `null` when the state is unknown.
+   */
+  async _lookupAssignedContainer(userContextId) {
+    const cookieStoreId = backgroundLogic.cookieStoreId(userContextId);
+    try {
+      const identity = await browser.contextualIdentities.get(cookieStoreId);
+      return identity || null;
+    } catch {
+      try {
+        const identities = await browser.contextualIdentities.query({});
+        const match = identities.find(
+          (identity) => identity.cookieStoreId === cookieStoreId
+        );
+        return match || false;
+      } catch (e) {
+        LOG.warn("Could not confirm container for assignment", cookieStoreId, e);
+        return null;
+      }
+    }
   },
 
   async _maybeSiteIsolatedReloadInDefault(siteSettings, tab) {
@@ -497,6 +572,42 @@ window.assignManager = {
     return currentContainerState && currentContainerState.isIsolated;
   },
 
+  /**
+   * Answer HTTP(S) proxy authentication challenges.
+   *
+   * Firefox only uses ProxyInfo username/password for SOCKS. For an HTTP or
+   * HTTPS proxy the credentials in the proxy URL were silently ignored: the
+   * proxy answered 407 and Firefox showed its own login prompt. Supply them
+   * here instead, once per request, so wrong credentials fall through to that
+   * prompt rather than looping.
+   */
+  _proxyAuthAttempts: new Set(),
+
+  async _handleProxyAuth(details) {
+    if (!details.isProxy || this._proxyAuthAttempts.has(details.requestId)) return {};
+    const challenger = details.challenger || {};
+
+    const candidates = [];
+    const cookieStoreId = details.cookieStoreId ||
+      await this._cookieStoreIdForProxyRequest(details);
+    if (cookieStoreId) {
+      const entry = await proxifiedContainers.retrieve(cookieStoreId);
+      if (entry && entry.proxy) candidates.push(entry.proxy);
+    }
+    if (this.globalProxy.enabled && this.globalProxy.proxy) {
+      candidates.push({ ...this.globalProxy.proxy, password: this._sessionGlobalProxyPassword });
+    }
+
+    const match = candidates.find((proxy) =>
+      proxy.username && proxy.password &&
+      String(proxy.host || "").toLowerCase() === String(challenger.host || "").toLowerCase() &&
+      Number(proxy.port) === Number(challenger.port));
+    if (!match) return {};
+
+    this._proxyAuthAttempts.add(details.requestId);
+    return { authCredentials: { username: String(match.username), password: String(match.password) } };
+  },
+
   _proxyListenerAdded: false,
 
   maybeAddProxyListeners() {
@@ -515,7 +626,7 @@ window.assignManager = {
     if (this._proxyListenerAdded && this._boundHandleProxifiedRequest) {
       try {
         browser.proxy.onRequest.removeListener(this._boundHandleProxifiedRequest);
-      } catch (e) {
+      } catch {
         // Listener may already have been removed by the browser when the
         // permission was revoked – that's fine.
       }
@@ -559,23 +670,60 @@ window.assignManager = {
       }
     },{urls: ["<all_urls>"], types: ["main_frame"]});
 
+    if (browser.webRequest.onAuthRequired) {
+      browser.webRequest.onAuthRequired.addListener(
+        (details) => this._handleProxyAuth(details),
+        { urls: ["<all_urls>"] },
+        ["blocking"]
+      );
+      const forget = (details) => this._proxyAuthAttempts.delete(details.requestId);
+      browser.webRequest.onCompleted.addListener(forget, { urls: ["<all_urls>"] });
+      browser.webRequest.onErrorOccurred.addListener(forget, { urls: ["<all_urls>"] });
+    }
+
     this.resetBookmarksMenuItem();
   },
 
+  /**
+   * Adopt a proxy config that arrived through storage.
+   *
+   * Stored configs are password-less by design. The popup sends the real
+   * config (password included) by message first and then writes the stripped
+   * copy, so that write echoes back here. Re-caching from it blindly wiped the
+   * password milliseconds after it was set, and an authenticated global proxy
+   * never worked in the session it was configured. Keep the in-memory password
+   * while the stored config is still the same endpoint and user.
+   */
+  _applyStoredGlobalProxy(stored) {
+    if (stored && !stored.password && this._sessionGlobalProxyPassword &&
+        PhoenixBoxReviewHelpers.isSameProxyEndpoint(stored, this.globalProxy.proxy)) {
+      const password = this._sessionGlobalProxyPassword;
+      this.globalProxy.proxy = this._cacheGlobalProxySecret(stored);
+      this._sessionGlobalProxyPassword = password;
+      return;
+    }
+    this.globalProxy.proxy = this._cacheGlobalProxySecret(stored);
+  },
+
+  /** Load the stored global proxy when it is enabled without being resent. */
+  async _reloadStoredGlobalProxy() {
+    const stored = await browser.storage.local.get({
+      [this.GLOBAL_PROXY_PARSED_KEY]: null,
+      [this.GLOBAL_PROXY_NEEDS_PASSWORD_KEY]: false,
+    });
+    if (!this.globalProxy.proxy) {
+      this._applyStoredGlobalProxy(stored[this.GLOBAL_PROXY_PARSED_KEY] || null);
+    }
+    // Same signal as at startup: enabled, needs a password, none in memory.
+    const credentialsMissing =
+      !!this.globalProxy.proxy &&
+      !!stored[this.GLOBAL_PROXY_NEEDS_PASSWORD_KEY] &&
+      !this._sessionGlobalProxyPassword;
+    await browser.storage.local.set({ [this.GLOBAL_PROXY_CREDENTIALS_MISSING_KEY]: credentialsMissing });
+  },
+
   _sanitizePromotedProxyContainerIds(rawIds) {
-    if (!Array.isArray(rawIds)) {
-      return [];
-    }
-    const seen = new Set();
-    const result = [];
-    for (const id of rawIds) {
-      const value = String(id || "");
-      if (value && !seen.has(value)) {
-        seen.add(value);
-        result.push(value);
-      }
-    }
-    return result;
+    return PhoenixBoxReviewHelpers.sanitizePromotedProxyContainerIds(rawIds);
   },
 
   async _initGlobalProxy() {
@@ -583,6 +731,7 @@ window.assignManager = {
       [this.GLOBAL_PROXY_ENABLED_KEY]: false,
       [this.GLOBAL_PROXY_URL_KEY]: "",
       [this.GLOBAL_PROXY_PARSED_KEY]: null,
+      [this.GLOBAL_PROXY_NEEDS_PASSWORD_KEY]: false,
       [this.PROMOTED_PROXY_CONTAINER_ID_KEY]: "",
       [this.PROMOTED_PROXY_CONTAINER_IDS_KEY]: null,
     });
@@ -605,31 +754,50 @@ window.assignManager = {
       });
     }
 
-    const sanitizedProxy = this.setGlobalProxyConfig(stored[this.GLOBAL_PROXY_PARSED_KEY] || null);
+    // Use the private cache helper rather than setGlobalProxyConfig(): the
+    // stored config has already had its password stripped, so the public
+    // setter would record "this proxy needs no password" and mask the very
+    // situation we are about to detect.
+    const sanitizedProxy = this._cacheGlobalProxySecret(stored[this.GLOBAL_PROXY_PARSED_KEY] || null);
+    this.globalProxy.proxy = sanitizedProxy;
+
     const sanitizedUrl = this._sanitizeGlobalProxyUrl(stored[this.GLOBAL_PROXY_URL_KEY]);
     const needsProxyScrub = JSON.stringify(sanitizedProxy) !== JSON.stringify(stored[this.GLOBAL_PROXY_PARSED_KEY] || null);
     const needsUrlScrub = sanitizedUrl !== String(stored[this.GLOBAL_PROXY_URL_KEY] || "");
-    if (needsProxyScrub || needsUrlScrub) {
-      const updates = {};
-      if (needsProxyScrub) updates[this.GLOBAL_PROXY_PARSED_KEY] = sanitizedProxy;
-      if (needsUrlScrub) updates[this.GLOBAL_PROXY_URL_KEY] = sanitizedUrl;
-      await browser.storage.local.set(updates);
-    }
+
+    // Passwords only ever live in memory, so a configured authenticated proxy
+    // always comes back credential-less after a restart. Flag it so the popup
+    // can say so instead of the user seeing unexplained proxy failures.
+    const credentialsMissing =
+      this.globalProxy.enabled &&
+      !!stored[this.GLOBAL_PROXY_NEEDS_PASSWORD_KEY] &&
+      !this._sessionGlobalProxyPassword;
+
+    const updates = {};
+    if (needsProxyScrub) updates[this.GLOBAL_PROXY_PARSED_KEY] = sanitizedProxy;
+    if (needsUrlScrub) updates[this.GLOBAL_PROXY_URL_KEY] = sanitizedUrl;
+    updates[this.GLOBAL_PROXY_CREDENTIALS_MISSING_KEY] = credentialsMissing;
+    await browser.storage.local.set(updates);
 
     browser.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== "local") return;
       if (this.GLOBAL_PROXY_ENABLED_KEY in changes) {
         this.globalProxy.enabled = !!changes[this.GLOBAL_PROXY_ENABLED_KEY].newValue;
         if (!this.globalProxy.enabled) {
-          this.clearGlobalProxyConfig();
-        }
-        // Re-check if we need to add the proxy listener (in case permission was just granted)
-        if (this.globalProxy.enabled) {
+          // Drop the secret, but keep the endpoint. Clearing the whole config
+          // here meant a later re-enable that did not also resend it — the
+          // permission re-grant "rescue" in backgroundLogic — showed the proxy
+          // as ON while every request went DIRECT.
+          this._sessionGlobalProxyPassword = null;
+        } else {
+          // Re-check if we need to add the proxy listener (in case permission was just granted)
           this.maybeAddProxyListeners();
+          this._reloadStoredGlobalProxy().catch((e) =>
+            LOG.error("Failed to reload the global proxy on enable:", e));
         }
       }
       if (this.GLOBAL_PROXY_PARSED_KEY in changes) {
-        this.globalProxy.proxy = this._cacheGlobalProxySecret(changes[this.GLOBAL_PROXY_PARSED_KEY].newValue || null);
+        this._applyStoredGlobalProxy(changes[this.GLOBAL_PROXY_PARSED_KEY].newValue || null);
       }
       if (this.PROMOTED_PROXY_CONTAINER_IDS_KEY in changes) {
         this.promotedProxyContainerIds = this._sanitizePromotedProxyContainerIds(
@@ -686,8 +854,10 @@ window.assignManager = {
       });
   },
 
+  // Registered as a listener, unbound: `this` is not assignManager here, so it
+  // used to throw and leave the deleted container in the bookmark submenu.
   contextualIdentityRemoved(changeInfo) {
-    this.removeMenuItem(changeInfo.contextualIdentity.cookieStoreId);
+    assignManager.removeMenuItem(changeInfo.contextualIdentity.cookieStoreId);
   },
 
   async _onClickedHandler(info, tab) {
@@ -708,15 +878,15 @@ window.assignManager = {
         );
         break;
       case this.MENU_MOVE_ID:
+        // Container-scoped: gathers this container's tabs from every window.
         backgroundLogic.moveTabsToWindow({
           cookieStoreId: tab.cookieStoreId,
-          windowId: tab.windowId,
         });
         break;
       case this.MENU_HIDE_ID:
+        // Container-scoped: hides this container's tabs in every window.
         backgroundLogic.hideTabs({
           cookieStoreId: tab.cookieStoreId,
-          windowId: tab.windowId,
         });
         break;
       }
@@ -762,7 +932,7 @@ window.assignManager = {
 
 
   deleteContainer(userContextId) {
-    this.storageArea.deleteContainer(userContextId);
+    return this.storageArea.deleteContainer(userContextId);
   },
 
   getUserContextIdFromCookieStore(tab) {
@@ -784,16 +954,84 @@ window.assignManager = {
     return true;
   },
 
+  /**
+   * Clear cookies for a site within one container.
+   *
+   * browsingData.removeCookies only matches the exact hostnames it is given,
+   * so on its own it leaves behind the two kinds of cookie that matter most
+   * here: cookies set on subdomains (api.example.com) and domain cookies set
+   * on a parent (.example.com) that are still sent to this host. Both would
+   * keep a session alive after the user asked for a reset, so enumerate via
+   * the cookies API and delete those explicitly too.
+   */
   async _resetCookiesForSite(hostname, cookieStoreId) {
-    const bare = String(hostname || "").replace(/^www\./, "");
-    if (!bare) {
+    // Assignment keys can carry a ":port" suffix, but cookies are not scoped
+    // by port, so drop it before matching.
+    const host = String(hostname || "").trim()
+      .replace(/^\.+/, "")
+      .replace(/:\d+$/, "");
+    if (!host) {
       return false;
     }
+    const bare = host.replace(/^www\./, "");
+    const hostnames = [...new Set([host, bare, `www.${bare}`])];
+
     await browser.browsingData.removeCookies({
       cookieStoreId: cookieStoreId,
-      hostnames: [bare]
+      hostnames
     });
+
+    await this._removeRelatedCookies(bare, cookieStoreId);
     return true;
+  },
+
+  async _removeRelatedCookies(bareHostname, cookieStoreId) {
+    const collected = new Map();
+    const collect = (cookies) => {
+      for (const cookie of cookies || []) {
+        // domain + path + name identifies a cookie within a store.
+        collected.set(`${cookie.domain}|${cookie.path}|${cookie.name}`, cookie);
+      }
+    };
+
+    // `domain` covers the host and its subdomains; the `url` query additionally
+    // returns parent-domain cookies that apply to the host.
+    const queries = [
+      { domain: bareHostname, storeId: cookieStoreId, firstPartyDomain: null },
+      { url: `https://${bareHostname}/`, storeId: cookieStoreId, firstPartyDomain: null },
+      { url: `http://${bareHostname}/`, storeId: cookieStoreId, firstPartyDomain: null },
+    ];
+
+    for (const query of queries) {
+      try {
+        collect(await browser.cookies.getAll(query));
+      } catch (e) {
+        LOG.warn("resetCookiesForSite: cookie lookup failed", query, e);
+      }
+    }
+
+    await Promise.all(
+      [...collected.values()].map(async (cookie) => {
+        const domain = cookie.domain.replace(/^\./, "");
+        const scheme = cookie.secure ? "https" : "http";
+        const removal = {
+          url: `${scheme}://${domain}${cookie.path}`,
+          name: cookie.name,
+          storeId: cookieStoreId,
+        };
+        if (cookie.firstPartyDomain !== undefined) {
+          removal.firstPartyDomain = cookie.firstPartyDomain;
+        }
+        if (cookie.partitionKey !== undefined) {
+          removal.partitionKey = cookie.partitionKey;
+        }
+        try {
+          await browser.cookies.remove(removal);
+        } catch (e) {
+          LOG.warn("resetCookiesForSite: could not remove cookie", cookie.name, e);
+        }
+      })
+    );
   },
 
   async _setOrRemoveAssignment(tabId, pageUrl, userContextId, remove) {
@@ -824,26 +1062,61 @@ window.assignManager = {
       }, exemptedTabIds);
       actionName = "assigned site to always open in this container";
     } else {
+      // The container that actually held the assignment. The page action's
+      // "Default" entry removes with userContextId false, which re-checked
+      // isolation for a non-existent "firefox-container-false" and left the
+      // real container locked with zero sites.
+      const existing = await this.storageArea.get(pageUrl);
+      const owner = existing && existing.userContextId ? String(existing.userContextId) : userContextId;
+
       // Remove assignment
       await this.storageArea.remove(pageUrl);
 
       actionName = "removed from assigned sites list";
 
       // remove site isolation if now empty
-      await this._maybeRemoveSiteIsolation(userContextId);
+      if (owner && owner !== "false") {
+        await this._maybeRemoveSiteIsolation(owner);
+      }
     }
 
     if (tabId) {
-      const tab = await browser.tabs.get(tabId);
-      setTimeout(function(){
-        browser.tabs.sendMessage(tabId, {
-          text: `Successfully ${actionName}`
-        });
-      }, 1000);
-
-
-      this.calculateContextMenu(tab);
+      await this._announceToTab(tabId, `Successfully ${actionName}`);
     }
+  },
+
+  /**
+   * Show the in-page confirmation toast once the tab can receive it.
+   *
+   * The content script runs at document_idle, so a fixed one-second delay
+   * could arrive before it existed and the toast silently never appeared.
+   * Wait for the tab to finish loading (bounded), then send. Best-effort:
+   * pages the content script cannot run in simply get no toast.
+   */
+  async _announceToTab(tabId, text) {
+    let tab;
+    try {
+      tab = await browser.tabs.get(tabId);
+    } catch {
+      return;
+    }
+    this.refreshContextMenuFor(tab);
+
+    if (tab.status !== "complete") {
+      await new Promise((resolve) => {
+        const done = () => {
+          clearTimeout(timer);
+          browser.tabs.onUpdated.removeListener(onUpdated);
+          resolve();
+        };
+        const onUpdated = (id, changeInfo) => {
+          if (id === tabId && changeInfo.status === "complete") done();
+        };
+        const timer = setTimeout(done, 10000);
+        browser.tabs.onUpdated.addListener(onUpdated, { tabId, properties: ["status"] });
+      });
+    }
+    browser.tabs.sendMessage(tabId, { text }).catch(() => {});
   },
 
   async _maybeRemoveSiteIsolation(userContextId) {
@@ -883,6 +1156,19 @@ window.assignManager = {
     this.removeMenuItem(this.MENU_SEPARATOR_ID);
     this.removeMenuItem(this.MENU_HIDE_ID);
     this.removeMenuItem(this.MENU_MOVE_ID);
+  },
+
+  /**
+   * Rebuild the context menu for a tab only if it is the one on screen.
+   *
+   * The menu is global, not per tab. Every main-frame load in any tab used to
+   * tear it down and rebuild it for that tab, so a background tab finishing a
+   * load left the active tab with the wrong menu, or none at all.
+   */
+  refreshContextMenuFor(tab) {
+    if (!tab || !tab.active) return;
+    this.calculateContextMenu(tab).catch((e) =>
+      LOG.error("Failed to update the context menu:", e));
   },
 
   async calculateContextMenu(tab) {
@@ -943,7 +1229,7 @@ window.assignManager = {
    * @param {number} [groupId]
    * @returns {void}
    */
-  reloadPageInDefaultContainer(url, index, active, openerTabId, groupId) {
+  reloadPageInDefaultContainer(url, index, active, openerTabId, groupId, windowId) {
     // To create a new tab in the default container, it is easiest just to omit the
     // cookieStoreId entirely.
     //
@@ -962,7 +1248,7 @@ window.assignManager = {
     // does not automatically return to the original opener tab. To get this desired behaviour,
     // we MUST specify the openerTabId when creating the new tab.
     const cookieStoreId = "firefox-default";
-    this.createTabWrapper(url, cookieStoreId, index, active, openerTabId, groupId);
+    return this.createTabWrapper(url, cookieStoreId, index, active, openerTabId, groupId, windowId);
   },
 
 
@@ -978,14 +1264,23 @@ window.assignManager = {
    * @param {number} [groupId] Tab group ID
    * @returns {Promise<Tab>}
    */
-  async createTabWrapper(url, cookieStoreId, index, active, openerTabId, groupId) {
-    const newTab = await browser.tabs.create({
-      url,
-      cookieStoreId,
-      index,
-      active,
-      openerTabId,
-    });
+  async createTabWrapper(url, cookieStoreId, index, active, openerTabId, groupId, windowId) {
+    // In the navigating tab's own window: `index` is a position in that
+    // window, and without it Firefox uses the last-focused window instead.
+    const props = { url, cookieStoreId, index, active, openerTabId };
+    if (typeof windowId === "number" && windowId >= 0) props.windowId = windowId;
+
+    let newTab;
+    try {
+      newTab = await browser.tabs.create(props);
+    } catch (e) {
+      // Firefox rejects an opener in another window. The opener only decides
+      // which tab gets focus when this one closes, so drop it rather than
+      // lose the navigation.
+      if (!openerTabId) throw e;
+      delete props.openerTabId;
+      newTab = await browser.tabs.create(props);
+    }
 
     if (groupId >= 0 && typeof browser.tabs.group === "function") {
       // If the original tab was in a tab group, make sure that the reopened tab
@@ -1011,19 +1306,19 @@ window.assignManager = {
    * @param {number} [groupId]
    * @returns {Promise<Tab>}
    */
-  reloadPageInContainer(url, currentUserContextId, userContextId, index, active, neverAsk = false, openerTabId = null, groupId = undefined) {
+  reloadPageInContainer(url, currentUserContextId, userContextId, index, active, neverAsk = false, openerTabId = null, groupId = undefined, windowId = undefined) {
     const cookieStoreId = backgroundLogic.cookieStoreId(userContextId);
     const loadPage = browser.runtime.getURL("confirm-page.html");
     // False represents assignment is not permitted
     // If the user has explicitly checked "Never Ask Again" on the warning page we will send them straight there
     if (neverAsk) {
-      return this.createTabWrapper(url, cookieStoreId, index, active, openerTabId, groupId);
+      return this.createTabWrapper(url, cookieStoreId, index, active, openerTabId, groupId, windowId);
     } else {
-      let confirmUrl = `${loadPage}?url=${this.encodeURLProperty(url)}&cookieStoreId=${cookieStoreId}`;
+      let confirmUrl = `${loadPage}?url=${this.encodeURLProperty(url)}&cookieStoreId=${this.encodeURLProperty(cookieStoreId)}`;
       let currentCookieStoreId;
       if (currentUserContextId) {
         currentCookieStoreId = backgroundLogic.cookieStoreId(currentUserContextId);
-        confirmUrl += `&currentCookieStoreId=${currentCookieStoreId}`;
+        confirmUrl += `&currentCookieStoreId=${this.encodeURLProperty(currentCookieStoreId)}`;
       }
       return this.createTabWrapper(
         confirmUrl,
@@ -1031,10 +1326,9 @@ window.assignManager = {
         index,
         active,
         openerTabId,
-        groupId
-      ).catch((e) => {
-        throw e;
-      });
+        groupId,
+        windowId
+      );
     }
   },
 

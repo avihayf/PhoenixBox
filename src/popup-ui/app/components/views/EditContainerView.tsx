@@ -7,23 +7,15 @@ import { Switch } from '../ui/switch';
 import { CONTAINER_COLORS, getContainerColorHex } from '../../../lib/containerColors';
 import type { UserAgentData } from '../../../lib/userAgent';
 
-type Container = {
-  cookieStoreId: string;
-  name: string;
-  color: string;
-  icon: string;
-  displayIcon: string;
-  tabCount: number;
-  proxyUrl?: string;
-  proxySource?: string;
-  isIsolated?: boolean;
-  userAgent?: string;
-};
+import type { Container } from '../../../lib/types';
 
 interface EditContainerViewProps {
   container?: Container;
   onBack: () => void;
-  onSave: (name: string, color: string, icon: string, proxyUrl: string, siteIsolation: boolean) => void;
+  // No proxy argument: proxies are edited live by the VPN section and Advanced
+  // Proxy Settings. Passing a copy captured when the form opened made Save
+  // re-apply that stale value over changes made since.
+  onSave: (name: string, color: string, icon: string, siteIsolation: boolean) => void | Promise<void>;
   onDelete?: () => void;
   onManageSites?: () => void;
   onAdvancedProxyToggle?: (enabled: boolean) => void;
@@ -70,17 +62,23 @@ export function EditContainerView({
   const [name, setName] = useState(container?.name || '');
   const [color, setColor] = useState(container?.color || 'blue');
   const [icon, setIcon] = useState(container?.displayIcon || container?.icon || 'circle');
-  const [proxyUrl, setProxyUrl] = useState(container?.proxyUrl || '');
   const [siteIsolation, setSiteIsolation] = useState(container?.isIsolated || false);
   const [vpnExpanded, setVpnExpanded] = useState(false);
   const [showUserAgentModal, setShowUserAgentModal] = useState(false);
   const [containerUserAgentType, setContainerUserAgentType] = useState<'all' | 'desktop' | 'mobile'>('all');
   const [pendingDelete, setPendingDelete] = useState(false);
 
-  const handleSave = () => {
+  // A double click used to create two containers: guard until the save settles.
+  const [saving, setSaving] = useState(false);
+  const handleSave = async () => {
     const trimmedName = name.trim();
-    if (!trimmedName) return;
-    onSave(trimmedName, color, icon, proxyUrl, siteIsolation);
+    if (!trimmedName || saving) return;
+    setSaving(true);
+    try {
+      await onSave(trimmedName, color, icon, siteIsolation);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const selectedColorHex = getContainerColorHex(color);
@@ -220,12 +218,7 @@ export function EditContainerView({
               <Switch
                 aria-label="Advanced proxy settings"
                 checked={advancedProxyEnabled}
-                onCheckedChange={(enabled) => {
-                  if (!enabled) {
-                    setProxyUrl("");
-                  }
-                  onAdvancedProxyToggle?.(enabled);
-                }}
+                onCheckedChange={(enabled) => onAdvancedProxyToggle?.(enabled)}
               />
             </div>
           </div>
@@ -261,6 +254,7 @@ export function EditContainerView({
             <div className="flex items-center justify-between p-2.5 bg-[var(--ext-bg-secondary)]/50 border border-[var(--ext-border)]/50 rounded-lg hover:border-[var(--ext-border)] transition-colors">
               <span className="text-xs text-[var(--ext-text)]">Limit to designated sites</span>
               <Switch
+                aria-label="Limit to designated sites"
                 checked={siteIsolation}
                 onCheckedChange={setSiteIsolation}
               />
@@ -335,9 +329,9 @@ export function EditContainerView({
           </button>
         )}
         <button
-          onClick={handleSave}
+          onClick={() => void handleSave()}
           className="flex-1 flex items-center justify-center py-2 bg-[var(--ext-accent)] text-[var(--primary-foreground)] rounded-lg hover:opacity-90 btn-brand-primary disabled:opacity-50 disabled:cursor-not-allowed text-xs uppercase tracking-wider"
-          disabled={!name.trim()}
+          disabled={!name.trim() || saving}
         >
           Save Identity
         </button>

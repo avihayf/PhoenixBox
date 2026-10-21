@@ -19,7 +19,7 @@ Complete installation instructions for PhoenixBox.
 
 ### Required
 
-- **Firefox 142.0 or later** — any edition works (standard release, ESR, Developer Edition, or Nightly). Developer Edition is **not** required.
+- **Firefox 142.0 or later** — any edition at 142 or later works (standard release, Developer Edition, Nightly, or an ESR once it reaches 142). Developer Edition is **not** required.
   - Download: [Firefox](https://www.mozilla.org/firefox/)
 
 ### For building from source (developers only)
@@ -101,37 +101,32 @@ npm run dev
 ```
 
 This will:
-- Build the extension
-- Launch Firefox Developer Edition
-- Load the extension
-- Watch for changes and auto-reload
+- Build the extension into `dist/`
+- Launch Firefox (your default install; set `FIREFOX_BIN` to use another, e.g. Developer Edition)
+- Load `dist/` as a temporary add-on and reload it when `dist/` changes
+
+It does **not** rebuild on source changes — re-run `node scripts/build-extension.mjs` after editing `src/`.
 
 ### Linting
 
 ```bash
 npm run lint        # Run all linters
-npm run lint:js     # JavaScript/TypeScript only
+npm run lint:js     # ESLint over JavaScript and the TypeScript popup
 npm run lint:css    # CSS only
 npm run lint:html   # HTML only
 ```
 
 ### Testing
 
-PhoenixBox includes a comprehensive test suite using Vitest:
+Tests use Mocha and Chai:
 
 ```bash
-npm run test        # Run all tests
-npm run test:unit   # Run unit tests only
-npm run coverage    # Generate test coverage report
+npm test            # Type-check, all linters, then unit tests
+npm run test:unit   # Unit tests only
+npm run typecheck   # TypeScript only
 ```
 
-**Test Coverage**:
-- Proxy URL parsing and validation
-- Container color mapping and hex conversion
-- Burp Suite header integration
-- Error handling and edge cases
-
-Tests are located in the `test/` directory and use Vitest as the test runner.
+Tests live in `test/`. Background logic is covered through the pure helpers in `src/js/shared/`, and popup logic by importing `src/popup-ui/lib/*.ts` directly — Node 22.18+ strips TypeScript types natively, so `.test.mjs` files need no build step.
 
 ---
 
@@ -158,22 +153,22 @@ npm run test
 ```
 dist/
 ├── manifest.json
-├── background.html
-├── popup.html
-├── js/
+├── popup/              # React popup built by Vite
+├── js/                 # background page, content script, shared helpers
 ├── css/
 ├── img/
-└── _locales/
+├── fonts/
+├── _locales/
+└── *.html              # options, page-action, confirm and endpoint-results pages
 ```
 
 ### Creating Release Package
 
 ```bash
-# Build and package
-npm run build
+# Test, build and package
 npm run package
 
-# Output: phoenix_proxy-1.0.0.xpi in root directory
+# Output: phoenixbox-<version>.xpi in the repo root (unsigned; AMO signs it)
 ```
 
 ---
@@ -184,13 +179,13 @@ npm run package
 
 1. **Download the JAR**
    ```
-   Go to: https://github.com/avihayf/PhoenixBox/releases
-   Download: PhoenixBoxHighlighter.jar
+   Go to: https://github.com/avihayf/PhoenixBox-Highlighter/releases/latest
+   Download: PhoenixBoxHighlighter.jar (v2.0.0 or later)
    ```
 
 2. **Install in Burp Suite**
    - Open Burp Suite
-   - Go to **Extender** → **Extensions** → **Add**
+   - Go to **Extensions** → **Installed** → **Add**
    - Extension type: **Java**
    - Click "Select file..."
    - Choose `PhoenixBoxHighlighter.jar`
@@ -198,12 +193,13 @@ npm run package
 
 3. **Verify Installation**
    - Check Extensions list
-   - "PhoenixBox" should appear with checkmark
-   - Output window shows "PhoenixBox Loaded"
+   - "PhoenixBox Highlighter v2.0.0" should appear with checkmark
+   - Burp has a new **PhoenixBox** tab
 
-4. **Enable in Firefox**
-   - Click PhoenixBox icon in Firefox
-   - Toggle "Add container color header" to ON
+4. **Turn on the Highlighter and pair in Firefox**
+   - Select the **Burp Suite** proxy preset in PhoenixBox, then turn on the **Highlighter** tile
+   - Burp asks whether to pair PhoenixBox: click **Allow**. No copy-paste; it asks once per Firefox profile
+   - Every container with an open tab now gets its own Burp listener
 
 ### Requirements
 
@@ -244,10 +240,9 @@ See [BURP_SUITE_SETUP.md](BURP_SUITE_SETUP.md) for detailed setup.
 **Problem**: `npm run build` fails with errors
 
 **Solutions**:
-1. Ensure Node.js 18+ is installed: `node --version`
-2. Delete `node_modules` and `package-lock.json`, run `npm install` again
+1. Ensure Node.js 22.18 or later (below 25) is installed: `node --version`
+2. Delete `node_modules` and run `npm ci` — keep `package-lock.json`, it pins the tested dependency versions
 3. Check for errors in console output
-4. Ensure all dependencies installed: `npm install`
 
 ---
 
@@ -276,15 +271,15 @@ See [BURP_SUITE_SETUP.md](BURP_SUITE_SETUP.md) for detailed setup.
 
 ---
 
-### Headers Not Showing in Burp
+### Requests Not Highlighted in Burp
 
-**Problem**: X-MAC-Container-Color headers visible in Burp
+**Problem**: A container's requests aren't coloured in Burp
 
 **Solutions**:
-1. Ensure "Add container color header" is enabled in Firefox
-2. Verify PhoenixBoxHighlighter.jar is loaded in Burp
-3. Check Burp Output tab for extension errors
-4. Extension should strip headers - if you see them, extension may not be working
+1. The **Highlighter** tile must be on; its gear should say *Connected*. If not, pair again.
+2. Verify Phoenix Highlighter v2.0.0+ is loaded in Burp and its **PhoenixBox** tab lists the container
+3. Make sure the container's traffic goes through the Burp preset (and is promoted, if you promote containers)
+4. Open the container: **Burp Listener** shows any error, e.g. a pinned address in use
 
 ---
 

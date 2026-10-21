@@ -104,32 +104,81 @@ window.identityState = {
 
   },
 
-  _createTabObject(tab) {
-    return Object.assign({}, tab);
-  },
+  /** @type {Map<string, Promise>} cookieStoreId -> tail of that container's write queue */
+  _stateLocks: new Map(),
 
-  async getCookieStoreIDuuidMap() {
-    const containers = {};
-    const identities = await browser.contextualIdentities.query({});
-    for(const identity of identities) {
-      const containerInfo = await this.storageArea.get(identity.cookieStoreId);
-      containers[identity.cookieStoreId] = containerInfo.macAddonUUID;
-    }
-    return containers;
-  },
-
-  async storeHidden(cookieStoreId, windowId) {
-    const containerState = await this.storageArea.get(cookieStoreId);
-    const tabsByContainer = await browser.tabs.query({cookieStoreId, windowId});
-    tabsByContainer.forEach((tab) => {
-      const tabObject = PhoenixBoxReviewHelpers.sanitizeHiddenTab(tab);
-      if (!backgroundLogic.isPermissibleURL(tab.url)) {
-        return;
-      }
-      containerState.hiddenTabs.push(tabObject);
+  /**
+   * Read-modify-write one container's state with no other writer in between.
+   *
+   * Hide, un-hide, move-to-window and the isolation toggle all read the state,
+   * await other work, then write it back. Two of them overlapping meant the
+   * later write carried a stale copy — an un-hide finishing after a hide
+   * wrote `hiddenTabs: []` over the tabs the hide had just recorded, and
+   * those tabs were gone for good. Calls for the same container now queue.
+   *
+   * `mutate` receives the state (or null if the container no longer exists,
+   * in which case nothing is written) and may change it in place; its return
+   * value is passed through.
+   */
+  withContainerState(cookieStoreId, mutate) {
+    const previous = this._stateLocks.get(cookieStoreId) || Promise.resolve();
+    const current = previous.catch(() => {}).then(async () => {
+      const state = await this.storageArea.get(cookieStoreId);
+      if (!state) return mutate(null);
+      if (!Array.isArray(state.hiddenTabs)) state.hiddenTabs = [];
+      const result = await mutate(state);
+      await this.storageArea.set(cookieStoreId, state);
+      return result;
     });
+    this._stateLocks.set(cookieStoreId, current);
+    const release = () => {
+      if (this._stateLocks.get(cookieStoreId) === current) this._stateLocks.delete(cookieStoreId);
+    };
+    current.then(release, release).catch(() => {});
+    return current;
+  },
 
-    return this.storageArea.set(cookieStoreId, containerState);
+  /**
+   * Take a container's hidden-tab list and empty it, in one locked step.
+   *
+   * Whoever claims the list owns reopening those tabs, so two un-hides (or an
+   * un-hide and a move-to-window) can no longer both reopen them.
+   */
+  claimHiddenTabs(cookieStoreId) {
+    return this.withContainerState(cookieStoreId, (state) => {
+      if (!state) return [];
+      const claimed = state.hiddenTabs;
+      state.hiddenTabs = [];
+      return claimed;
+    });
+  },
+
+  /** Put back hidden tabs that could not be reopened, so they are not lost. */
+  returnHiddenTabs(cookieStoreId, tabs) {
+    if (!tabs || !tabs.length) return Promise.resolve();
+    return this.withContainerState(cookieStoreId, (state) => {
+      if (state) state.hiddenTabs.push(...tabs);
+    });
+  },
+
+  /**
+   * Record tabs so un-hide can bring them back.
+   *
+   * Takes the tabs explicitly rather than querying for them: the caller has
+   * already decided which ones it is going to close, and a second query here
+   * could see a different set, closing a tab that was never recorded.
+   *
+   * @param {string} cookieStoreId
+   * @param {object[]} tabs tabs the caller is about to close.
+   */
+  storeHidden(cookieStoreId, tabs) {
+    return this.withContainerState(cookieStoreId, (state) => {
+      if (!state) return false;
+      for (const tab of (tabs || [])) {
+        state.hiddenTabs.push(PhoenixBoxReviewHelpers.sanitizeHiddenTab(tab));
+      }
+      return state;
+    });
   },
 
   async updateUUID(cookieStoreId, uuid) {
@@ -146,27 +195,32 @@ window.identityState = {
     await this.storageArea.get(cookieStoreId);
   },
 
+  // Both lookups used to read the whole of storage.local — every container's
+  // hidden-tab list and every site assignment — to find one entry, and sync
+  // calls them once per container and per site on every run.
+
   async lookupMACaddonUUID(cookieStoreId) {
-    // This stays a lookup, because if the cookieStoreId doesn't 
+    // This stays a lookup, because if the cookieStoreId doesn't
     // exist, this.get() will create it, which is not what we want.
-    const cookieStoreIdKey = cookieStoreId.includes("firefox-container-") ? 
+    const cookieStoreIdKey = cookieStoreId.includes("firefox-container-") ?
       cookieStoreId : "firefox-container-" + cookieStoreId;
-    const macConfigs = await this.storageArea.area.get();
-    for(const configKey of Object.keys(macConfigs)) {
-      if (configKey === this.storageArea.getContainerStoreKey(cookieStoreIdKey)) {
-        return macConfigs[configKey].macAddonUUID;
-      }
-    }
-    return false;
+    const key = this.storageArea.getContainerStoreKey(cookieStoreIdKey);
+    const stored = await this.storageArea.area.get(key);
+    return stored[key] ? stored[key].macAddonUUID : false;
   },
 
+  // Only live containers are candidates: every caller acts on the result as
+  // a container that exists (removing it, or reassigning a site to it).
   async lookupCookieStoreId(macAddonUUID) {
-    const macConfigs = await this.storageArea.area.get();
-    for(const configKey of Object.keys(macConfigs)) {
-      if (configKey.includes("identitiesState@@_")) {
-        if(macConfigs[configKey].macAddonUUID === macAddonUUID) {
-          return String(configKey).replace(/^identitiesState@@_/, "");
-        }
+    const identities = await browser.contextualIdentities.query({});
+    const keys = identities.map((identity) =>
+      this.storageArea.getContainerStoreKey(identity.cookieStoreId));
+    if (!keys.length) return false;
+    const stored = await this.storageArea.area.get(keys);
+    for (const identity of identities) {
+      const state = stored[this.storageArea.getContainerStoreKey(identity.cookieStoreId)];
+      if (state && state.macAddonUUID === macAddonUUID) {
+        return identity.cookieStoreId;
       }
     }
     return false;

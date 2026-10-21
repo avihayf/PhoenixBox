@@ -2,14 +2,7 @@ import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { ContainerIcon } from '../ContainerIcon';
 import { getContainerColorHex } from '../../../lib/containerColors';
 
-type Container = {
-  cookieStoreId: string;
-  name: string;
-  color: string;
-  icon: string;
-  displayIcon: string;
-  tabCount: number;
-};
+import type { Container } from '../../../lib/types';
 
 interface ManageContainersViewProps {
   containers: Container[];

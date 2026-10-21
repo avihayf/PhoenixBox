@@ -4,10 +4,6 @@
 
 const DEFAULT_TAB = "about:newtab";
 
-const FIREFOX_DEFAULT_ICONS = new Set([
-  "fingerprint", "briefcase", "dollar", "cart", "circle",
-  "gift", "vacation", "food", "fruit", "pet", "tree", "chill"
-]);
 
 const backgroundLogic = {
   NEW_TAB_PAGES: new Set([
@@ -17,7 +13,6 @@ const backgroundLogic = {
     "about:blank"
   ]),
   NUMBER_OF_KEYBOARD_SHORTCUTS: 10,
-  unhideQueue: [],
   init() {
 
     browser.commands.onCommand.addListener(function (command) {
@@ -85,103 +80,40 @@ const backgroundLogic = {
   },
 
   /**
-   * Single idempotent pass that normalizes all container identities.
+   * Normalize container identities; the single owner of profile defaults.
    *
-   * Combines what was previously four separate passes:
-   * 1. One-time migration of default names (Personal→Attacker, etc.)
-   * 2. Enforcement of security-profile names on default container IDs 1-4
-   * 3. Icon normalization (custom icons → fingerprint for Firefox URL bar)
-   * 4. Preservation of custom icons in storage overrides for the popup UI
-   *
-   * Queries contextualIdentities once and computes all needed updates in a
-   * single loop to avoid redundant API calls.
+   * The decisions live in PhoenixBoxReviewHelpers.planProfileNormalization:
+   * security-profile names, colours and icons are applied once, by this
+   * migration, and afterwards the user's own choices stand. Custom icons are
+   * mapped to "fingerprint" for Firefox every time, kept as display overrides.
    */
   async _normalizeSecurityProfiles() {
     const MIGRATION_KEY = "securityDefaultContainerNamesMigrated";
-    const PREFIX = "firefox-container-";
-
-    const SECURITY_NAMES = {
-      1: "Attacker",
-      2: "Victim",
-      3: "Admin",
-      4: "Member",
-    };
-
-    const LEGACY_RENAME = {
-      "Personal": "Attacker",
-      "Work": "Victim",
-      "Banking": "Admin",
-      "Shopping": "Member",
-    };
-
     try {
       const stored = await browser.storage.local.get({
         [MIGRATION_KEY]: false,
         containerDisplayIconOverrides: {},
       });
-      const migrated = !!stored[MIGRATION_KEY];
-      const overrides =
-        stored.containerDisplayIconOverrides && typeof stored.containerDisplayIconOverrides === "object"
-          ? stored.containerDisplayIconOverrides
-          : {};
-
       const identities = await browser.contextualIdentities.query({});
-      let overridesChanged = false;
+      const plan = PhoenixBoxReviewHelpers.planProfileNormalization(
+        identities, stored.containerDisplayIconOverrides, !!stored[MIGRATION_KEY]
+      );
 
-      for (const identity of identities) {
-        if (!identity.cookieStoreId || !identity.cookieStoreId.startsWith(PREFIX)) continue;
-
-        const idNum = Number(identity.cookieStoreId.slice(PREFIX.length));
-        const isDefault = Number.isFinite(idNum) && idNum >= 1 && idNum <= 4;
-
-        let desiredName = null;
-        let desiredIcon = null;
-
-        if (isDefault) {
-          desiredName = SECURITY_NAMES[idNum];
-
-          if (!migrated && LEGACY_RENAME[identity.name]) {
-            desiredName = LEGACY_RENAME[identity.name];
-          }
-
-          desiredIcon = idNum === 1 ? "circle" : identity.icon;
-          if (desiredIcon && !FIREFOX_DEFAULT_ICONS.has(desiredIcon)) {
-            desiredIcon = "fingerprint";
-          }
-        } else {
-          if (!migrated && LEGACY_RENAME[identity.name]) {
-            desiredName = LEGACY_RENAME[identity.name];
-          }
-        }
-
-        const isCustomIcon = !FIREFOX_DEFAULT_ICONS.has(identity.icon);
-        const targetIcon = desiredIcon || (isCustomIcon ? "fingerprint" : identity.icon);
-
-        if (isCustomIcon && identity.icon && identity.icon !== "fingerprint" && !overrides[identity.cookieStoreId]) {
-          overrides[identity.cookieStoreId] = identity.icon;
-          overridesChanged = true;
-        }
-
-        const nameNeedsUpdate = desiredName && identity.name !== desiredName;
-        const iconNeedsUpdate = targetIcon && identity.icon !== targetIcon;
-
-        if (nameNeedsUpdate || iconNeedsUpdate) {
-          const patch = {};
-          if (nameNeedsUpdate) patch.name = desiredName;
-          if (iconNeedsUpdate) patch.icon = targetIcon;
-          try {
-            await browser.contextualIdentities.update(identity.cookieStoreId, patch);
-          } catch {
-            // ignore per-identity failures
-          }
-        }
-      }
-
+      // Overrides first, so the popup never shows a fingerprint where a
+      // security icon belongs while the identity updates are in flight.
       const storageUpdates = {};
-      if (!migrated) storageUpdates[MIGRATION_KEY] = true;
-      if (overridesChanged) storageUpdates.containerDisplayIconOverrides = overrides;
+      if (!stored[MIGRATION_KEY]) storageUpdates[MIGRATION_KEY] = true;
+      if (plan.overridesChanged) storageUpdates.containerDisplayIconOverrides = plan.overrides;
       if (Object.keys(storageUpdates).length) {
         await browser.storage.local.set(storageUpdates);
+      }
+
+      for (const { cookieStoreId, patch } of plan.updates) {
+        try {
+          await browser.contextualIdentities.update(cookieStoreId, patch);
+        } catch {
+          // ignore per-identity failures
+        }
       }
     } catch {
       // ignore failures (e.g. contextualIdentities unavailable)
@@ -256,23 +188,23 @@ const backgroundLogic = {
     }
   },
 
-  async getExtensionInfo() {
-    const manifestPath = browser.runtime.getURL("manifest.json");
-    const response = await fetch(manifestPath);
-    const extensionInfo = await response.json();
-    return extensionInfo;
-  },
-
   // Remove container data (cookies, localStorage and cache)
+  // Remove a container's site data. Cookies and localStorage are required;
+  // IndexedDB and service workers are cleared when this Firefox supports
+  // container-scoped removal for them. The HTTP cache is shared across
+  // containers and cannot be cleared per container.
   async deleteContainerDataOnly(userContextId) {
-    await browser.browsingData.removeCookies({
-      cookieStoreId: this.cookieStoreId(userContextId)
-    });
-
-    await browser.browsingData.removeLocalStorage({
-      cookieStoreId: this.cookieStoreId(userContextId)
-    });
-
+    const options = { cookieStoreId: this.cookieStoreId(userContextId) };
+    await browser.browsingData.removeCookies(options);
+    await browser.browsingData.removeLocalStorage(options);
+    for (const optional of ["removeIndexedDB", "removeServiceWorkers"]) {
+      if (typeof browser.browsingData[optional] !== "function") continue;
+      try {
+        await browser.browsingData[optional](options);
+      } catch (e) {
+        LOG.warn(`deleteContainerDataOnly: ${optional} not supported per container`, e);
+      }
+    }
     return {done: true, userContextId};
   },
 
@@ -294,20 +226,51 @@ const backgroundLogic = {
       await browser.contextualIdentities.remove(this.cookieStoreId(userContextId));
     }
 
-    assignManager.deleteContainer(userContextId);
-
-    // Now remove the identity->proxy association in proxifiedContainers also
-    proxifiedContainers.delete(this.cookieStoreId(userContextId));
+    const cookieStoreId = this.cookieStoreId(userContextId);
+    // Awaited so "done" means done: callers refresh their view straight after.
+    await assignManager.deleteContainer(userContextId);
+    await proxifiedContainers.delete(cookieStoreId);
+    await this._cleanupContainerSettings(cookieStoreId);
 
     return {done: true, userContextId};
   },
 
+  /**
+   * Drop every setting that still names a deleted container.
+   *
+   * The single owner of this cleanup: every deletion path — the popup, Firefox
+   * Settings, sync — ends in contextualIdentities.onRemoved, which lands here.
+   * Previously only the popup's quick-delete cleaned up the promoted-proxy
+   * list, and a stale entry there silently sends all traffic DIRECT.
+   */
+  async _cleanupContainerSettings(cookieStoreId) {
+    const shortcutKeys = [];
+    for (let i = 0; i < this.NUMBER_OF_KEYBOARD_SHORTCUTS; i++) {
+      shortcutKeys.push(`open_container_${i}`);
+    }
+    const stored = await browser.storage.local.get([
+      "promotedProxyContainerIds",
+      "containerUserAgents",
+      "containerDisplayIconOverrides",
+      ...shortcutKeys,
+    ]);
+    const patch = PhoenixBoxReviewHelpers.planContainerSettingsCleanup(stored, cookieStoreId);
+    if (!Object.keys(patch).length) return;
+
+    await browser.storage.local.set(patch);
+    for (const key of shortcutKeys) {
+      if (key in patch) identityState.keyboardShortcut[key] = patch[key];
+    }
+  },
+
   async createOrUpdateContainer(options) {
+    // The icon the user picked. Firefox gets the nearest icon it accepts; the
+    // real choice is kept as a display override below — in one place, so the
+    // popup no longer writes a second, different override after this one.
     const desiredIcon = options?.params?.icon;
-    const isCustomIcon = desiredIcon && !FIREFOX_DEFAULT_ICONS.has(desiredIcon);
     const params = {
       ...options.params,
-      icon: isCustomIcon ? "fingerprint" : desiredIcon,
+      icon: desiredIcon ? PhoenixBoxReviewHelpers.firefoxIconFor(desiredIcon) : desiredIcon,
     };
     let identity;
     if (options.userContextId !== "new") {
@@ -339,7 +302,9 @@ const backgroundLogic = {
   async openNewTab(options) {
     let url = options.url || undefined;
     const userContextId = ("userContextId" in options) ? options.userContextId : 0;
-    const active = ("nofocus" in options) ? options.nofocus : true;
+    // `active` defaults to true so a plain openNewTab() call focuses the tab.
+    // Un-hide passes active:false so restoring a container never steals focus.
+    const active = ("active" in options) ? !!options.active : true;
     const discarded = ("noload" in options) ? options.noload : false;
 
     const cookieStoreId = backgroundLogic.cookieStoreId(userContextId);
@@ -377,132 +342,93 @@ const backgroundLogic = {
 
   checkArgs(requiredArguments, options, methodName) {
     for (const argument of requiredArguments) {
-      if (!(argument in options)) {
+      // Reject null/undefined, not just a missing key. A null windowId used to
+      // pass this check and then reach tabs.query, where it matches nothing —
+      // so the action silently did nothing instead of failing loudly.
+      if (!(argument in options) || options[argument] === null || options[argument] === undefined) {
         throw new Error(`${methodName} must be called with ${argument} argument.`);
       }
     }
   },
 
-  async getTabs(options) {
-    const requiredArguments = ["cookieStoreId", "windowId"];
-    this.checkArgs(requiredArguments, options, "getTabs");
-    const { cookieStoreId, windowId } = options;
-
-    const list = [];
-    const tabs = await browser.tabs.query({
-      cookieStoreId,
-      windowId
-    });
-    tabs.forEach((tab) => {
-      list.push(identityState._createTabObject(tab));
-    });
-
-    const containerState = await identityState.storageArea.get(cookieStoreId) || { hiddenTabs: [] };
-    return list.concat(containerState.hiddenTabs || []);
-  },
-
-  async unhideContainer(cookieStoreId, alreadyShowingUrl) {
-    if (!this.unhideQueue.includes(cookieStoreId)) {
-      this.unhideQueue.push(cookieStoreId);
-      try {
-        await this.showTabs({
-          cookieStoreId,
-          alreadyShowingUrl
-        });
-      } finally {
-        // Always release the queue slot, even if showTabs throws, otherwise
-        // the container stays stuck and future un-hide attempts no-op.
-        this.unhideQueue.splice(this.unhideQueue.indexOf(cookieStoreId), 1);
-      }
-    }
+  // Concurrent un-hides are safe without a queue: showTabs claims the hidden
+  // list atomically, so a second caller finds it empty.
+  unhideContainer(cookieStoreId, alreadyShowingUrl) {
+    return this.showTabs({ cookieStoreId, alreadyShowingUrl });
   },
 
   // https://github.com/mozilla/multi-account-containers/issues/847
   async addRemoveSiteIsolation(cookieStoreId, remove = false) {
-    const containerState = await identityState.storageArea.get(cookieStoreId) || { hiddenTabs: [] };
     try {
-      if ("isIsolated" in containerState || remove) {
-        delete containerState.isIsolated;
-      } else {
-        containerState.isIsolated = "locked";
-      }
-      return await identityState.storageArea.set(cookieStoreId, containerState);
+      return await identityState.withContainerState(cookieStoreId, (state) => {
+        // Container may have been removed between lookup and update.
+        if (!state) return;
+        if ("isIsolated" in state || remove) {
+          delete state.isIsolated;
+        } else {
+          state.isIsolated = "locked";
+        }
+      });
     } catch {
-      // Container may have been removed between lookup and update.
+      // Same: nothing to toggle on a container that has gone.
     }
   },
 
+  /**
+   * Give a container its own window: gather its tabs — including hidden ones —
+   * into a freshly created window.
+   *
+   * Container-scoped like hideTabs, so a container whose tabs are spread over
+   * several windows ends up consolidated rather than partially moved.
+   */
   async moveTabsToWindow(options) {
-    const requiredArguments = ["cookieStoreId", "windowId"];
-    this.checkArgs(requiredArguments, options, "moveTabsToWindow");
-    const { cookieStoreId, windowId } = options;
+    this.checkArgs(["cookieStoreId"], options, "moveTabsToWindow");
+    const { cookieStoreId } = options;
 
-    const list = await browser.tabs.query({
-      cookieStoreId,
-      windowId
-    });
-
-    const containerState = await identityState.storageArea.get(cookieStoreId);
+    const list = await browser.tabs.query({ cookieStoreId });
+    // Claimed up front and atomically: this call now owns reopening them.
+    const hiddenTabs = await identityState.claimHiddenTabs(cookieStoreId);
 
     // Nothing to do
-    if (list.length === 0 &&
-        (containerState.hiddenTabs || []).length === 0) {
+    if (list.length === 0 && hiddenTabs.length === 0) {
       return;
     }
-    let newWindowObj;
-    let hiddenDefaultTabToClose;
+
+    const newWindowObj = await browser.windows.create();
+    const placeholderIds = (newWindowObj.tabs || []).map((tab) => tab.id);
+
     if (list.length) {
-      newWindowObj = await browser.windows.create();
-
-      // Pin the default tab in the new window so existing pinned tabs can be moved after it.
-      // From the docs (https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/tabs/move):
-      //   Note that you can't move pinned tabs to a position after any unpinned tabs in a window, or move any unpinned tabs to a position before any pinned tabs.
-      await browser.tabs.update(newWindowObj.tabs[0].id, { pinned: true });
-
-      browser.tabs.move(list.map((tab) => tab.id), {
+      // Pin the default tab so existing pinned tabs can be moved after it:
+      // pinned tabs cannot sit after unpinned ones, or unpinned before pinned.
+      if (placeholderIds.length) {
+        await browser.tabs.update(placeholderIds[0], { pinned: true });
+      }
+      await browser.tabs.move(list.map((tab) => tab.id), {
         windowId: newWindowObj.id,
         index: -1
       });
-    } else {
-      // As we get a blank tab here we will need to await the tabs creation
-      newWindowObj = await browser.windows.create({
-      });
-      hiddenDefaultTabToClose = true;
     }
 
-    const showHiddenPromises = [];
+    const results = await Promise.allSettled(hiddenTabs.map((object) =>
+      browser.tabs.create({
+        url: object.url || DEFAULT_TAB,
+        windowId: newWindowObj.id,
+        cookieStoreId
+      })
+    ));
+    // Any hidden tab that failed to reopen goes back on the list, not away.
+    const failed = hiddenTabs.filter((_, i) => results[i].status === "rejected");
+    await identityState.returnHiddenTabs(cookieStoreId, failed);
 
-    // Let's show the hidden tabs.
-    if (!this.unhideQueue.includes(cookieStoreId)) {
-      this.unhideQueue.push(cookieStoreId);
-      for (let object of (containerState.hiddenTabs || [])) { // eslint-disable-line prefer-const
-        showHiddenPromises.push(browser.tabs.create({
-          url: object.url || DEFAULT_TAB,
-          windowId: newWindowObj.id,
-          cookieStoreId
-        }));
-      }
+    // Close the window's own placeholder tab(s), and anything else an add-on
+    // may have opened in it that is not this container's.
+    const tabs = await browser.tabs.query({ windowId: newWindowObj.id });
+    const strays = tabs
+      .filter((tab) => placeholderIds.includes(tab.id) || tab.cookieStoreId !== cookieStoreId)
+      .map((tab) => tab.id);
+    if (strays.length && strays.length < tabs.length) {
+      await browser.tabs.remove(strays);
     }
-
-    if (hiddenDefaultTabToClose) {
-      // Lets wait for hidden tabs to show before closing the others
-      await Promise.all(showHiddenPromises);
-    }
-
-    containerState.hiddenTabs = [];
-
-    // Let's close all the normal tab in the new window. In theory it
-    // should be only the first tab, but maybe there are addons doing
-    // crazy stuff.
-    const tabs = await browser.tabs.query({windowId: newWindowObj.id});
-    for (let tab of tabs) { // eslint-disable-line prefer-const
-      if (tab.cookieStoreId !== cookieStoreId) {
-        browser.tabs.remove(tab.id);
-      }
-    }
-    const rv = await identityState.storageArea.set(cookieStoreId, containerState);
-    this.unhideQueue.splice(this.unhideQueue.indexOf(cookieStoreId), 1);
-    return rv;
   },
 
   async _closeTabs(userContextId, windowId = false) {
@@ -523,16 +449,22 @@ const backgroundLogic = {
     return browser.tabs.remove(tabIds);
   },
 
-  async queryIdentitiesState(windowId) {
+  /**
+   * Open/hidden tab state per container.
+   *
+   * Counted across every window, to match hideTabs: these numbers drive the
+   * popup's hide/show toggle, so a per-window count would offer "show" for a
+   * container whose tabs are merely in another window.
+   *
+   * @param {number} [windowId] accepted for backwards compatibility; unused.
+   */
+  async queryIdentitiesState(windowId) { // eslint-disable-line no-unused-vars
     const identities = await browser.contextualIdentities.query({});
     const identitiesOutput = {};
     const identitiesPromise = identities.map(async (identity) => {
       const { cookieStoreId } = identity;
       const containerState = await identityState.storageArea.get(cookieStoreId) || { hiddenTabs: [] };
-      const openTabs = await browser.tabs.query({
-        cookieStoreId,
-        windowId
-      });
+      const openTabs = await browser.tabs.query({ cookieStoreId });
       identitiesOutput[cookieStoreId] = {
         hasHiddenTabs: !!(containerState.hiddenTabs || []).length,
         hasOpenTabs: !!openTabs.length,
@@ -601,8 +533,14 @@ const backgroundLogic = {
       });
     }
 
-    // Let's sort the map.
-    const sortMap = new Map([...map.entries()].sort((a, b) => a[1].order > b[1].order));
+    // Let's sort the map. `order` can be a container id string or a stored
+    // ordering number, so compare numerically and fall back to a string
+    // compare for anything non-numeric.
+    const sortMap = new Map(
+      [...map.entries()].sort(
+        (a, b) => PhoenixBoxReviewHelpers.compareContainerOrder(a[1].order, b[1].order)
+      )
+    );
 
     // Let's move tabs.
     for (const { tabs } of sortMap.values()) {
@@ -630,15 +568,34 @@ const backgroundLogic = {
     }
   },
 
+  /**
+   * Hide a container: stash its tabs and close them, so the user is left with
+   * only the other containers' tabs on screen.
+   *
+   * Scoped to the container, not to a window. Hiding is a container-level
+   * action, so leaving that container's tabs open in a second window defeats
+   * the point. Note that un-hide restores them into the focused window, since
+   * the tabs API gives no way to reopen a tab in the window it came from.
+   */
   async hideTabs(options) {
-    const requiredArguments = ["cookieStoreId", "windowId"];
-    this.checkArgs(requiredArguments, options, "hideTabs");
-    const { cookieStoreId, windowId } = options;
+    this.checkArgs(["cookieStoreId"], options, "hideTabs");
+    const { cookieStoreId } = options;
 
-    const userContextId = backgroundLogic.getUserContextIdFromCookieStoreId(cookieStoreId);
+    // One query feeds both the stash and the close, so a tab opened midway
+    // through can't be closed without having been recorded.
+    const tabs = await browser.tabs.query({ cookieStoreId });
+    const { toStore, toClose } =
+      PhoenixBoxReviewHelpers.partitionTabsForHide(tabs, this.NEW_TAB_PAGES);
 
-    const containerState = await identityState.storeHidden(cookieStoreId, windowId);
-    await this._closeTabs(userContextId, windowId);
+    const containerState = await identityState.storeHidden(cookieStoreId, toStore);
+    // Nothing was recorded (the container vanished mid-way), so closing would
+    // lose the tabs rather than hide them.
+    if (!containerState) return containerState;
+
+    const tabIds = toClose.map((tab) => tab.id);
+    if (tabIds.length) {
+      await browser.tabs.remove(tabIds);
+    }
     return containerState;
   },
 
@@ -646,31 +603,29 @@ const backgroundLogic = {
     if (!("cookieStoreId" in options)) {
       return Promise.reject("showTabs must be called with cookieStoreId argument.");
     }
+    const { cookieStoreId } = options;
+    const userContextId = backgroundLogic.getUserContextIdFromCookieStoreId(cookieStoreId);
 
-    const userContextId = backgroundLogic.getUserContextIdFromCookieStoreId(options.cookieStoreId);
-    const promises = [];
+    // Claim first, open after: the state is never held while tabs are created,
+    // and a hide that lands meanwhile records its own tabs untouched.
+    const hiddenTabs = await identityState.claimHiddenTabs(cookieStoreId);
+    // The tab that triggered an automatic un-hide is already showing its URL.
+    const toOpen = hiddenTabs.filter((object) => object.url !== options.alreadyShowingUrl);
 
-    const containerState = await identityState.storageArea.get(options.cookieStoreId) || { hiddenTabs: [] };
-
-    for (let object of (containerState.hiddenTabs || [])) { // eslint-disable-line prefer-const
-      // do not show already opened url
-      const noload = !object.pinned;
-      if (object.url !== options.alreadyShowingUrl) {
-        promises.push(this.openNewTab({
-          userContextId: userContextId,
-          url: object.url,
-          title: object.title,
-          nofocus: options.nofocus || false,
-          noload: noload,
-          pinned: object.pinned,
-        }));
-      }
-    }
-
-    containerState.hiddenTabs = [];
-
-    await Promise.all(promises);
-    return identityState.storageArea.set(options.cookieStoreId, containerState);
+    const results = await Promise.allSettled(toOpen.map((object) =>
+      this.openNewTab({
+        userContextId,
+        url: object.url,
+        title: object.title,
+        active: false,
+        noload: !object.pinned,
+        pinned: object.pinned,
+      })
+    ));
+    // One failed create used to skip the state write entirely, so the next
+    // un-hide reopened every tab a second time. Keep only the failures.
+    const failed = toOpen.filter((_, i) => results[i].status === "rejected");
+    await identityState.returnHiddenTabs(cookieStoreId, failed);
   },
 
   cookieStoreId(userContextId) {
@@ -678,6 +633,5 @@ const backgroundLogic = {
     return `firefox-container-${userContextId}`;
   }
 };
-
 
 backgroundLogic.init();

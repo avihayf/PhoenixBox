@@ -1,14 +1,10 @@
+import { useEffect, useState } from 'react';
 import { ArrowLeft, Plus, Eye, ArrowLeftRight, Hourglass, Trash2, X } from 'lucide-react';
 import { ContainerIcon } from '../ContainerIcon';
 import { getContainerColorHex } from '../../../lib/containerColors';
-import type { ProxyPreset } from '../../../data/mockData';
+import type { ProxyPreset } from '../../../lib/proxyPresets';
 
-interface Tab {
-  id: number;
-  title: string;
-  url: string;
-  favicon?: string;
-}
+import type { Tab } from '../../../lib/types';
 
 interface ContainerDetailViewProps {
   containerName: string;
@@ -23,9 +19,22 @@ interface ContainerDetailViewProps {
   onHideContainer: () => void;
   onMoveToWindow: () => void;
   onManageSites: () => void;
-  onClearStorage: () => void;
+  /** Resolves true when the container's site data was cleared. */
+  onClearStorage: () => Promise<boolean>;
   onCloseTab: (tabId: number) => void;
   onSelectProxyPreset?: (preset: ProxyPreset | null) => void;
+  /**
+   * Burp listener, shown only while the Highlighter is on. `onSetPin`
+   * resolves to an error message, or null once the pin is saved.
+   */
+  burpListener?: {
+    address?: string;
+    /** Shown in place of the address while there is none, e.g. "opens with a tab". */
+    idleLabel: string;
+    pin?: string;
+    error?: string;
+    onSetPin: (pin: string | null) => Promise<string | null>;
+  };
 }
 
 export function ContainerDetailView({
@@ -44,8 +53,36 @@ export function ContainerDetailView({
   onClearStorage,
   onCloseTab,
   onSelectProxyPreset,
+  burpListener,
 }: ContainerDetailViewProps) {
   const colorHex = getContainerColorHex(containerColor);
+
+  // Clearing wipes the session this container exists to hold, with no undo,
+  // so it takes a second click; the first arms it for a few seconds.
+  const [clearState, setClearState] = useState<'idle' | 'armed' | 'busy' | 'done' | 'failed'>('idle');
+  useEffect(() => {
+    if (clearState !== 'armed' && clearState !== 'done' && clearState !== 'failed') return;
+    const timer = window.setTimeout(() => setClearState('idle'), clearState === 'armed' ? 4000 : 3000);
+    return () => window.clearTimeout(timer);
+  }, [clearState]);
+
+  const handleClearClick = async () => {
+    if (clearState === 'busy') return;
+    if (clearState !== 'armed') {
+      setClearState('armed');
+      return;
+    }
+    setClearState('busy');
+    setClearState((await onClearStorage().catch(() => false)) ? 'done' : 'failed');
+  };
+
+  const clearLabel = {
+    idle: 'Clear container storage',
+    armed: 'Click again to clear cookies & site data',
+    busy: 'Clearing…',
+    done: 'Container storage cleared',
+    failed: 'Could not clear storage',
+  }[clearState];
 
   const themed = {
     '--c-accent': colorHex,
@@ -55,7 +92,7 @@ export function ContainerDetailView({
   } as React.CSSProperties;
 
   return (
-    <div className="w-full h-auto max-h-[720px] flex flex-col bg-[var(--ext-bg)] border border-[var(--ext-border)] rounded-xl shadow-xl overflow-hidden" style={themed}>
+    <div className="w-full h-auto max-h-[600px] flex flex-col bg-[var(--ext-bg)] border border-[var(--ext-border)] rounded-xl shadow-xl overflow-hidden" style={themed}>
       {/* Header */}
       <div className="flex items-center gap-3 px-3 py-2 border-b border-[var(--ext-border)] z-20" style={{ background: `${colorHex}08` }}>
         <button
@@ -115,10 +152,11 @@ export function ContainerDetailView({
           <div className="h-px bg-[var(--ext-border)] mx-2 my-1.5" />
           <ActionButton
             icon={<Trash2 className="w-4 h-4 text-[var(--ext-red)]" />}
-            label="Clear container storage"
-            onClick={onClearStorage}
+            label={clearLabel}
+            onClick={() => void handleClearClick()}
             variant="danger"
           />
+          <p className="sr-only" role="status" aria-live="polite">{clearState === 'idle' ? '' : clearLabel}</p>
         </div>
 
         {/* Proxy Quick-Switch */}
@@ -150,6 +188,8 @@ export function ContainerDetailView({
           </div>
         )}
 
+        {burpListener && <BurpListenerPin {...burpListener} />}
+
         {/* Open Tabs Section */}
         <div className="p-2.5 border-t border-[var(--ext-border)] flex-1 flex flex-col min-h-0 space-y-1">
           <h2 className="text-xs uppercase tracking-wider mb-2.5 font-bold opacity-80 flex-shrink-0" style={{ color: colorHex }}>
@@ -175,7 +215,8 @@ export function ContainerDetailView({
                       e.stopPropagation();
                       onCloseTab(tab.id);
                     }}
-                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[var(--ext-red)]/10 text-[var(--ext-text-muted)] hover:text-[var(--ext-red)] rounded transition-colors"
+                    aria-label={`Close ${tab.title || tab.url}`}
+                    className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-1 hover:bg-[var(--ext-red)]/10 text-[var(--ext-text-muted)] hover:text-[var(--ext-red)] rounded transition-colors"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -245,5 +286,56 @@ function ActionButton({ icon, label, onClick, variant = 'default', accentColor, 
       </span>
       <span className="text-sm font-medium leading-none flex-1">{label}</span>
     </button>
+  );
+}
+
+/**
+ * Which Burp listener the container uses while the Highlighter is on, and an optional pin to a
+ * specific IP:port, e.g. a listener built in Burp with special settings, which
+ * the Highlighter then uses as-is.
+ */
+function BurpListenerPin({ address, idleLabel, pin, error, onSetPin }: NonNullable<ContainerDetailViewProps['burpListener']>) {
+  const [draft, setDraft] = useState(pin || '');
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => { setDraft(pin || ''); }, [pin]);
+
+  const save = async (value: string | null) => {
+    setSaveError(await onSetPin(value));
+  };
+
+  return (
+    <div className="px-2.5 pb-2.5 flex-shrink-0">
+      <div className="p-2 rounded-lg border border-[var(--ext-border)] bg-[var(--ext-bg-secondary)] space-y-1.5">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-[var(--ext-text-muted)] uppercase tracking-wider flex-shrink-0">Burp Listener</span>
+          <span className="flex-1 min-w-0 text-xs font-mono truncate text-right" style={{ color: error ? 'var(--ext-red)' : 'var(--ext-text)' }}>
+            {error ? 'not listening' : address || idleLabel}
+          </span>
+        </div>
+        <div className="flex gap-1.5">
+          <input
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') void save(draft.trim() || null); }}
+            placeholder="Automatic · or pin ip:port"
+            aria-label="Pin this container to a Burp listener address"
+            spellCheck={false}
+            className="flex-1 min-w-0 px-2 py-1 text-xs font-mono bg-[var(--ext-bg)] border border-[var(--ext-border)] rounded text-[var(--ext-text)] focus:outline-none focus:border-[var(--ext-accent)]"
+          />
+          <button
+            type="button"
+            onClick={() => void save(draft.trim() || null)}
+            className="px-2 py-1 text-xs border border-[var(--ext-border)] rounded text-[var(--ext-text)] hover:border-[var(--ext-accent)] transition-colors"
+          >
+            {draft.trim() ? 'Pin' : 'Auto'}
+          </button>
+        </div>
+        {(saveError || error) && (
+          <p className="text-[10px] text-[var(--ext-red)] leading-snug">{saveError || error}</p>
+        )}
+      </div>
+    </div>
   );
 }

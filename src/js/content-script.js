@@ -10,40 +10,83 @@ async function delayAnimation(delay = 350) {
 
 async function doAnimation(element, property, value) {
   return new Promise((resolve) => {
-    const handler = () => {
+    // transitionend never fires in a background tab (no animation frames) or
+    // when transitions are disabled, which left the toast stuck; don't wait
+    // on it for longer than the transition itself takes.
+    const timer = setTimeout(done, 1000);
+    function done() {
+      clearTimeout(timer);
+      element.removeEventListener("transitionend", done);
       resolve();
-      element.removeEventListener("transitionend", handler);
-    };
-    element.addEventListener("transitionend", handler);
+    }
+    element.addEventListener("transitionend", done);
     window.requestAnimationFrame(() => {
       element.style[property] = value;
     });
   });
 }
 
+// The toast is built inside a closed shadow root and styled through CSSOM
+// rather than a stylesheet. content.css used to be injected into every page,
+// so any site could detect PhoenixBox by probing that class's computed style;
+// and a page's style-src CSP can block an injected <style>, while element.style
+// set from script is not affected.
+function styled(element, styles) {
+  Object.assign(element.style, styles);
+  return element;
+}
+
 async function addMessage(message) {
-  const divElement = document.createElement("div");
-  divElement.classList.add("container-notification");
-  // Ideally we would use https://bugzilla.mozilla.org/show_bug.cgi?id=1340930 when this is available
-  divElement.innerText = message.text;
+  const host = document.createElement("div");
+  const shadow = host.attachShadow({ mode: "closed" });
 
-  const imageElement = document.createElement("img");
-  const imagePath = browser.runtime.getURL("/img/PhoenixLogo.png");
-  const response = await fetch(imagePath);
-  const blob = await response.blob();
-  const objectUrl = URL.createObjectURL(blob);
-  imageElement.src = objectUrl;
-  imageElement.width = imageElement.height = 24;
-  divElement.prepend(imageElement);
+  const toast = styled(document.createElement("div"), {
+    alignItems: "center",
+    background: "#efefef",
+    boxSizing: "border-box",
+    color: "#003f07",
+    display: "flex",
+    font: "12px sans-serif",
+    gap: "6px",
+    insetBlockStart: "0",
+    insetInlineStart: "0",
+    inlineSize: "100vw",
+    padding: "8px",
+    position: "fixed",
+    transform: "translateY(-100%)",
+    transition: "transform 0.3s cubic-bezier(0.07, 0.95, 0, 1) 0.3s",
+    zIndex: "2147483647",
+  });
+  toast.setAttribute("role", "status");
 
-  document.body.appendChild(divElement);
+  const text = document.createElement("span");
+  text.textContent = message.text;
 
-  await delayAnimation(100);
-  await doAnimation(divElement, "transform", "translateY(0)");
-  await delayAnimation(3000);
-  await doAnimation(divElement, "transform", "translateY(-100%)");
+  // Loaded as a blob so the page never sees the extension's internal URL.
+  const image = styled(document.createElement("img"), { blockSize: "16px", inlineSize: "16px" });
+  image.alt = "";
+  let objectUrl = null;
+  try {
+    const response = await fetch(browser.runtime.getURL("/img/icon-48.png"));
+    objectUrl = URL.createObjectURL(await response.blob());
+    image.src = objectUrl;
+    toast.append(image);
+  } catch {
+    // The text alone is fine.
+  }
+  toast.append(text);
+  shadow.append(toast);
+  document.documentElement.appendChild(host);
 
-  divElement.remove();
+  try {
+    await delayAnimation(100);
+    await doAnimation(toast, "transform", "translateY(0)");
+    await delayAnimation(3000);
+    await doAnimation(toast, "transform", "translateY(-100%)");
+  } finally {
+    host.remove();
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+  }
 }
 
 browser.runtime.onMessage.addListener((message, sender) => {

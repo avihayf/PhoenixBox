@@ -21,6 +21,13 @@ proxifiedContainers = {
         delete item.proxy.passwordEnc;
         changed = true;
       }
+      // Presets used to be saved flagged as Mozilla VPN proxies. A real VPN
+      // entry always carries a countryCode; a preset never does.
+      if (item && item.proxy && item.proxy.source === "preset" &&
+          item.proxy.mozProxyEnabled === true && !item.proxy.countryCode) {
+        item.proxy.mozProxyEnabled = false;
+        changed = true;
+      }
     }
     if (changed) {
       await browser.storage.local.set({ proxifiedContainersKey: list });
@@ -81,9 +88,10 @@ proxifiedContainers = {
   },
 
   async set(cookieStoreId, proxy) {
-    // Assumes proxy is a properly formatted object
-    let proxifiedContainersStore = await proxifiedContainers.retrieveAll();
-    if (!proxifiedContainersStore) proxifiedContainersStore = [];
+    // Build the write from the raw stored list, never retrieveAll(): that
+    // merges in-memory session passwords, and writing it back would persist
+    // them.
+    const proxifiedContainersStore = [...(await this._ensureCache())];
 
     // Security hardening:
     // Do not persist proxy passwords to storage. Keep them in memory for the
@@ -117,43 +125,29 @@ proxifiedContainers = {
     this._cache = proxifiedContainersStore;
   },
 
-  parseProxy(proxy_str, mozillaVpnData = null) {
-    const proxyRegexp = /(?<type>https?|socks4?):\/\/(?:(?<username>[^:@/]+):(?<password>[^@/]+)@)?(?<host>(?:\d{1,3}\.){3}\d{1,3}|[\w][\w.-]*)(?::(?<port>\d+))?/;
-    const matches = proxyRegexp.exec(proxy_str);
-    if (!matches) {
-      return false;
-    }
-
-    if (mozillaVpnData && mozillaVpnData.mozProxyEnabled === undefined) {
-      matches.groups.type = null;
-    }
-
-    if (!mozillaVpnData) {
-      mozillaVpnData = MozillaVPN.getMozillaProxyInfoObj();
-    }
-
-    return {...matches.groups,...mozillaVpnData};
-  },
-
   // Deletes the proxy information object for a specified cookieStoreId [useful for cleaning]
   async delete(cookieStoreId) {
-    // Assumes proxy is a properly formatted object
-    const proxifiedContainersStore = await proxifiedContainers.retrieveAll();
-    if (!proxifiedContainersStore) {
-      await browser.storage.local.set({ proxifiedContainersKey: [] });
-      this._cache = [];
-      return;
-    }
+    // From the raw stored list, for the same reason as set(): retrieveAll()
+    // carries session passwords that must never be written back.
+    const proxifiedContainersStore = [...(await this._ensureCache())];
     const index = proxifiedContainersStore.findIndex(i => i.cookieStoreId === cookieStoreId);
-    if (index !== -1) {
-      proxifiedContainersStore.splice(index, 1);
-    }
+    delete this._sessionProxyPasswords[cookieStoreId];
+    if (index === -1) return;
+    proxifiedContainersStore.splice(index, 1);
     await browser.storage.local.set({
       proxifiedContainersKey: proxifiedContainersStore
     });
 
     // Keep cache consistent immediately (storage event is async).
     this._cache = proxifiedContainersStore;
-    delete this._sessionProxyPasswords[cookieStoreId];
+  },
+
+  /**
+   * Synchronous answer to "is any container proxy configured?", or null while
+   * the list has not been loaded yet. Lets the per-request proxy handler skip
+   * all work when there is nothing to route.
+   */
+  hasAnyCached() {
+    return Array.isArray(this._cache) ? this._cache.length > 0 : null;
   }
 };
